@@ -1,18 +1,25 @@
 <div align="center">
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/FU_DEVER_Logo_White_Layers_Red_Accent.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/logodever-01.png">
+  <img alt="CLB FU-DEVER Logo" src="docs/assets/logodever-01.png" width="260">
+</picture>
+
 # ⚔️ DEVER Arena (DEVER-Forces)
 
 **Nền tảng thi đấu lập trình giải thuật trực tuyến chuẩn Codeforces & ICPC của CLB FU-DEVER — Trường Đại học FPT Đà Nẵng**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![React](https://img.shields.io/badge/React-19.2%20(18%20LTS)-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8.2-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4.3-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Tests](https://img.shields.io/badge/Tests-98%2F98%20Passed%20(100%25)-success?logo=checkmarx&logoColor=white)](tests/)
-[![WCAG AA](https://img.shields.io/badge/Accessibility-WCAG%20AA-blueviolet)](PRODUCT.md)
+[![Website](https://img.shields.io/badge/Website-fudever.com-FF6600?logo=google-chrome&logoColor=white)](https://fu-dever-landingpage-v2.vercel.app/)
+[![GitHub Org](https://img.shields.io/badge/GitHub-fudever--club-181717?logo=github&logoColor=white)](https://github.com/fudever-club)
 
-[Tính Năng Nổi Bật](#tinh-nang-noi-bat) • [Kiến Trúc Hệ Thống](#kien-truc-he-thong) • [Vòng Đời Contest](#vong-doi-contest) • [Sổ Bộ ADR](#so-bo-adr) • [Cài Đặt & Khởi Chạy](#cai-dat-khoi-chay) • [Kiểm Thử](#kiem-thu-chat-luong) • [Cấu Trúc Thư Mục](#cau-truc-thu-muc) • [Ban Phát Triển](#ban-phat-trien)
+[Tổng Quan](#gioi-thieu-tong-quan) • [Tính Năng Nổi Bật](#tinh-nang-noi-bat) • [Kiến Trúc Hệ Thống](#kien-truc-he-thong) • [Vòng Đời Contest](#vong-doi-contest) • [Sổ Bộ ADR](#so-bo-adr) • [Cài Đặt & Khởi Chạy](#cai-dat-khoi-chay) • [Kiểm Thử](#kiem-thu-chat-luong) • [Cấu Trúc Thư Mục](#cau-truc-thu-muc) • [Ban Phát Triển](#ban-phat-trien)
 
 ---
 
@@ -24,8 +31,8 @@
 **DEVER Arena** (mật danh: *DEVER-Forces*) là nền tảng thi đấu thuật toán và luyện tập Competitive Programming chuyên sâu được nghiên cứu và phát triển bởi **CLB Lập trình FU-DEVER (Trường Đại học FPT Đà Nẵng)**.
 
 Hệ thống được thiết kế nhằm mục đích:
-1. **Mô phỏng 100% chân thực vòng đời kỳ thi Codeforces**: Phân phòng (Hack Room 25 người), chấm sơ bộ (Pretests), vòng phản biện đối thủ (Instant Hacking Phase) và kiểm thử hệ thống ngầm (System Testing).
-2. **Liêm chính học thuật tuyệt đối**: Trang bị engine AST Winnowing phát hiện đạo văn mã nguồn tự động, triệt tiêu việc ngụy trang bằng cách đổi tên biến hay xóa chú thích, đồng thời cam kết **Zero-AI Client** (loại bỏ hoàn toàn AI sinh code trong các round Rated).
+1. **Mô phỏng 100% chân thực vòng đời kỳ thi Codeforces**: Phân phòng (Hack Room 25 người theo rank), chấm sơ bộ (Pretests), vòng phản biện đối thủ (Instant Hacking Phase) và kiểm thử hệ thống ngầm (System Testing).
+2. **Liêm chính học thuật tuyệt đối**: Trang bị engine AST Winnowing phát hiện đạo văn mã nguồn tự động, triệt tiêu việc ngụy trang bằng cách đổi tên biến hay xóa chú thích, đồng thời cam kết **Zero-AI Client** (ADR-003, loại bỏ hoàn toàn AI sinh code trong các round Rated).
 3. **Sư phạm qua phản biện**: Tính năng Hack Room 25 người tạo cơ hội để sinh viên đọc hiểu mã nguồn của bạn học, phát hiện các trường hợp biên (edge cases), tràn số (`integer overflow`) hay độ phức tạp thuật toán vượt ngưỡng (`TLE`).
 4. **Vinh danh tập thể (Clan Wars)**: Hệ thống xếp hạng bang hội House of Buggy (K18, K19, K20, K21...) theo thuật toán Harmonic Mean Top-5.
 
@@ -42,11 +49,11 @@ Hệ thống được thiết kế nhằm mục đích:
 * **System Testing Tự Động**: Chạy toàn bộ 45+ bộ test ngầm bí mật để xác định kết quả chung cuộc, lật ngược tình thế trước khi cập nhật điểm xếp hạng Elo.
 * **ICPC Scoreboard Freeze & Dramatic Reveal**: Đóng băng bảng điểm ở 60 phút cuối trận và công cụ mô phỏng giải băng kịch tính từng bài thi.
 
-### 2. 🛡️ AST Winnowing Anti-Cheat Sentinel
-* **AST Tokenizer**: Phân tích cú pháp trừu tượng, loại bỏ bình luận, khoảng trắng, chuẩn hóa tên biến/hàm về token định danh đồng nhất.
+### 2. 🛡️ AST Winnowing Anti-Cheat Sentinel (ADR-004)
+* **AST Tokenizer**: Phân tích cú pháp trừu tượng, loại bỏ bình luận, khoảng trắng, chuẩn hóa tên biến/hàm về token định danh đồng nhất `ID`.
 * **Winnowing Fingerprinting Algorithm**: Tạo dấu vân tay mã nguồn k-gram/3-gram với chi phí bộ nhớ tối ưu.
 * **Jaccard Distance Matrix**: Đối soát chéo toàn bộ lời giải trong cùng contest; tự động gắn cờ cảnh báo giám khảo khi độ tương đồng vượt ngưỡng 85%.
-* **Zero-AI Client Contract**: Loại bỏ các extension/plugin AI can thiệp để bảo đảm sân chơi công bằng cho các đội tuyển ICPC/Olympic.
+* **Zero-AI Client Contract**: Cam kết không tích hợp AI sinh code tự động vào workspace trong các contest Rated để bảo vệ liêm chính học thuật Olympic/ICPC.
 
 ### 3. 🧪 DEVER Polygon Problemsetter Studio
 * **Testlib Input Validator**: Kiểm tra định dạng testcase cực kỳ nghiêm ngặt (kiểm tra newline cuối file, cấm trailing whitespace, kiểm soát biên $N$ và từng phần tử).
@@ -54,6 +61,7 @@ Hệ thống được thiết kế nhằm mục đích:
   - *Token Matcher*: So khớp từ vựng bỏ qua khoảng trắng/xuống dòng.
   - *Float Tolerance*: So khớp số thực với sai số $\epsilon = 10^{-6}$ hoặc $10^{-9}$.
   - *Multiple Solutions Verifier*: Trình chấm tùy biến cho bài toán có nhiều nghiệm hợp lệ.
+* **KaTeX Math Typography**: Hiển thị công thức toán học LaTeX sắc nét trong đề bài và bộ test ví dụ.
 
 ### 4. 🕹️ Virtual Contest Simulator (Ghost Replay)
 * Tái hiện lại bất kỳ contest đã diễn ra trong quá khứ.
@@ -195,7 +203,7 @@ npm run test:watch
 npm run test:e2e
 
 # Quét kiểm tra kiến trúc bất biến (Linter)
-node detect.mjs
+npm run lint
 ```
 
 ### Kết quả kiểm thử tự động mẫu:
@@ -226,8 +234,9 @@ dever-arena/
 │       ├── dever-anti-cheat-sentinel/
 │       ├── dever-arena-orchestrator/
 │       └── polygon-problemsetter/
-├── docs/                       # Tài liệu thiết kế & đặc tả hệ thống
-│   ├── decisions/              # Bộ lưu trữ ADR (ADR-001 -> ADR-004)
+├── docs/                       # Tài liệu thiết kế, assets & đặc tả hệ thống
+│   ├── assets/                 # Logo nhận diện thương hiệu (Light & Dark mode)
+│   ├── decisions/              # Sổ bộ ADR (ADR-001 -> ADR-004)
 │   ├── ANTI_CHEAT_POLICY.md    # Quy chuẩn chống gian lận & liêm chính
 │   ├── CONTEST_RULEBOOK.md     # Luật thi đấu, thang điểm & hack room
 │   ├── DATABASE_SCHEMA.md      # Thiết kế cơ sở dữ liệu IndexedDB & SQL
