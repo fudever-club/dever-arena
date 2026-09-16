@@ -372,7 +372,7 @@ DEVER Arena/
 1. **Giai đoạn 1 (Đã Hoàn Thành):**
    - Phỏng vấn định hướng (/grill-me) xác lập ý định người dùng.
    - Họp Hội đồng Multi-Agent (5 chuyên gia) phân tích toàn diện 4 luồng người dùng và lỗ hổng bất đồng bộ.
-   - Khảo sát chuẩn LeetCode và ban hành tài liệu thiết kế kiến trúc chuẩn mực [`docs/design.md`](file:///c:/Users/ADMIN/DEVER%20Arena/docs/design.md).
+   - Khảo sát chuẩn LeetCode và ban hành tài liệu thiết kế kiến trúc chuẩn mực [`docs/design.md`](./design.md).
 
 2. **Giai đoạn 2 (Đã Hoàn Thành):**
    - Khởi tạo môi trường Vite + React, tích hợp Tailwind CSS v4 và Lucide Icons.

@@ -12,7 +12,7 @@ Các hệ thống thi đấu lập trình thuật toán (Competitive Programming
 
 ## Quyết Định (Decision)
 1. **Kiến Trúc Hàm Thuần (Pure Functions Architecture)**:
-   Toàn bộ logic tính toán cốt lõi trong thư mục `src/core/` ([scoring.js](file:///c:/Users/ADMIN/DEVER%20Arena/src/core/scoring.js), [rating.js](file:///c:/Users/ADMIN/DEVER%20Arena/src/core/rating.js), [contestStateMachine.js](file:///c:/Users/ADMIN/DEVER%20Arena/src/core/contestStateMachine.js), [virtualContest.js](file:///c:/Users/ADMIN/DEVER%20Arena/src/core/virtualContest.js), [clanRating.js](file:///c:/Users/ADMIN/DEVER%20Arena/src/core/clanRating.js), [scoreboardFreeze.js](file:///c:/Users/ADMIN/DEVER%20Arena/src/core/scoreboardFreeze.js)) được thiết kế theo chuẩn:
+   Toàn bộ logic tính toán cốt lõi trong thư mục `src/core/` ([`scoring.js`](../../src/core/scoring.js), [`rating.js`](../../src/core/rating.js), [`contestStateMachine.js`](../../src/core/contestStateMachine.js), [`virtualContest.js`](../../src/core/virtualContest.js), [`clanRating.js`](../../src/core/clanRating.js), [`scoreboardFreeze.js`](../../src/core/scoreboardFreeze.js)) được thiết kế theo chuẩn:
    - **Zero DOM Dependency**: Không tham chiếu tới `window`, `document`, `HTMLElement`.
    - **Deterministic Output**: Cùng dữ liệu đầu vào luôn sinh ra kết quả đầu ra giống nhau 100%.
    - **Độc lập nền tảng**: Có thể import và chạy trực tiếp cả trong môi trường Node.js (test runner, CLI) lẫn trình duyệt web (ES Modules).

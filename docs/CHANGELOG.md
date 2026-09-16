@@ -199,7 +199,7 @@
 - `tests/testlib.test.js`: 9 tests PASS 100%.
 
 ### 4. Đồng bộ 14 tài liệu đặc tả & hệ thống kiểm định
-- Cập nhật [DATABASE_SCHEMA.md](file:///c:/Users/ADMIN/DEVER%20Arena/docs/DATABASE_SCHEMA.md), [API_SPECIFICATION.md](file:///c:/Users/ADMIN/DEVER%20Arena/docs/API_SPECIFICATION.md), [SPEC.md](file:///c:/Users/ADMIN/DEVER%20Arena/docs/SPEC.md), [CAPABILITY_MAP.md](file:///c:/Users/ADMIN/DEVER%20Arena/docs/CAPABILITY_MAP.md), [PRODUCT.md](file:///c:/Users/ADMIN/DEVER%20Arena/PRODUCT.md), [tasks/plan.md](file:///c:/Users/ADMIN/DEVER%20Arena/tasks/plan.md), [tasks/todo.md](file:///c:/Users/ADMIN/DEVER%20Arena/tasks/todo.md).
+- Cập nhật [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md), [API_SPECIFICATION.md](./API_SPECIFICATION.md), [SPEC.md](./SPEC.md), [CAPABILITY_MAP.md](./CAPABILITY_MAP.md), [PRODUCT.md](../PRODUCT.md), [tasks/plan.md](../tasks/plan.md), [tasks/todo.md](../tasks/todo.md).
 - Nâng tổng số kiểm thử nền tảng lên **98/98 tests PASS 100%** qua 25 test suites.
 
 ---
@@ -208,23 +208,23 @@
 
 **Mục tiêu:** Nâng cấp trải nghiệm người dùng theo tiêu chuẩn Cyber Dark eSports, kiểm định tự động 100% bằng Playwright E2E, Chrome DevTools Protocol và xây dựng sổ bộ quyết định kiến trúc ADRs.
 
-### 1. Nâng cấp UI/UX eSports ([css/style.css](file:///c:/Users/ADMIN/DEVER%20Arena/css/style.css))
+### 1. Nâng cấp UI/UX eSports ([css/style.css](../css/style.css))
 - **Glassmorphism & Depth**: Áp dụng `backdrop-filter: blur(14px)`, viền phát sáng cam quang học `rgba(255,102,0,0.18)` và bóng đổ kép `box-shadow: 0 8px 24px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.25)` kết hợp `will-change: transform` trên toàn bộ thẻ card.
 - **eSports Digital Timer HUD**: Đồng hồ neon font JetBrains Mono, dải tiến độ 135 phút và pulsing phase indicators.
 - **Console Dots**: Bổ sung thanh tiêu đề terminal với 3 chấm Unix/macOS (🔴 🟡 🟢).
 - **Huy chương vinh danh**: Tích hợp 🥇 Vàng, 🥈 Bạc, 🥉 Đồng cho Top 3 bảng điểm Standings.
 
-### 2. Bộ kiểm định Playwright E2E ([tests/e2e_playwright.mjs](file:///c:/Users/ADMIN/DEVER%20Arena/tests/e2e_playwright.mjs))
+### 2. Bộ kiểm định Playwright E2E ([tests/e2e_playwright.mjs](../tests/e2e_playwright.mjs))
 - Tích hợp trình duyệt thực tế Microsoft Edge / Chromium headless.
 - 47/47 assertions tự động kiểm thử toàn bộ 3 trang (`index.html`, `arena.html`, `admin.html`), responsive hamburger, code editor runner, AST anti-cheat scan, Polygon CMS live preview.
 - Đạt tỷ lệ thành công tuyệt đối: **100.0% PASS**.
 
-### 3. Kiểm định Chrome DevTools Protocol & Clean Console ([tests/devtools_audit.mjs](file:///c:/Users/ADMIN/DEVER%20Arena/tests/devtools_audit.mjs))
+### 3. Kiểm định Chrome DevTools Protocol & Clean Console ([tests/devtools_audit.mjs](../tests/devtools_audit.mjs))
 - Khai thác trực tiếp giao thức CDP (`Performance.enable`, `Accessibility.enable`).
 - Đo lường FCP < 360ms, DOM Content Loaded < 315ms, JS Heap < 1.85MB.
 - Phát hiện và vá lỗi 404 `/favicon.ico`, đưa toàn bộ 3 trang về chuẩn **Clean Console Standard (0 errors, 0 warnings)**.
 
-### 4. Sổ bộ quyết định kiến trúc ([docs/decisions/](file:///c:/Users/ADMIN/DEVER%20Arena/docs/decisions/))
+### 4. Sổ bộ quyết định kiến trúc ([docs/decisions/](./decisions/))
 - Thiết lập hệ thống ADRs theo chuẩn `documentation-and-adrs`:
   - **ADR-001**: Kiến trúc 3 trang HTML độc lập.
   - **ADR-002**: Cơ chế thực thi Isolate Sandbox & Fail-Fast.
@@ -237,30 +237,30 @@
 
 **Mục tiêu:** Nâng cấp toàn diện kiến trúc React 18 + Vite + Tailwind CSS v4 SPA, phân tách rạch ròi Member Portal và Admin Command Center, tích hợp Monaco Editor chuẩn LeetCode, công thái học Resizable Splitters, KaTeX Math Typography, Polygon Studio cho Admin, và loại bỏ hoàn toàn module 9Router tuân thủ tuyệt đối ADR-003.
 
-### 1. Kiến trúc React 18 + Vite + Tailwind CSS v4 SPA ([app.html](file:///c:/Users/ADMIN/DEVER%20Arena/app.html), [src/App.jsx](file:///c:/Users/ADMIN/DEVER%20Arena/src/App.jsx))
+### 1. Kiến trúc React 18 + Vite + Tailwind CSS v4 SPA ([app.html](../app.html), [src/App.jsx](../src/App.jsx))
 - Tách biệt 2 layout độc lập: `MemberLayout` (dành cho thí sinh với Navbar tối giản, đồng hồ HUD, tabs tiện ích) và `AdminLayout` (dành cho BTC với Sidebar 5 module: Phase Orchestrator, AST Radar, Polygon Studio, Telemetry, Hack Rooms).
 - Hệ thống Route chuẩn: `/` (Landing), `/problems` (Problemset), `/workspace/:id` (LeetCode Workspace), `/standings` (ICPC Unfreeze), `/hacks` (Hack Room), `/clans` (Clan Wars), `/login` (Auth 1-Click), `/admin` (Command Center).
 - Đồng bộ đa tab thời gian thực qua `BroadcastChannel('dever_arena_bus')`.
 
-### 2. Không gian làm bài LeetCode 3 phân vùng & Công thái học ([src/pages/ProblemWorkspace.jsx](file:///c:/Users/ADMIN/DEVER%20Arena/src/pages/ProblemWorkspace.jsx))
+### 2. Không gian làm bài LeetCode 3 phân vùng & Công thái học ([src/pages/ProblemWorkspace.jsx](../src/pages/ProblemWorkspace.jsx))
 - **Monaco Editor Pro:** C++20 / Python 3 / Java 17 / JavaScript, themes Cyber Dark / Monokai, auto-save `localStorage` chống mất code khi reload.
 - **Resizable Splitters:** Kéo thả 2 chiều linh hoạt (Trái/Phải clamped 20%–80%, Trên/Dưới clamped 30%–75%) với thanh kéo phát sáng Cyber Cyan và tự động lưu tỷ lệ layout vào `localStorage`.
 - **Zen Mode (2 cấp độ):** Cấp 1 ẩn Testcase Console tối đa hóa diện tích code; Cấp 2 phóng đại toàn màn hình với hotkey phím tắt `Esc` thuận tiện.
 - **Multi-Tab Testcase Console:** Chạy test mẫu tức thời, đối soát trực quan Diff Output, hiển thị thời gian chạy (ms) và bộ nhớ (KB).
 
-### 3. KaTeX LaTeX Math Typography Engine ([src/components/common/MathRenderer.jsx](file:///c:/Users/ADMIN/DEVER%20Arena/src/components/common/MathRenderer.jsx))
+### 3. KaTeX LaTeX Math Typography Engine ([src/components/common/MathRenderer.jsx](../src/components/common/MathRenderer.jsx))
 - Trình dựng công thức toán học chuyên sâu offline-safe chuẩn KaTeX.
 - Tự động nhận diện và phân tích cú pháp LaTeX inline `$O(N \log N)$` và display block `$$\sum_{i=1}^N A_i$$`.
 - Tích hợp mượt mà vào Đề bài, Giới hạn thời gian/bộ nhớ, Ví dụ mẫu và Polygon Preview.
 
-### 4. Polygon Problemsetter Studio trong Admin Center ([src/components/layout/AdminLayout.jsx](file:///c:/Users/ADMIN/DEVER%20Arena/src/components/layout/AdminLayout.jsx))
+### 4. Polygon Problemsetter Studio trong Admin Center ([src/components/layout/AdminLayout.jsx](../src/components/layout/AdminLayout.jsx))
 - Bộ công cụ quản trị và soạn thảo đề bài hoàn chỉnh cho Ban Giám Khảo:
   - Form thêm/sửa bài toán đầy đủ schema: Mã bài, Tên bài, Điểm thưởng, Giới hạn thời gian (ms), Bộ nhớ (MB), Đề bài (Markdown + LaTeX), Ràng buộc, Định dạng Input/Output, Bộ test ví dụ.
   - Chế độ KaTeX Live Preview 2 cột tức thời.
   - Nút Xóa đề bài với Modal xác nhận an toàn.
   - Tự động đồng bộ bài tập mới vào kho dữ liệu `ContestContext` và phát tín hiệu cho mọi tab thí sinh qua `BroadcastChannel`.
 
-### 5. Khử bỏ toàn diện 9Router & Củng cố Zero-AI Client ([docs/decisions/ADR-003-pure-core-engine-and-zero-ai.md](file:///c:/Users/ADMIN/DEVER%20Arena/docs/decisions/ADR-003-pure-core-engine-and-zero-ai.md))
+### 5. Khử bỏ toàn diện 9Router & Củng cố Zero-AI Client ([docs/decisions/ADR-003-pure-core-engine-and-zero-ai.md](./decisions/ADR-003-pure-core-engine-and-zero-ai.md))
 - Gỡ bỏ hoàn toàn 8 agent skills `9router*` trong `.agents/skills/`.
 - Cam kết không có bất kỳ cuộc gọi API nào ra cổng AI bên ngoài trong suốt quá trình thi đấu Rated, bảo đảm 100% môi trường thi đấu thuật toán thuần khiết và công bằng cho sinh viên.
 

@@ -69,6 +69,6 @@ $$\text{Points} = \max\left( \lfloor 0.3 \times P_{\max} \rfloor, \; P_{\max} - 
 ---
 
 ## ĐIỀU 4: ĐIỀU KHOẢN THI HÀNH
-Mọi thí sinh đăng ký tham gia contest trên nền tảng DEVER-Forces mặc nhiên đồng ý tuân thủ toàn bộ quy định trong Quy chế này và [Chính Sách Chống Gian Lận (ANTI_CHEAT_POLICY.md)](file:///c:/Users/ADMIN/DEVER%20Arena/docs/ANTI_CHEAT_POLICY.md).
+Mọi thí sinh đăng ký tham gia contest trên nền tảng DEVER-Forces mặc nhiên đồng ý tuân thủ toàn bộ quy định trong Quy chế này và [Chính Sách Chống Gian Lận (ANTI_CHEAT_POLICY.md)](./ANTI_CHEAT_POLICY.md).
 
 > Cập nhật: DB schema và API contract tại db/schema.sql và src/db/api.js (2026-09-07)

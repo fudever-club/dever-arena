@@ -14,7 +14,7 @@ Tuy nhiên, nếu cho phép thí sinh chạy code ngay trên trình duyệt (In-
 - Mã nguồn có thể chứa vòng lặp vô tận gây treo hoàn toàn tab trình duyệt của thí sinh (tab crash).
 
 ## Quyết Định (Decision)
-Chúng tôi triển khai **DEVER Isolate Sandbox Runner** ([src/engine/isolateRunner.js](file:///c:/Users/ADMIN/DEVER%20Arena/src/engine/isolateRunner.js)) kết hợp cơ chế dừng sớm (Fail-Fast):
+Chúng tôi triển khai **DEVER Isolate Sandbox Runner** ([`src/engine/isolateRunner.js`](../../src/engine/isolateRunner.js)) kết hợp cơ chế dừng sớm (Fail-Fast):
 1. **Chặn Đứng 18 APIs Nguy Hiểm (Security Policy Guard)**:
    Quét AST/Token trước khi thực thi, lập tức từ chối các mã nguồn chứa:
    `child_process`, `fs.unlink`, `fs.rmdir`, `fs.write`, `process.exit`, `require`, `Worker`, `SharedWorker`, `WebSocket`, `localStorage`, `sessionStorage`, `indexedDB`, `document.cookie`, `window.location`, `globalThis.process`.

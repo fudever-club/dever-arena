@@ -22,7 +22,7 @@ Chúng tôi quyết định **áp dụng kiến trúc 3 trang HTML vật lý ri�
 2. **`arena.html` (Client Workspace & Contest Arena)**: Đấu trường trực tiếp dành cho thí sinh làm bài, nộp code, Digital Timer HUD, bảng điểm Standings, phòng Hack Room và Clan Wars.
 3. **`admin.html` (Admin Command Center & Polygon CMS)**: Trung tâm điều hành của Ban Giám Khảo, bảo vệ bởi ranh giới phân quyền RBAC, quản lý phase contest, radar chống gian lận AST và soạn thảo đề thi.
 
-Đồng thời, áp dụng ràng buộc cấu trúc bất biến (Architectural Invariant) được kiểm định tự động bằng [detect.mjs](file:///c:/Users/ADMIN/DEVER%20Arena/detect.mjs):
+Đồng thời, áp dụng ràng buộc cấu trúc bất biến (Architectural Invariant) được kiểm định tự động bằng [`detect.mjs`](../../detect.mjs):
 - Mỗi trang có chính xác duy nhất một thẻ `<h1>`.
 - Footer đồng nhất 100% về nội dung (Docs, GitHub, Discord, Copyright).
 - Thiết lập token viền bo chuẩn `--radius-lg: 12px` trên toàn bộ hệ thống card.

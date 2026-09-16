@@ -2,34 +2,36 @@
 
 # ⚔️ DEVER Arena (DEVER-Forces)
 
-**Nền tảng thi đấu lập trình giải thuật trực tuyến chuẩn Codeforces & ICPC của CLB FU-DEVER — Đại học FPT Đà Nẵng**
+**Nền tảng thi đấu lập trình giải thuật trực tuyến chuẩn Codeforces & ICPC của CLB FU-DEVER — Trường Đại học FPT Đà Nẵng**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![React](https://img.shields.io/badge/React-19.2%20(18%20LTS)-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8.2-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4.3-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Tests](https://img.shields.io/badge/Tests-98%2F98%20Passed%20(100%25)-success?logo=checkmarx&logoColor=white)](tests/)
 [![WCAG AA](https://img.shields.io/badge/Accessibility-WCAG%20AA-blueviolet)](PRODUCT.md)
 
-[Tính Năng Nổi Bật](#-tính-năng-nổi-bật) • [Kiến Trúc Hệ Thống](#-kiến-trúc-hệ-thống) • [Vòng Đời Contest](#-vòng-đời-thi-đấu-chuẩn-codeforces) • [Cài Đặt & Khởi Chạy](#-cài-đặt--khởi-chạy) • [Kiểm Thử](#-kiểm-thử--chất-lượng-mã-nguồn) • [Sổ Bộ ADR](#-sổ-bộ-quyết-định-kiến-trúc-adr)
+[Tính Năng Nổi Bật](#tinh-nang-noi-bat) • [Kiến Trúc Hệ Thống](#kien-truc-he-thong) • [Vòng Đời Contest](#vong-doi-contest) • [Sổ Bộ ADR](#so-bo-adr) • [Cài Đặt & Khởi Chạy](#cai-dat-khoi-chay) • [Kiểm Thử](#kiem-thu-chat-luong) • [Cấu Trúc Thư Mục](#cau-truc-thu-muc) • [Ban Phát Triển](#ban-phat-trien)
 
 ---
 
 </div>
 
+<a id="gioi-thieu-tong-quan"></a>
 ## 📌 Giới Thiệu Tổng Quan
 
 **DEVER Arena** (mật danh: *DEVER-Forces*) là nền tảng thi đấu thuật toán và luyện tập Competitive Programming chuyên sâu được nghiên cứu và phát triển bởi **CLB Lập trình FU-DEVER (Trường Đại học FPT Đà Nẵng)**.
 
 Hệ thống được thiết kế nhằm mục đích:
-1. **Mô phỏng 100% chân thực vòng đời kỳ thi Codeforces**: Phân phòng (Hack Room), chấm sơ bộ (Pretests), vòng phản biện đối thủ (Instant Hacking Phase) và kiểm thử hệ thống ngầm (System Testing).
+1. **Mô phỏng 100% chân thực vòng đời kỳ thi Codeforces**: Phân phòng (Hack Room 25 người), chấm sơ bộ (Pretests), vòng phản biện đối thủ (Instant Hacking Phase) và kiểm thử hệ thống ngầm (System Testing).
 2. **Liêm chính học thuật tuyệt đối**: Trang bị engine AST Winnowing phát hiện đạo văn mã nguồn tự động, triệt tiêu việc ngụy trang bằng cách đổi tên biến hay xóa chú thích, đồng thời cam kết **Zero-AI Client** (loại bỏ hoàn toàn AI sinh code trong các round Rated).
 3. **Sư phạm qua phản biện**: Tính năng Hack Room 25 người tạo cơ hội để sinh viên đọc hiểu mã nguồn của bạn học, phát hiện các trường hợp biên (edge cases), tràn số (`integer overflow`) hay độ phức tạp thuật toán vượt ngưỡng (`TLE`).
 4. **Vinh danh tập thể (Clan Wars)**: Hệ thống xếp hạng bang hội House of Buggy (K18, K19, K20, K21...) theo thuật toán Harmonic Mean Top-5.
 
 ---
 
+<a id="tinh-nang-noi-bat"></a>
 ## ⚡ Tính Năng Nổi Bật
 
 ### 1. 🎯 Chế Độ Thi Đấu Chuẩn Codeforces & ICPC
@@ -59,6 +61,7 @@ Hệ thống được thiết kế nhằm mục đích:
 
 ---
 
+<a id="kien-truc-he-thong"></a>
 ## 🏛️ Kiến Trúc Hệ Thống (Dual-Stack Architecture)
 
 DEVER Arena được thiết kế theo kiến trúc kép để đảm bảo tính linh hoạt tối đa:
@@ -86,6 +89,7 @@ DEVER Arena
 
 ---
 
+<a id="vong-doi-contest"></a>
 ## 🔄 Vòng Đời Thi Đấu Chuẩn Codeforces
 
 ```mermaid
@@ -123,9 +127,10 @@ stateDiagram-v2
 
 ---
 
+<a id="so-bo-adr"></a>
 ## 📜 Sổ Bộ Quyết Định Kiến Trúc (ADR)
 
-Mọi quyết định thiết kế quan trọng của hệ thống đều được lưu trữ minh bạch tại [`docs/decisions/`](docs/decisions/):
+Mọi quyết định thiết kế quan trọng của hệ thống đều được lưu trữ minh bạch tại [`docs/decisions/`](docs/decisions/README.md):
 
 | Mã số | Tiêu đề quyết định | Trạng thái | Tóm tắt tác động kỹ thuật |
 |---|---|---|---|
@@ -136,6 +141,7 @@ Mọi quyết định thiết kế quan trọng của hệ thống đều đư�
 
 ---
 
+<a id="cai-dat-khoi-chay"></a>
 ## 🚀 Cài Đặt & Khởi Chạy
 
 ### Yêu Cầu Tiên Quyết
@@ -173,6 +179,7 @@ Bản build tối ưu hóa sẽ được tạo tại thư mục `dist/`.
 
 ---
 
+<a id="kiem-thu-chat-luong"></a>
 ## 🧪 Kiểm Thử & Chất Lượng Mã Nguồn
 
 Dự án áp dụng quy chuẩn kiểm thử nghiêm ngặt với bộ Test Runner tích hợp sẵn trong Node.js (Zero external test runner bloatware):
@@ -187,8 +194,8 @@ npm run test:watch
 # Chạy kiểm thử End-to-End với Playwright
 npm run test:e2e
 
-# Quét kiểm tra chất lượng mã nguồn (Linter)
-npm run lint
+# Quét kiểm tra kiến trúc bất biến (Linter)
+node detect.mjs
 ```
 
 ### Kết quả kiểm thử tự động mẫu:
@@ -209,6 +216,7 @@ npm run lint
 
 ---
 
+<a id="cau-truc-thu-muc"></a>
 ## 📂 Cấu Trúc Thư Mục Dự Án
 
 ```
@@ -241,18 +249,21 @@ dever-arena/
 ├── arena.html                  # Giao diện thi đấu Zero-Build
 ├── app.html                    # Giao diện ứng dụng SPA
 ├── index.html                  # Trang chủ giới thiệu
+├── detect.mjs                  # Bộ kiểm tra ràng buộc kiến trúc bất biến
 ├── package.json
 └── README.md
 ```
 
 ---
 
+<a id="ban-phat-trien"></a>
 ## 👥 Ban Phát Triển & Bản Quyền
 
 Dự án được xây dựng và duy trì bởi **CLB Lập Trình FU-DEVER** — Trường Đại học FPT Đà Nẵng.
 
-* **Email liên hệ**: [club.dever@gmail.com](mailto:club.dever@gmail.com)
-* **Fanpage CLB**: [FU-DEVER Club](https://facebook.com/fudever)
-* **GitHub Tổ Chức**: [@fudever-club](https://github.com/fudever-club)
+* **Email chính thức**: [club.dever@gmail.com](mailto:club.dever@gmail.com)
+* **Fanpage chính thức**: [https://www.facebook.com/FPTUDever](https://www.facebook.com/FPTUDever)
+* **Website chính thức**: [https://fu-dever-landingpage-v2.vercel.app/](https://fu-dever-landingpage-v2.vercel.app/)
+* **GitHub Organization**: [@fudever-club](https://github.com/fudever-club)
 
 Mã nguồn được phát hành theo giấy phép **MIT License**. Mọi đóng góp (Pull Requests, Issue Reports) từ cộng đồng sinh viên FPT và lập trình viên đều được chào đón nồng nhiệt!

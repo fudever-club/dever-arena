@@ -15,7 +15,7 @@ Trong các cuộc thi lập trình sinh viên, các hành vi đạo nhái mã ng
 Nếu chỉ so sánh chuỗi văn bản thông thường (String Diff / Levenshtein Distance), hệ thống sẽ bị đánh lừa dễ dàng hoặc sinh ra quá nhiều cảnh báo sai (False Positives). Ngược lại, nếu sử dụng các mô hình Deep Learning hoặc dịch vụ bên thứ ba (như MOSS của Stanford), hệ thống sẽ mất khả năng hoạt động Offline / On-Premise và phát sinh độ trễ lớn.
 
 ## Quyết Định (Decision)
-Chúng tôi quyết định tự chủ xây dựng **Anti-Cheat AST Tokenizer & Winnowing Engine** ([src/engine/astDiff.js](file:///c:/Users/ADMIN/DEVER%20Arena/src/engine/astDiff.js)):
+Chúng tôi quyết định tự chủ xây dựng **Anti-Cheat AST Tokenizer & Winnowing Engine** ([`src/engine/astDiff.js`](../../src/engine/astDiff.js)):
 1. **Chuẩn Hóa Mã Nguồn (Normalization)**:
    - Loại bỏ toàn bộ ghi chú đơn dòng (`//`) và đa dòng (`/* ... */`).
    - Khử toàn bộ định danh biến/hàm do người dùng tự đặt về dạng token trừu tượng `ID`, giữ lại các từ khóa cú pháp cốt lõi (`for`, `while`, `if`, `return`, các toán tử `+`, `-`, `*`, `/`, `%`).
