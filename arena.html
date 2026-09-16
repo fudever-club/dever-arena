@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="DEVER Arena — Nền tảng thi đấu lập trình chuẩn Codeforces & ICPC cho CLB FU-DEVER: Coding Phase, Hack Room, System Testing, Elo Rating.">
+  <meta name="theme-color" content="#ff6600">
+  <meta name="color-scheme" content="dark light">
+  <link rel="manifest" href="manifest.json">
+  <link rel="alternate" hreflang="vi" href="index.html?lang=vi">
+  <link rel="alternate" hreflang="en" href="index.html?lang=en">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta property="og:title" content="DEVER Arena — Thi đấu thuật toán">
+  <meta property="og:description" content="DEVER Arena — Nền tảng thi đấu lập trình chuẩn Codeforces & ICPC cho CLB FU-DEVER: Coding Phase, Hack Room, System Testing, Elo Rating.">
+  <meta property="og:image" content="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=">
+  <title>DEVER Arena Enterprise — Nền Tảng Thi Đấu Giải Thuật Chuẩn Codeforces & ICPC</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .profile-grid { display:grid; grid-template-columns:320px 1fr; gap:1.5rem; }
+    @media (max-width:900px){ .profile-grid{ grid-template-columns:1fr; } }
+    .highlight mark { background: rgba(255,102,0,0.3) }
+    .highlight mark { background: rgba(255,102,0,0.3); color: inherit; }
+    .search-suggestions { display:flex; gap:0.35rem; flex-wrap:wrap; }
+  </style>
+  <!-- KaTeX for Math rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Bỏ qua điều hướng — tới nội dung chính</a>
+
+  <!-- NAVBAR — semantic + a11y + responsive -->
+  <nav class="navbar" aria-label="Điều hướng chính">
+    <div class="brand" onclick="location.href='index.html'" tabindex="0" role="button" aria-label="Về landing" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();location.href='index.html'}">
+      <span style="color: #ffffff;">DEVER</span>
+      <span style="color: var(--accent-orange);">FORCES</span>
+      <span class="brand-badge">Arena</span>
+    </div>
+    <button id="nav-hamburger" class="nav-hamburger" aria-label="Mở menu điều hướng" aria-expanded="false" aria-controls="primary-nav-links" onclick="toggleMobileNav()">☰</button>
+    <ul id="primary-nav-links" class="nav-links" role="menubar">
+      <li role="none"><a href="index.html" class="nav-link-btn" role="menuitem" style="text-decoration:none">🏠 Landing</a></li>
+      <li role="none"><button class="nav-link-btn active" role="menuitem" aria-current="page" onclick="switchMainView('view-contests')">🏆 Kỳ Thi</button></li>
+      <li role="none"><button class="nav-link-btn" role="menuitem" onclick="switchMainView('view-problemset')">📚 Kho Bài Tập</button></li>
+      <li role="none"><button class="nav-link-btn" role="menuitem" onclick="switchMainView('view-standings')">📊 Standings</button></li>
+      <li role="none"><button class="nav-link-btn" role="menuitem" onclick="switchMainView('view-clans')">🛡️ Clan</button></li>
+      <li role="none"><a href="admin.html" class="nav-link-btn" role="menuitem" style="text-decoration:none;border:1px solid rgba(255,51,102,0.35)">👑 Admin →</a></li>
+    </ul>
+
+    <!-- RIGHT ACTION CLUSTER -->
+    <div class="nav-actions">
+      <button id="theme-toggle-btn" class="theme-toggle-btn" aria-label="Chuyển giao diện sáng/tối" title="Sáng/Tối">🌙</button>
+      <div class="role-selector-wrap" title="Chuyển đổi phân quyền để trải nghiệm các góc nhìn">
+        <label for="role-select" style="font-size: 0.75rem; color: #94a3b8;">Vai trò:</label>
+        <select id="role-select" class="role-select" aria-label="Chọn vai trò">
+          <option value="GUEST">Khách</option>
+          <option value="PARTICIPANT" selected>Thí Sinh</option>
+          <option value="ADMIN">Admin</option>
+        </select>
+      </div>
+      <button id="sound-btn" class="sound-toggle-btn active" title="Bật/Tắt âm thanh thi đấu" aria-pressed="true" aria-label="Bật tắt âm thanh">
+        🔊 <span id="sound-label">ON</span>
+      </button>
+      <div id="nav-user-cluster" style="display: flex; align-items: center; gap: 0.5rem;">
+        <div id="user-profile-badge" class="user-profile-badge" onclick="handleProfileBadgeClick()" tabindex="0" role="button" aria-label="Mở hồ sơ cá nhân" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();handleProfileBadgeClick()}">
+          <img id="user-nav-avatar" class="user-avatar" alt="Avatar của bạn" loading="lazy" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26'%3E%3C/svg%3E">
+          <div>
+            <span id="user-nav-name" class="rank-specialist" style="font-weight: 700;">dever_hero</span>
+            <span id="user-nav-rating" style="color: #64748b; font-size: 0.8rem; margin-left: 0.25rem;">(1742)</span>
+          </div>
+          <span id="user-role-badge" class="badge-role badge-participant">Thí Sinh</span>
+        </div>
+        <button id="nav-logout-btn" class="btn btn-outline" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; display: none;" onclick="handleLogoutClick()" aria-label="Đăng xuất">Đăng Xuất</button>
+        <button id="nav-login-btn" class="btn" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; display: none;" onclick="openAuthModal()" aria-label="Đăng nhập">🔑 Đăng Nhập</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ========================================== -->
+  <!-- MAIN VIEW 1: CONTESTS & ARENA (DEFAULT)   -->
+  <!-- ========================================== -->
+  <div id="view-contests" class="app-view active">
+    
+    <!-- CONTEST HERO BANNER -->
+    <header class="contest-hero" aria-label="Thông tin kỳ thi">
+      <div class="contest-title-area">
+        <h1>
+          <span class="gradient-text-orange">DEVER Round #1 (Div. 3)</span>
+          <span class="tag-badge" style="background: rgba(255, 102, 0, 0.2); color: var(--accent-orange); border: 1px solid rgba(255, 102, 0, 0.4);">Rated for Div. 3 & Div. 4</span>
+        </h1>
+        <div class="contest-meta">
+          <span>⏱️ Thời gian: <strong>2 giờ 15 phút</strong></span>
+          <span>🏆 Thể thức: <strong>Codeforces</strong> (Pretests + Hack + System Test)</span>
+          <span>👥 Phòng của bạn: <strong style="color: var(--accent-cyan);">Room #1</strong></span>
+        </div>
+        <div class="contest-progress-wrap" aria-hidden="true"><div class="contest-progress-fill" id="contest-progress-fill"></div></div>
+      </div>
+      <div class="contest-hero-actions">
+        <div class="timer-container" role="timer" aria-live="polite" aria-atomic="true">
+          <span id="phase-indicator" class="phase-pill phase-coding">Coding Phase</span>
+          <div id="timer-countdown" class="timer-digits">01:18:32</div>
+        </div>
+      </div>
+    </header>
+
+    <main id="main-content" class="container">
+      <!-- VIRTUAL CONTEST HUD -->
+      <div id="virtual-contest-hud" class="card" style="display:none;background:linear-gradient(90deg,rgba(0,240,255,0.12),rgba(255,102,0,0.12));border-color:var(--accent-cyan);padding:0.9rem 1.25rem;margin-bottom:1rem;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+          <span class="tag-badge" style="background:var(--accent-cyan);color:#080b13;font-weight:700;">🚀 VIRTUAL MODE</span>
+          <span style="font-size:0.9rem;color:#e2e8f0;">Đang thi đấu lại theo dòng thời gian lịch sử (Ghost Replay).</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+          <span style="color:#94a3b8;font-size:0.85rem;">Thời gian ảo còn lại:</span>
+          <span id="virtual-timer-display" class="timer-digits" style="font-size:1.15rem;color:var(--accent-cyan);">02:00:00</span>
+          <button id="virtual-finish-btn" class="btn btn-secondary" style="font-size:0.8rem;padding:0.3rem 0.75rem;" onclick="handleFinishVirtualContest()">Kết thúc thi ảo</button>
+        </div>
+      </div>
+
+      <!-- SUB-TABS NAVIGATION -->
+      <div class="tabs-nav" role="tablist" aria-label="Tabs kỳ thi">
+        <button class="tab-btn active" data-tab="tab-overview" role="tab" aria-selected="true" aria-controls="tab-overview">
+          📋 Danh Sách Bài Thi
+          <span class="tab-badge">2 Problems</span>
+        </button>
+        <button class="tab-btn" data-tab="tab-workspace" role="tab" aria-selected="false" aria-controls="tab-workspace">
+          💻 Workspace
+        </button>
+        <button class="tab-btn" data-tab="tab-standings" role="tab" aria-selected="false" aria-controls="tab-standings">
+          🏆 Standings
+        </button>
+        <button class="tab-btn" data-tab="tab-hackroom" role="tab" aria-selected="false" aria-controls="tab-hackroom">
+          ⚔️ Hack Room #1
+          <span class="tab-badge">Special</span>
+        </button>
+      </div>
+
+      <!-- TAB 1: DANH SÁCH BÀI TẬP CONTEST -->
+      <section id="tab-overview" class="tab-view active" role="tabpanel">
+        <div class="card">
+          <div class="table-responsive">
+          <table class="data-table" aria-label="Danh sách bài thi">
+            <thead>
+              <tr>
+                <th style="width: 80px;">Bài</th>
+                <th>Tên Bài Toán</th>
+                <th>Giới Hạn</th>
+                <th>Điểm Ban Đầu</th>
+                <th>Trạng Thái Của Bạn</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="prob-code" style="color: var(--accent-cyan); font-weight: 700; font-family: var(--font-code);">A</td>
+                <td>
+                  <a class="prob-title" style="font-weight: 600; cursor: pointer;" onclick="loadProblemToWorkspace('p101')" tabindex="0" role="button" aria-label="Mở bài Cyber Energy Array" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();loadProblemToWorkspace('p101')}">Cyber Energy Array</a>
+                  <div style="font-size: 0.8rem; color: #64748b;">Implementation, Two Pointers, Math</div>
+                </td>
+                <td style="color: #94a3b8; font-size: 0.85rem;">1.0s / 256 MB</td>
+                <td style="font-family: var(--font-code); font-weight: 700;">500 pts</td>
+                <td><span class="cell-passed" style="padding: 0.25rem 0.6rem;">Pretests Passed (+472)</span></td>
+              </tr>
+              <tr>
+                <td class="prob-code" style="color: var(--accent-cyan); font-weight: 700; font-family: var(--font-code);">B</td>
+                <td>
+                  <a class="prob-title" style="font-weight: 600; cursor: pointer;" onclick="loadProblemToWorkspace('p102')" tabindex="0" role="button" aria-label="Mở bài DEVER Big Product Challenge" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();loadProblemToWorkspace('p102')}">DEVER Big Product Challenge</a>
+                  <div style="font-size: 0.8rem; color: #64748b;">Math, Prefix Sums, Big Integer, Hack Target</div>
+                </td>
+                <td style="color: #94a3b8; font-size: 0.85rem;">1.0s / 256 MB</td>
+                <td style="font-family: var(--font-code); font-weight: 700;">1000 pts</td>
+                <td><span class="cell-failed" style="padding: 0.25rem 0.6rem;">Chưa giải (-1)</span></td>
+              </tr>
+            </tbody>
+          </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: WORKSPACE LÀM BÀI NÂNG CẤP -->
+      <section id="tab-workspace" class="tab-view" role="tabpanel">
+        <div class="workspace-grid" id="workspace-grid">
+          
+          <!-- LEFT: PROBLEM STATEMENT & EDITORIAL & DISCUSSIONS -->
+          <div class="problem-statement-pane" aria-label="Đề bài và thảo luận">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.75rem;">
+              <h2 id="ws-problem-title">Bài B: DEVER Big Product Challenge</h2>
+              <span id="ws-problem-rating" class="tag-badge">1200 Điểm</span>
+            </div>
+
+            <!-- 3 SUB-TABS: ĐỀ BÀI, EDITORIAL, THẢO LUẬN -->
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+              <button id="ws-tab-desc" class="btn btn-outline" style="padding: 0.3rem 0.8rem; font-size: 0.8rem;" onclick="toggleProblemTab('desc')">Đề Bài</button>
+              <button id="ws-tab-editorial" class="btn btn-outline" style="padding: 0.3rem 0.8rem; font-size: 0.8rem;" onclick="toggleProblemTab('editorial')">💡 Lời Giải (Editorial)</button>
+              <button id="ws-tab-discussions" class="btn btn-outline" style="padding: 0.3rem 0.8rem; font-size: 0.8rem;" onclick="toggleProblemTab('discussions')">💬 Thảo Luận (3)</button>
+            </div>
+
+            <!-- PANE 1: ĐỀ BÀI -->
+            <div id="ws-desc-content">
+              <div style="background: rgba(255,255,255,0.03); padding: 0.8rem; border-radius: 8px; font-size: 0.85rem; color: #94a3b8; margin-bottom: 1rem;">
+                ⏱️ Giới hạn thời gian: <span id="ws-timelimit">1.0s</span> &nbsp;|&nbsp; 💾 Giới hạn bộ nhớ: <span id="ws-memlimit">256 MB</span>
+              </div>
+
+              <div id="ws-statement-body" style="font-size: 0.95rem; line-height: 1.6; margin-bottom: 1.25rem;"></div>
+
+              <h4 style="font-size: 0.95rem; color: #cbd5e1; margin-bottom: 0.4rem;">Ví Dụ Mẫu:</h4>
+              <div style="background: #060910; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.75rem; font-family: var(--font-code); font-size: 0.85rem;">
+                <div style="color: var(--accent-orange); font-size: 0.75rem;">INPUT:</div>
+                <div id="ws-sample-in">3<br>1 2 3</div>
+                <div style="color: var(--accent-green); font-size: 0.75rem; margin-top: 0.5rem;">OUTPUT:</div>
+                <div id="ws-sample-out">11</div>
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem; border-top: 1px dashed var(--border-subtle); padding-top: 0.6rem;">
+                  <button id="ws-run-sample-btn" class="btn btn-secondary" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 0.35rem 0.65rem;" aria-label="Chạy thử với test ví dụ mẫu">🧪 Chạy Test Mẫu (Run Sample)</button>
+                  <button id="ws-copy-sample-btn" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.35rem 0.65rem;" title="Sao chép input vào clipboard" aria-label="Sao chép test mẫu">📋 Copy</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- PANE 2: LỜI GIẢI EDITORIAL -->
+            <div id="ws-editorial-content" style="display: none; font-size: 0.95rem; line-height: 1.6;">
+              <div style="background: rgba(0, 240, 255, 0.08); border: 1px solid rgba(0,240,255,0.18); padding: 0.85rem; border-radius: 8px; margin-bottom: 1rem;">
+                <strong>Phân tích thuật toán chính thức từ Ban Chuyên Môn DEVER</strong>
+              </div>
+              <div id="ws-editorial-body"></div>
+              <div id="editorial-empty" style="display: none; text-align:center; color:#94a3b8; padding:1.5rem; border:1px dashed var(--border-subtle); border-radius:8px;">Chưa có editorial — sẽ mở sau contest</div>
+            </div>
+
+            <!-- PANE 3: THẢO LUẬN & BÌNH LUẬN -->
+            <div id="ws-discussions-content" style="display: none;">
+              <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                <input id="new-comment-input" type="text" class="search-input" style="flex: 1;" placeholder="Viết thắc mắc hoặc chia sẻ hướng tiếp cận...">
+                <button id="post-comment-btn" class="btn" style="padding: 0.4rem 0.9rem; font-size: 0.85rem;">Gửi</button>
+              </div>
+              <div id="discussion-threads-list">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+
+          </div>
+          <div class="workspace-resizer" role="separator" aria-orientation="vertical" aria-label="Kéo để thay đổi kích thước" tabindex="0" id="workspace-resizer"></div>
+
+          <!-- RIGHT: CODE EDITOR WITH ADVANCED CONTROLS -->
+          <div id="editor-pane-container" class="editor-pane" aria-label="Trình soạn thảo code">
+            
+            <!-- GUEST MODE NOTIFICATION BANNER (CHỈ HIỂN THỊ KHI LÀ KHÁCH) -->
+            <div id="ws-guest-banner" class="guest-warning-banner" style="display: none;">
+              <div>
+                <strong>👁️ Bạn đang xem ở Chế độ Khách:</strong>
+                <span style="margin-left: 0.25rem;">Đăng nhập để nộp bài, chạy Sandbox và tích lũy điểm Elo chính thức.</span>
+              </div>
+              <button class="btn btn-outline" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-color: var(--accent-yellow); color: var(--accent-yellow);" onclick="openAuthModal('Vui lòng đăng nhập để nộp bài!')" aria-label="Đăng nhập để nộp bài">Đăng Nhập Ngay</button>
+            </div>
+
+            <div class="editor-toolbar">
+              <div class="editor-toolbar-group">
+                <label for="language-select" class="sr-only">Ngôn ngữ</label>
+                <select id="language-select" aria-label="Chọn ngôn ngữ">
+                  <option value="cpp">GNU C++20 (64-bit)</option>
+                  <option value="python">Python 3.11</option>
+                  <option value="java">Java 17 (OpenJDK)</option>
+                  <option value="javascript">JavaScript (ES2023)</option>
+                </select>
+                <label for="theme-select" class="sr-only">Theme editor</label>
+                <select id="theme-select" aria-label="Chọn theme editor">
+                  <option value="theme-obsidian">Obsidian Dark</option>
+                  <option value="theme-monokai">Monokai Pro</option>
+                  <option value="theme-cyber">Cyber Neon</option>
+                </select>
+                <button id="font-decrease-btn" class="btn btn-outline" aria-label="Giảm cỡ chữ">A-</button>
+                <button id="font-increase-btn" class="btn btn-outline" aria-label="Tăng cỡ chữ">A+</button>
+                <button id="fullscreen-btn" class="btn btn-outline" title="Chế độ toàn màn hình" aria-label="Toàn màn hình">⛶</button>
+              </div>
+              <div class="editor-toolbar-group">
+                <button id="download-code-btn" class="btn btn-outline" title="Tải file code về máy" aria-label="Tải file code">📥 Tải Về</button>
+                <button id="custom-test-btn" class="btn btn-secondary" aria-label="Chạy custom test">🧪 Custom Test</button>
+                <button id="inspect-diff-btn" class="btn btn-outline" title="So sánh dòng lỗi" aria-label="So sánh diff">🔍 Diff</button>
+                <button id="run-code-btn" class="btn" aria-label="Nộp bài">▶ Nộp Bài</button>
+              </div>
+            </div>
+
+            <div class="editor-main-area">
+              <div id="line-numbers" class="line-numbers" aria-hidden="true">1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9<br>10<br>11<br>12<br>13<br>14<br>15<br>16<br>17<br>18<br>19<br>20</div>
+              <textarea id="code-editor-input" class="editor-textarea theme-obsidian" spellcheck="false" aria-label="Trình soạn thảo mã nguồn"></textarea>
+            </div>
+
+            <div class="console-pane">
+              <div class="console-header-bar">
+                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                  <div class="console-dots">
+                    <span class="console-dot console-dot-red"></span>
+                    <span class="console-dot console-dot-yellow"></span>
+                    <span class="console-dot console-dot-green"></span>
+                  </div>
+                  <span style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-family: var(--font-code); font-weight: 600;">Judge Execution Console:</span>
+                </div>
+                <div id="execution-metrics" style="font-size: 0.75rem; color: #94a3b8; font-family: var(--font-code);"></div>
+              </div>
+              <div id="editor-console-output" aria-live="polite" aria-busy="false" style="color: #cbd5e1;">Sẵn sàng. Nhấn "Nộp Bài" hoặc "Custom Test" để biên dịch và chạy thử.</div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- TAB 3: STANDINGS -->
+      <section id="tab-standings" class="tab-view" role="tabpanel">
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+            <h3>Bảng Điểm Thời Gian Thực (Codeforces Standings)</h3>
+            <span style="font-size: 0.85rem; color: #94a3b8;">Cập nhật tức thời qua WebSocket</span>
+          </div>
+          <div class="table-responsive">
+          <table class="standings-table" aria-label="Bảng điểm trực tiếp">
+            <thead>
+              <tr>
+                <th style="width: 40px;">#</th>
+                <th>Thí Sinh</th>
+                <th>Tổng Điểm</th>
+                <th>Hack (+/-)</th>
+                <th style="width: 100px;">Bài A (500)</th>
+                <th style="width: 100px;">Bài B (1000)</th>
+              </tr>
+            </thead>
+            <tbody id="standings-tbody"></tbody>
+          </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 1rem;">
+          <h4 style="color: var(--accent-yellow); margin-bottom: 0.5rem;">System Testing Live Monitor</h4>
+          <div id="system-test-log" style="font-family: var(--font-code); font-size: 0.85rem; color: #94a3b8;">
+            System Testing sẽ kích hoạt sau khi kết thúc 15 phút Hack Phase.
+          </div>
+        </div>
+
+        <div id="rating-results-card" class="card" style="display: none; border-color: var(--accent-green);">
+          <h3 style="color: var(--accent-green); margin-bottom: 1rem;">🎉 Biến Động Rating Chính Thức (Elo Recalculation)</h3>
+          <table class="standings-table">
+            <thead>
+              <tr>
+                <th>Hạng</th>
+                <th>Thí Sinh</th>
+                <th>Rating Cũ</th>
+                <th>Delta (±)</th>
+                <th>Rating Mới & Danh Hiệu</th>
+              </tr>
+            </thead>
+            <tbody id="rating-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 4: HACK ROOM -->
+      <section id="tab-hackroom" class="tab-view" role="tabpanel">
+        <div class="room-header">
+          <div>
+            <h3>⚔️ Room #1 — Phòng Thách Đấu (Challenge Arena)</h3>
+            <p style="font-size: 0.85rem; color: #94a3b8;">
+              Soi mã nguồn của các thí sinh trong cùng phòng. Nhập testcase độc để bẻ khóa nhận <strong>+100 điểm</strong>!
+            </p>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.85rem; color: #94a3b8;">Thưởng Hack: <span style="color: var(--accent-green); font-weight: 700;">+100 pts</span></div>
+            <div style="font-size: 0.85rem; color: #94a3b8;">Phạt Hack Trượt: <span style="color: var(--accent-red); font-weight: 700;">-50 pts</span></div>
+          </div>
+        </div>
+
+        <div id="room-cards-grid" class="room-grid"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MAIN VIEW 2: KHO BÀI TẬP (PROBLEMSET)      -->
+  <!-- ========================================== -->
+  <div id="view-problemset" class="app-view">
+    <main class="container">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.25rem;">
+        <div>
+          <h2>Kho Bài Tập Thuật Toán (DEVER Problemset)</h2>
+          <p style="color: #94a3b8; font-size: 0.9rem;">Hàng trăm bài tập phân loại theo dạng giải thuật và mức Elo Rating từ 800 đến 2600.</p>
+        </div>
+        <span id="problemset-count-badge" class="tag-badge">5 Bài Đã Sẵn Sàng</span>
+      </div>
+
+      <div class="filter-bar">
+        <div style="position:relative; display:flex; flex-direction:column; gap:0.4rem; flex:0 1 320px; max-width:100%;">
+          <input id="prob-search-input" type="text" class="search-input" placeholder="🔍 Tìm theo tên bài hoặc mã bài..." aria-label="Tìm kiếm bài toán" aria-describedby="prob-search-help" list="prob-search-history" autocomplete="off" style="width:100%;">
+          <datalist id="prob-search-history"></datalist>
+          <div id="prob-search-suggestions" class="search-suggestions" aria-live="polite"></div>
+        </div>
+        <span id="prob-search-help" class="sr-only">Nhập tên bài, mã bài hoặc tag để lọc danh sách</span>
+        
+        <div class="tag-pills">
+          <button class="tag-pill-btn active" onclick="filterProblems('ALL')">Tất Cả</button>
+          <button class="tag-pill-btn" onclick="filterProblems('math')">Math</button>
+          <button class="tag-pill-btn" onclick="filterProblems('dp')">DP</button>
+          <button class="tag-pill-btn" onclick="filterProblems('graphs')">Graphs</button>
+          <button class="tag-pill-btn" onclick="filterProblems('data-structures')">Data Structures</button>
+          <button class="tag-pill-btn" onclick="filterProblems('two-pointers')">Two Pointers</button>
+        </div>
+      </div>
+
+      <div class="card" aria-busy="false" id="problemset-card">
+        <div class="table-responsive">
+        <table class="data-table" aria-label="Kho bài tập">
+          <thead>
+            <tr>
+              <th style="width: 70px;">Mã</th>
+              <th>Tên Bài Toán</th>
+              <th>Dạng Thuật Toán (Tags)</th>
+              <th style="width: 110px;">Độ Khó Elo</th>
+              <th style="width: 100px;">Đã Giải</th>
+              <th style="width: 90px;">Hành Động</th>
+            </tr>
+          </thead>
+          <tbody id="problemset-tbody"></tbody>
+        </table>
+        </div>
+        <div id="arena-loading" aria-busy="true" aria-live="polite" style="display:none;">
+          <div class="skeleton" style="height:16px; margin-bottom:8px;"></div>
+          <div class="skeleton" style="height:16px; margin-bottom:8px;"></div>
+          <div class="skeleton" style="height:16px;"></div>
+        </div>
+        <div id="arena-empty" class="arena-empty" style="display:none;" aria-live="polite">Chưa có submission nào — hãy bắt đầu nộp bài!</div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MAIN VIEW 3: CLAN WARS (HOUSE OF BUGGY)    -->
+  <!-- ========================================== -->
+  <div id="view-clans" class="app-view">
+    <main class="container">
+      <div style="margin-bottom: 1.25rem;">
+        <h2>House of Buggy — Đấu Trường Bang Hội (Clan Wars)</h2>
+        <p style="color: #94a3b8; font-size: 0.9rem;">
+          Đua bảng xếp hạng nội bộ CLB giữa các Khóa sinh viên (K18, K19, K20, K21) và các Ban chuyên môn (AI, Web, Mobile).
+        </p>
+      </div>
+
+      <div id="clans-cards-grid" class="clan-grid"></div>
+    </main>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MAIN VIEW: BẢNG ĐIỂM TOÀN CỤC (STANDINGS)  -->
+  <!-- ========================================== -->
+  <div id="view-standings" class="app-view">
+    <main class="container">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.25rem;">
+        <div>
+          <h2>Bảng Xếp Hạng Trực Tiếp (DEVER Live Standings)</h2>
+          <p style="color: #94a3b8; font-size: 0.9rem;">
+            Cập nhật thời gian thực điểm thi theo thời gian giải, số lần nộp sai và điểm bẻ khóa (Hack Points).
+          </p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <span class="tag-badge" style="background: rgba(0, 240, 255, 0.1); color: var(--accent-cyan);">⚡ Live WebSocket</span>
+          <button class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;" onclick="renderStandings()">🔄 Làm Mới</button>
+        </div>
+      </div>
+
+      <!-- FROZEN BOARD WARNING (KHI BAN TỔ CHỨC ĐÓNG BĂNG BẢNG ĐIỂM) -->
+      <div id="frozen-board-banner" class="frozen-board-banner" style="display: none;">
+        <span class="frozen-board-icon">❄️</span>
+        <div style="flex: 1;">
+          <strong style="color: var(--accent-cyan); font-size: 0.95rem;">BẢNG ĐIỂM ĐANG BỊ ĐÓNG BĂNG (FROZEN BOARD)!</strong>
+          <div style="font-size: 0.85rem; color: #cbd5e1; margin-top: 0.2rem;">
+            Ban Tổ Chức đã kích hoạt trạng thái đóng băng bảng điểm ở 60 phút cuối để bảo mật kết quả chung cuộc. Điểm số của các lượt nộp bài mới chỉ hiển thị trạng thái "?" trên bảng xếp hạng công khai.
+          </div>
+        </div>
+      </div>
+
+      <!-- STANDINGS CARD -->
+      <div class="card">
+        <div class="table-responsive">
+        <table class="standings-table" aria-label="Bảng xếp hạng toàn cục">
+          <thead>
+            <tr>
+              <th style="width: 50px;">#</th>
+              <th>Thí Sinh</th>
+              <th>Tổng Điểm</th>
+              <th>Hack (+/-)</th>
+              <th style="width: 110px;">Bài A (500)</th>
+              <th style="width: 110px;">Bài B (1000)</th>
+            </tr>
+          </thead>
+          <tbody id="top-standings-tbody"></tbody>
+        </table>
+        </div>
+      </div>
+
+      <!-- SYSTEM TEST & OFFICIAL RATING CARD -->
+      <div class="card" style="margin-top: 1.5rem;">
+        <h4 style="color: var(--accent-yellow); margin-bottom: 0.5rem;">System Testing Live Monitor</h4>
+        <div id="top-system-test-log" style="font-family: var(--font-code); font-size: 0.85rem; color: #94a3b8;">
+          System Testing sẽ kích hoạt sau khi kết thúc 15 phút Hack Phase.
+        </div>
+      </div>
+
+      <div id="top-rating-results-card" class="card" style="display: none; border-color: var(--accent-green); margin-top: 1.5rem;">
+        <h3 style="color: var(--accent-green); margin-bottom: 1rem;">🎉 Biến Động Rating Chính Thức (Elo Recalculation)</h3>
+        <table class="standings-table">
+          <thead>
+            <tr>
+              <th>Hạng</th>
+              <th>Thí Sinh</th>
+              <th>Rating Cũ</th>
+              <th>Delta (±)</th>
+              <th>Rating Mới & Danh Hiệu</th>
+            </tr>
+          </thead>
+          <tbody id="top-rating-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- LIVE SUBMISSIONS STREAM PREVIEW -->
+      <div class="card" style="margin-top: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+          <h4>Luồng Bài Nộp Thời Gian Thực (Recent Submissions)</h4>
+          <span style="font-size: 0.8rem; color: #94a3b8;">Hàng đợi máy chấm tự động</span>
+        </div>
+        <div class="table-responsive">
+        <table class="data-table" aria-label="Luồng bài nộp">
+          <thead>
+            <tr>
+              <th style="width: 80px;">ID</th>
+              <th style="width: 120px;">Thời Gian</th>
+              <th>Thí Sinh</th>
+              <th>Bài Toán</th>
+              <th>Ngôn Ngữ</th>
+              <th>Kết Quả (Verdict)</th>
+              <th style="width: 90px;">Thời Gian</th>
+              <th style="width: 90px;">Bộ Nhớ</th>
+            </tr>
+          </thead>
+          <tbody id="top-submissions-tbody"></tbody>
+        </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+
+
+  <!-- ========================================== -->
+  <!-- MAIN VIEW 8: TRANG CÁ NHÂN (MY PROFILE)   -->
+  <!-- ========================================== -->
+  <div id="view-profile" class="app-view">
+    <main class="container">
+      <div class="profile-grid">
+        
+        <!-- USER CARD -->
+        <div class="card" style="text-align: center;">
+          <div style="width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #00f0ff, #2f54eb); margin: 0 auto 1rem auto; box-shadow: 0 8px 24px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.25);"></div>
+          <h2 class="rank-specialist">dever_hero</h2>
+          <div style="color: #94a3b8; font-size: 0.85rem; margin-top: 0.25rem;">CLB FU-DEVER • K19 Software Engineering</div>
+
+          <div style="margin: 1.25rem 0; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); padding: 1rem 0;">
+            <div style="font-size: 0.85rem; color: #94a3b8;">Rating Hiện Tại:</div>
+            <div style="font-size: 2.2rem; font-weight: 800; font-family: var(--font-code); color: var(--rank-specialist);">1540</div>
+            <div class="tag-badge" style="margin-top: 0.25rem; display: inline-block;">Specialist (Algorithm Adept)</div>
+          </div>
+
+          <div style="text-align: left; font-size: 0.9rem; color: #cbd5e1; display: flex; flex-direction: column; gap: 0.5rem;">
+            <div>🏆 Thứ hạng trong CLB: <strong>#4 / 120</strong></div>
+            <div>⚡ Tỷ lệ Hack thành công: <strong>83% (5/6)</strong></div>
+            <div>🧩 Tổng bài đã giải: <strong>48 bài</strong></div>
+            <div>🔥 Chuỗi ngày liên tục: <strong>14 ngày</strong></div>
+            <div>🛡️ Bang hội: <strong>House of K19 (Gold Clan)</strong></div>
+          </div>
+        </div>
+
+        <!-- RIGHT: INTERACTIVE RATING GRAPH & STATS -->
+        <div>
+          <div class="rating-graph-card">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem;">
+              <h3>📈 Lịch Sử Biến Động Elo Rating (Rating History)</h3>
+              <span style="font-size: 0.85rem; color: #94a3b8;">Max Rating: 1540 (Specialist)</span>
+            </div>
+
+            <!-- SVG RATING CHART -->
+            <svg id="profile-rating-chart" class="svg-chart" viewBox="0 0 800 240" role="img" aria-label="Rating history"><title>Rating history</title></svg>
+          </div>
+
+          <div class="card">
+            <h3 style="margin-bottom: 1rem;">Thống Kê Kỹ Năng Giải Thuật Theo Dạng (Tags Breakdown)</h3>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+              <div style="background: #090d16; padding: 0.9rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
+                <div style="color: #94a3b8; font-size: 0.85rem;">Math & Number Theory</div>
+                <div style="font-size: 1.35rem; font-weight: 700; color: #38bdf8;">18 bài</div>
+              </div>
+              <div style="background: #090d16; padding: 0.9rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
+                <div style="color: #94a3b8; font-size: 0.85rem;">Dynamic Programming</div>
+                <div style="font-size: 1.35rem; font-weight: 700; color: #a855f7;">12 bài</div>
+              </div>
+              <div style="background: #090d16; padding: 0.9rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
+                <div style="color: #94a3b8; font-size: 0.85rem;">Graph & Shortest Paths</div>
+                <div style="font-size: 1.35rem; font-weight: 700; color: #00e676;">9 bài</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: CODE VIEWER & HACK INJECTION        -->
+  <!-- ========================================== -->
+  <div id="hack-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="hack-modal-title">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <h3 id="hack-modal-title" style="display: flex; align-items: center; gap: 0.5rem;">
+            <span>Soi Mã Nguồn Đối Thủ:</span>
+            <span id="modal-target-user" class="rank-newbie" style="font-weight: 700;">rookie_fresher_k21</span>
+          </h3>
+          <div id="modal-target-problem" style="font-size: 0.85rem; color: #94a3b8;">Problem B</div>
+        </div>
+        <button id="modal-close-btn" class="btn btn-outline" style="padding: 0.3rem 0.75rem;" aria-label="Đóng modal hack">✕ Đóng</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 0.5rem;">
+          Mã nguồn đã nộp (Chỉ đọc):
+        </div>
+        <pre id="modal-code-viewer" class="code-viewer"></pre>
+
+        <div class="hack-box">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="color: var(--accent-red); font-size: 0.95rem;">🎯 BẺ KHÓA (HACK THIS SOLUTION)</strong>
+            <span style="font-size: 0.8rem; color: #94a3b8;">Nhập Input bẫy theo đúng định dạng đề bài</span>
+          </div>
+          <textarea id="hack-input-field" placeholder="Ví dụ nhập dữ liệu cực lớn để gây tràn số hoặc TLE:
+200000
+1000000 1000000 ..."></textarea>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
+            <div id="hack-result-log" style="font-family: var(--font-code); font-size: 0.85rem;"></div>
+            <button id="submit-hack-btn" class="btn btn-danger" aria-label="Thực hiện hack">
+              ⚡ Thực Hiện HACK!
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: CUSTOM TEST RUNNER                  -->
+  <!-- ========================================== -->
+  <div id="custom-test-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="custom-test-title">
+    <div class="modal-dialog" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3 id="custom-test-title">🧪 Chạy Thử Testcase Tùy Biến (Custom Input)</h3>
+        <button id="custom-test-close-btn" class="btn btn-outline" style="padding: 0.3rem 0.75rem;" aria-label="Đóng custom test">✕ Đóng</button>
+      </div>
+      <div class="modal-body">
+        <label style="font-weight: 600; font-size: 0.85rem; color: #94a3b8;">Dữ liệu đầu vào (Custom Stdin):</label>
+        <textarea id="custom-input-box" style="width: 100%; height: 110px; background: #07090e; border: 1px solid var(--border-subtle); border-radius: 6px; color: #fff; font-family: var(--font-code); padding: 0.75rem; margin: 0.5rem 0 1rem 0;"></textarea>
+
+        <label style="font-weight: 600; font-size: 0.85rem; color: #94a3b8;">Kết quả chạy thực tế (Stdout):</label>
+        <div id="custom-output-box" style="background: #07090e; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.75rem; font-family: var(--font-code); font-size: 0.85rem; min-height: 80px; color: var(--accent-cyan);"></div>
+
+        <div style="margin-top: 1rem; text-align: right;">
+          <button id="execute-custom-test-run" class="btn" aria-label="Chạy test ngay">Chạy Test Ngay</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: VISUAL LINE DIFF INSPECTOR          -->
+  <!-- ========================================== -->
+  <div id="diff-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="diff-modal-title">
+    <div class="modal-dialog" style="max-width: 750px;">
+      <div class="modal-header">
+        <h3 id="diff-modal-title" style="color: var(--accent-yellow);">🔍 Visual Line Diff Inspector (So Sánh Output)</h3>
+        <button id="diff-close-btn" class="btn btn-outline" style="padding: 0.3rem 0.75rem;" aria-label="Đóng diff">✕ Đóng</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 0.75rem;">
+          Đối soát kết quả giữa <strong>Kết Quả Kỳ Vọng (Expected Output)</strong> và <strong>Kết Quả Thực Tế (Actual Output)</strong>:
+        </p>
+
+        <div class="diff-container">
+          <div>
+            <div style="font-size: 0.8rem; color: var(--accent-green); font-weight: 700; margin-bottom: 0.3rem;">EXPECTED OUTPUT:</div>
+            <div class="diff-box">
+              <div class="diff-line-green">11</div>
+              <div style="color: #64748b;">[EOF]</div>
+            </div>
+          </div>
+          <div>
+            <div style="font-size: 0.8rem; color: var(--accent-red); font-weight: 700; margin-bottom: 0.3rem;">ACTUAL OUTPUT:</div>
+            <div class="diff-box">
+              <div class="diff-line-red">-184729104</div>
+              <div style="color: #64748b;">[EOF]</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 1rem; background: rgba(255, 51, 102, 0.1); border: 1px solid var(--accent-red); padding: 0.75rem; border-radius: 6px; font-size: 0.85rem;">
+          <strong>Nhận định lỗi:</strong> Phát hiện sai khác tại dòng 1. Số âm <code>-184729104</code> cho thấy giá trị tích bị tràn số nguyên 32-bit có dấu. Khuyến nghị đổi kiểu dữ liệu sang <code>__int128_t</code> hoặc <code>long long</code>.
+        </div>
+      </div>
+    </div>
+  <!-- ========================================== -->
+  <!-- MODAL: XÁC THỰC & ĐĂNG NHẬP (AUTH MODAL)   -->
+  <!-- ========================================== -->
+  <div id="auth-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+    <div class="modal-dialog" style="max-width: 480px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <span style="font-size: 1.3rem;" aria-hidden="true">🔐</span>
+          <h3 id="auth-modal-title">Đăng Nhập DEVER Arena</h3>
+        </div>
+        <button id="auth-close-btn" class="btn btn-outline" style="padding: 0.3rem 0.75rem;" aria-label="Đóng đăng nhập">✕ Đóng</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- REASON BANNER -->
+        <div id="auth-reason-banner" class="guest-warning-banner" style="display: none; margin-bottom: 1rem;">
+          <span id="auth-reason-text">Vui lòng đăng nhập để thực hiện hành động này.</span>
+        </div>
+
+        <div class="auth-nav-tabs">
+          <button id="auth-tab-student" class="auth-nav-btn active" onclick="switchAuthTab('student')">
+            🎓 Sinh Viên FPTU
+          </button>
+          <button id="auth-tab-admin" class="auth-nav-btn" onclick="switchAuthTab('admin')">
+            🛡️ Ban Giám Khảo & Admin
+          </button>
+        </div>
+
+        <!-- TAB CONTENT: SINH VIÊN FPTU -->
+        <div id="auth-pane-student">
+          <form id="student-login-form" novalidate onsubmit="event.preventDefault(); handleStudentLogin();">
+            <div class="auth-field-group">
+              <label>Email Sinh Viên (@fpt.edu.vn):</label>
+              <input id="student-email-input" type="email" class="auth-input" placeholder="datntse18000@fpt.edu.vn" value="datntse18000@fpt.edu.vn" required aria-required="true" aria-invalid="false" oninvalid="this.setCustomValidity('Vui lòng nhập email sinh viên @fpt.edu.vn')" oninput="this.setCustomValidity('')">
+            </div>
+
+            <div class="auth-field-group">
+              <label>Mật Khẩu:</label>
+              <input id="student-password-input" type="password" class="auth-input" placeholder="••••••••" value="password123" required aria-required="true" aria-invalid="false" oninvalid="this.setCustomValidity('Vui lòng nhập mật khẩu')" oninput="this.setCustomValidity('')">
+            </div>
+
+            <button type="submit" class="auth-sso-btn">
+              ⚡ Đăng Nhập FPTU SSO (@fpt.edu.vn)
+            </button>
+          </form>
+
+          <div style="margin-top: 1.25rem; text-align: center;">
+            <span style="font-size: 0.8rem; color: #64748b;">— HOẶC TRẢI NGHIỆM NHANH —</span>
+            <button class="btn btn-secondary" style="width: 100%; margin-top: 0.6rem; justify-content: center; font-size: 0.85rem;" onclick="quickLogin('PARTICIPANT')">
+              🚀 Vào ngay với tài khoản Thí Sinh mẫu (dever_hero - 1742)
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB CONTENT: BAN GIÁM KHẢO & ADMIN -->
+        <div id="auth-pane-admin" style="display: none;">
+          <form id="admin-login-form" novalidate onsubmit="event.preventDefault(); handleAdminLogin();">
+            <div class="auth-field-group">
+              <label>Tài Khoản Ban Tổ Chức:</label>
+              <input id="admin-user-input" type="text" class="auth-input" placeholder="admin_jury_dever" value="dever_admin" required aria-required="true" aria-invalid="false" oninvalid="this.setCustomValidity('Vui lòng nhập tài khoản Ban Tổ Chức')" oninput="this.setCustomValidity('')">
+            </div>
+
+            <div class="auth-field-group">
+              <label>Mã Khóa Ban Giám Khảo (Master Key):</label>
+              <input id="admin-pass-input" type="password" class="auth-input" placeholder="••••••••" value="admin123" required aria-required="true" aria-invalid="false" oninvalid="this.setCustomValidity('Vui lòng nhập Master Key')" oninput="this.setCustomValidity('')">
+            </div>
+
+            <button type="submit" class="btn btn-danger" style="width: 100%; justify-content: center; padding: 0.8rem; font-weight: 700;">
+              👑 Đăng Nhập Cổng Ban Giám Khảo
+            </button>
+          </form>
+
+          <div style="margin-top: 1.25rem; text-align: center;">
+            <span style="font-size: 0.8rem; color: #64748b;">— TRẢI NGHIỆM BAN TỔ CHỨC —</span>
+            <button class="btn btn-outline" style="width: 100%; margin-top: 0.6rem; justify-content: center; font-size: 0.85rem; border-color: #ff3366; color: #ff3366;" onclick="quickLogin('ADMIN')">
+              🛡️ Vào ngay Cổng Admin (dever_admin - Grandmaster)
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <footer style="border-top:1px solid var(--border-subtle);padding:1.5rem;text-align:center;color:#64748b;font-size:0.85rem">
+    <div><b style="color:#fff">DEVER FORCES</b> • CLB FU-DEVER • FPT University • <a href="docs/DESIGN_SYSTEM.md" hreflang="vi" style="color:var(--accent-cyan)" aria-label="Tài liệu Design System">Docs</a> • <a href="https://github.com/dever-forces" hreflang="en" style="color:var(--accent-cyan)" aria-label="GitHub DEVER Arena">GitHub</a> • <a href="https://discord.gg/dever" hreflang="en" style="color:var(--accent-cyan)" aria-label="Discord cộng đồng DEVER">Discord</a> • <a href="arena.html" hreflang="vi" style="color:var(--accent-cyan)" aria-label="Đi tới Arena">Arena</a> • <a href="admin.html" hreflang="vi" style="color:var(--accent-cyan)" aria-label="Cổng Admin">Admin</a></div>
+    <div style="margin-top:0.35rem">© 2026 DEVER Arena Enterprise — Built for ICPC & Olympic</div>
+  </footer>
+
+  <div id="dever-toast-container"></div>
+  <script>
+    (function(){function ensure(){let el=document.getElementById('dever-toast-container');if(!el){el=document.createElement('div');el.id='dever-toast-container';document.body.appendChild(el);}return el;}ensure();window.addEventListener('dever:notify',function(e){try{var d=e.detail||{};var msg=d.msg||'';var c=ensure();var t=document.createElement('div');t.className='toast';t.textContent=msg;t.setAttribute('role','status');t.setAttribute('aria-live','polite');c.appendChild(t);setTimeout(function(){t.style.opacity='0';t.style.transition='opacity 200ms';setTimeout(function(){try{t.remove()}catch{}} ,200)},3000)}catch{}});})();
+  </script>
+  <!-- App logic & Master Controllers -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

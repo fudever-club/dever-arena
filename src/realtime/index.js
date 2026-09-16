@@ -1,0 +1,2 @@
+export class RealtimeMock { constructor(){this.channels=new Set(); this.timers=[]} subscribe(channels){channels.forEach(c=>this.channels.add(c))} emit(event,payload){ window.dispatchEvent(new CustomEvent(event,{detail:payload})) } startMockContest(){ setInterval(()=> this.emit('EVENT_STANDINGS_UPDATE', {user_id:'c1', problem_code:'A', points: Math.floor(Math.random()*500), total_score: Math.floor(Math.random()*1500)}), 5000)} stop(){} }
+export const realtime = new RealtimeMock();
