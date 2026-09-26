@@ -41,6 +41,8 @@ export const LandingPage = () => {
   const [sandboxOutput, setSandboxOutput] = useState('');
   const [isExecuting, setIsExecuting] = useState(false);
   const [stats, setStats] = useState({ contests: null, problems: null });
+  const [contests, setContests] = useState([]);
+  const [topProblems, setTopProblems] = useState([]);
 
   // Số liệu thật từ backend; chưa chạy backend thì hiện dấu gạch ngang
   useEffect(() => {
@@ -48,11 +50,19 @@ export const LandingPage = () => {
     (async () => {
       try {
         const [c, p] = await Promise.all([api.getContests(), api.getProblems()]);
-        if (!cancelled) setStats({ contests: c.contests?.length ?? null, problems: p.problems?.length ?? null });
+        if (cancelled) return;
+        setStats({ contests: c.contests?.length ?? null, problems: p.problems?.length ?? null });
+        setContests(Array.isArray(c.contests) ? c.contests : []);
+        const probs = Array.isArray(p.problems) ? [...p.problems].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 5) : [];
+        setTopProblems(probs);
       } catch { /* giữ gạch ngang */ }
     })();
     return () => { cancelled = true; };
   }, []);
+
+  const nextContest = contests.find((c) => ['CODING', 'REGISTRATION'].includes(c.status))
+    || [...contests].sort((a, b) => new Date(a.start_time) - new Date(b.start_time)).find((c) => new Date(c.start_time) > new Date())
+    || null;
 
   const handleLangChange = (lang) => {
     setSandboxLang(lang);
@@ -92,7 +102,7 @@ export const LandingPage = () => {
           className="h-24 w-24 rounded-2xl object-cover ring-1 ring-[#23252a] mx-auto mb-6"
         />
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#141516] border border-[#23252a] text-[#d0d6e0] text-xs font-semibold mb-6">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span className="w-2 h-2 rounded-full bg-[#ff6600] animate-pulse"></span>
           <span>Vòng thi đấu thuật toán của CLB FU-DEVER</span>
         </div>
 
@@ -177,7 +187,7 @@ export const LandingPage = () => {
             <button
               onClick={handleRunSandbox}
               disabled={isExecuting}
-              className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition shadow-md disabled:opacity-50"
+              className="px-4 py-1.5 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-medium text-xs transition disabled:opacity-50"
             >
               {isExecuting ? 'Đang biên dịch...' : 'Chạy Thử Code'}
             </button>
@@ -193,32 +203,94 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* 2. STATS SECTION */}
+      {/* 2. CONTESTS SECTION (Upcoming + Past, kiểu Codeforces) */}
       <section className="border-y border-[#23252a] bg-[#0f1011] py-10 px-6">
-        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-          <div>
-            <span className="font-mono text-3xl font-bold text-[#ff6600] block">{stats.contests ?? '—'}</span>
-            <span className="text-xs text-slate-400 mt-1 block">Kỳ thi trên hệ thống</span>
-          </div>
-          <div>
-            <span className="font-mono text-3xl font-bold text-[#f7f8f8] block">{stats.problems ?? '—'}</span>
-            <span className="text-xs text-slate-400 mt-1 block">Bài tập trong kho đề</span>
-          </div>
-          <div>
-            <span className="font-mono text-3xl font-bold text-[#f7f8f8] block">JS · Py</span>
-            <span className="text-xs text-slate-400 mt-1 block">Ngôn ngữ chấm thật (local)</span>
-          </div>
-          <div>
-            <span className="font-mono text-3xl font-bold text-[#f7f8f8] block">5</span>
-            <span className="text-xs text-slate-400 mt-1 block">Giai đoạn một vòng thi</span>
-          </div>
+        <div className="max-w-5xl mx-auto space-y-6">
+          {nextContest && (
+            <div className="p-5 rounded-xl bg-[#010102] border border-[#ff6600]/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="text-[10px] font-semibold tracking-widest text-[#62666d] uppercase mb-1">Kỳ thi tiếp theo</div>
+                <div className="font-bold text-white">{nextContest.title}</div>
+                <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                  Bắt đầu {new Date(nextContest.start_time).toLocaleString('vi-VN')} • {nextContest.duration_minutes} phút • {nextContest.contest_format}
+                </div>
+              </div>
+              <Link to="/arena" className="px-4 py-2 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-medium text-xs transition shrink-0">
+                Xem & Đăng ký →
+              </Link>
+            </div>
+          )}
+          {contests.length > 0 ? (
+            <div className="rounded-xl border border-[#23252a] overflow-hidden">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#141516] text-slate-400 font-semibold uppercase tracking-wider text-[11px] border-b border-[#23252a]">
+                  <tr>
+                    <th className="py-3 px-4">Kỳ thi</th>
+                    <th className="py-3 px-4">Bắt đầu</th>
+                    <th className="py-3 px-4">Thời lượng</th>
+                    <th className="py-3 px-4 text-right">Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#23252a]">
+                  {contests.slice(0, 8).map((c) => (
+                    <tr key={c.id} className="hover:bg-white/[0.02] transition">
+                      <td className="py-3 px-4 font-bold text-slate-200">{c.title}</td>
+                      <td className="py-3 px-4 font-mono text-slate-400">{new Date(c.start_time).toLocaleString('vi-VN')}</td>
+                      <td className="py-3 px-4 font-mono text-slate-400">{c.duration_minutes}′</td>
+                      <td className="py-3 px-4 text-right">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-white/5 text-slate-300 border-white/10">{c.status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+              <div>
+                <span className="font-mono text-3xl font-bold text-[#ff6600] block">{stats.contests ?? '—'}</span>
+                <span className="text-xs text-slate-400 mt-1 block">Kỳ thi trên hệ thống</span>
+              </div>
+              <div>
+                <span className="font-mono text-3xl font-bold text-[#f7f8f8] block">{stats.problems ?? '—'}</span>
+                <span className="text-xs text-slate-400 mt-1 block">Bài tập trong kho đề</span>
+              </div>
+              <div>
+                <span className="font-mono text-3xl font-bold text-[#f7f8f8] block">JS · Py</span>
+                <span className="text-xs text-slate-400 mt-1 block">Ngôn ngữ chấm thật (local)</span>
+              </div>
+              <div>
+                <span className="font-mono text-3xl font-bold text-[#f7f8f8] block">5</span>
+                <span className="text-xs text-slate-400 mt-1 block">Giai đoạn một vòng thi</span>
+              </div>
+            </div>
+          )}
         </div>
       </section>
+
+      {/* 2b. PROBLEMSET PREVIEW */}
+      {topProblems.length > 0 && (
+        <section className="py-14 px-6 max-w-5xl mx-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-[#f7f8f8] tracking-tight">Bài nổi bật</h2>
+            <Link to="/arena" className="text-xs text-[#ff6600] hover:underline">Xem kho đề →</Link>
+          </div>
+          <div className="rounded-xl border border-[#23252a] overflow-hidden divide-y divide-[#23252a]">
+            {topProblems.map((p) => (
+              <Link key={p.id} to="/arena" className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition">
+                <span className="font-mono font-bold text-[#ff6600] text-sm w-10">{p.code}</span>
+                <span className="flex-1 font-medium text-slate-200 text-sm truncate">{p.title}</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-white/5 text-slate-400 border border-white/10 font-mono">{p.rating || 1000}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 3. CORE FEATURES GRID */}
       <section className="py-20 px-6 max-w-6xl mx-auto">
         <div className="text-center mb-12">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          <h2 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight">
             Thể thức thi đấu
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-xl mx-auto">
@@ -233,7 +305,7 @@ export const LandingPage = () => {
               Thi đấu tính giờ
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Điểm mỗi bài giảm dần theo từng phút: <code className="text-orange-400">Pmax - Pmax*t/250 - 50*W</code>. Nộp càng sớm điểm càng cao.
+              Điểm mỗi bài giảm dần theo từng phút: <code className="text-[#ff6600]">Pmax - Pmax*t/250 - 50*W</code>. Nộp càng sớm điểm càng cao.
             </p>
           </div>
 
@@ -243,7 +315,7 @@ export const LandingPage = () => {
               Phòng thách đấu
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Sau giờ làm bài, mỗi phòng được xem code của nhau trong 15 phút. Tìm input làm code đối thủ sai để được <b className="text-emerald-400">+100 điểm</b>.
+              Sau giờ làm bài, mỗi phòng được xem code của nhau trong 15 phút. Tìm input làm code đối thủ sai để được <b className="text-slate-200">+100 điểm</b>.
             </p>
           </div>
 

@@ -252,8 +252,7 @@ export const AdminLayout = ({ children }) => {
         } catch { /* backend chưa chạy */ }
       })();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+    }, [activeTab]);
   const [adminNotice, setAdminNotice] = useState('');
 
   const [formData, setFormData] = useState({
@@ -1292,8 +1291,7 @@ const TelemetryPanel = () => {
     let cancelled = false;
     (async () => { if (!cancelled) await load(); })();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    }, []);
 
   const handleRejudge = async (id) => {
     if (confirmRejudgeId !== id) {

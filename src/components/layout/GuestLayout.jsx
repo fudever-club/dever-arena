@@ -30,8 +30,15 @@ export const GuestLayout = () => {
       <main className="flex-1 overflow-hidden">
         <Outlet />
       </main>
-      <footer className="border-t border-[#23252a] py-4 px-6 text-center text-[11px] text-slate-500">
-        DEVER Arena • CLB FU-DEVER • Tài khoản thi đấu do ban tổ chức cấp
+      <footer className="border-t border-[#23252a] py-6 px-6">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-500">
+          <span>© 2026 DEVER Arena • CLB FU-DEVER • Tài khoản thi đấu do ban tổ chức cấp</span>
+          <div className="flex items-center gap-4">
+            <span>Thể thức Codeforces • Hack Room • Elo</span>
+            <span>club.dever@gmail.com</span>
+            <a href="https://github.com/fudever-club" target="_blank" rel="noreferrer" className="hover:text-slate-300 transition">GitHub</a>
+          </div>
+        </div>
       </footer>
     </div>
   );
