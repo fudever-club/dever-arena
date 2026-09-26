@@ -19,12 +19,18 @@ const runtimeGlobals = {
   IntersectionObserver: 'readonly', ResizeObserver: 'readonly', alert: 'readonly',
   indexedDB: 'readonly', CustomEvent: 'readonly', EventSource: 'readonly', WebSocket: 'readonly',
   MutationObserver: 'readonly', getComputedStyle: 'readonly', matchMedia: 'readonly',
+  atob: 'readonly', btoa: 'readonly', FileReader: 'readonly', DOMParser: 'readonly',
 };
 
 export default [
   {
-    files: ['server/**/*.js', 'src/**/*.js', 'scripts/**/*.mjs', 'tests/**/*.js', 'detect.mjs', 'eslint.config.mjs'],
-    languageOptions: { ecmaVersion: 2022, sourceType: 'module', globals: runtimeGlobals },
+    files: ['server/**/*.js', 'src/**/*.{js,jsx}', 'scripts/**/*.mjs', 'tests/**/*.js', 'detect.mjs', 'eslint.config.mjs'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: runtimeGlobals,
+      parserOptions: { ecmaFeatures: { jsx: true } },
+    },
     rules: {
       'no-undef': 'error',
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],

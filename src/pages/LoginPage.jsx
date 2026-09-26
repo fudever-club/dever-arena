@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export const LoginPage = () => {
@@ -11,6 +11,7 @@ export const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleFastSwitch = (roleKey) => {
     const loggedUser = loginWithPreset(roleKey);
@@ -23,16 +24,24 @@ export const LoginPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isLoading) return;
     if (!username.trim()) {
       setError('Vui lòng nhập Tên đăng nhập hoặc Email FPT!');
       return;
     }
     setError('');
-    const loggedUser = await loginWithCredentials(username, password);
-    if (loggedUser.role === 'ADMIN') {
-      navigate('/admin');
-    } else {
-      navigate(redirectUrl);
+    setIsLoading(true);
+    try {
+      const loggedUser = await loginWithCredentials(username, password);
+      if (loggedUser?.role === 'ADMIN') {
+        navigate('/admin');
+      } else {
+        navigate(redirectUrl);
+      }
+    } catch (err) {
+      setError(err?.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -45,10 +54,10 @@ export const LoginPage = () => {
           <img
             src="/brand/logo-dark.png"
             alt="CLB FU-DEVER — Work hard, Play hard"
-            className="h-20 w-20 rounded-2xl object-cover ring-1 ring-white/10 shadow-xl mb-6"
+            className="h-20 w-20 rounded-2xl object-cover ring-1 ring-[#23252a] mb-6"
           />
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-[#ff6600] text-xs font-semibold mb-6">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#141516] border border-[#23252a] text-[#d0d6e0] text-xs font-semibold mb-6">
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
             Hệ Thống Đấu Trường Giải Thuật CLB FU-DEVER
           </div>
 
@@ -61,21 +70,21 @@ export const LoginPage = () => {
           </p>
 
           <div className="space-y-3.5 max-w-md">
-            <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+            <div className="p-3 rounded-lg bg-[#141516] border border-[#23252a]">
               <div>
                 <h4 className="text-xs font-bold text-slate-200">Không gian làm bài</h4>
                 <p className="text-[11px] text-slate-400 mt-0.5">Soạn code, chạy thử testcase và nộp bài chấm điểm ngay trên trình duyệt.</p>
               </div>
             </div>
 
-            <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+            <div className="p-3 rounded-lg bg-[#141516] border border-[#23252a]">
               <div>
                 <h4 className="text-xs font-bold text-slate-200">Phòng thách đấu</h4>
                 <p className="text-[11px] text-slate-400 mt-0.5">Đọc code đối thủ cùng phòng, tìm input làm code sai để được cộng điểm.</p>
               </div>
             </div>
 
-            <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+            <div className="p-3 rounded-lg bg-[#141516] border border-[#23252a]">
               <div>
                 <h4 className="text-xs font-bold text-slate-200">Chống gian lận mã nguồn</h4>
                 <p className="text-[11px] text-slate-400 mt-0.5">So khớp cây cú pháp để phát hiện bài sao chép. Cấm dùng AI sinh code trong giờ thi tính điểm.</p>
@@ -85,14 +94,14 @@ export const LoginPage = () => {
         </div>
 
         {/* Social Proof Footer */}
-        <div className="pt-8 mt-8 border-t border-white/10 flex items-center justify-between text-xs text-slate-500 relative z-10">
+        <div className="pt-8 mt-8 border-t border-[#23252a] flex items-center justify-between text-xs text-slate-500 relative z-10">
           <span>CLB FU-DEVER • FPT University</span>
           <span>Hỗ trợ C++20 / Python / Java / JS</span>
         </div>
       </div>
 
       {/* Right Login & Fast Switch Form */}
-      <div className="lg:col-span-6 p-8 lg:p-12 flex flex-col justify-center items-center bg-[#090d18]">
+      <div className="lg:col-span-6 p-8 lg:p-12 flex flex-col justify-center items-center bg-[#141516]">
         <div className="w-full max-w-md">
           <div className="mb-6 text-center lg:text-left">
             <h2 className="text-2xl font-bold text-white tracking-tight">Đăng Nhập Đấu Trường</h2>
@@ -100,7 +109,7 @@ export const LoginPage = () => {
           </div>
 
           {/* 1-Click Fast Switch Panel */}
-          <div className="mb-6 p-4 rounded-xl bg-slate-900 border border-orange-500/20 shadow-lg relative overflow-hidden">
+          <div className="mb-6 p-4 rounded-xl bg-[#0f1011] border border-[#23252a] relative overflow-hidden">
             <div className="mb-3">
               <span className="text-xs font-bold text-orange-400 tracking-wide uppercase">
                 Đăng nhập nhanh
@@ -111,7 +120,7 @@ export const LoginPage = () => {
               <button
                 type="button"
                 onClick={() => handleFastSwitch('GUEST')}
-                className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition group text-center"
+                className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#23252a] transition group text-center"
               >
                 <span className="text-xs font-semibold text-slate-300 group-hover:text-white">Khách</span>
                 <span className="text-[10px] text-slate-500 mt-0.5">Chỉ xem, không thi</span>
@@ -138,8 +147,8 @@ export const LoginPage = () => {
           </div>
 
           <div className="relative flex items-center justify-center mb-6">
-            <div className="border-t border-white/10 w-full"></div>
-            <span className="bg-[#090d18] px-3 text-[11px] text-slate-500 uppercase tracking-wider font-semibold absolute">
+            <div className="border-t border-[#23252a] w-full"></div>
+            <span className="bg-[#141516] px-3 text-[11px] text-slate-500 uppercase tracking-wider font-semibold absolute">
               Hoặc nhập tài khoản cá nhân
             </span>
           </div>
@@ -147,7 +156,7 @@ export const LoginPage = () => {
           {/* Form Credentials */}
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="p-2.5 rounded bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
+              <div role="alert" className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
                 {error}
               </div>
             )}
@@ -161,7 +170,8 @@ export const LoginPage = () => {
                 placeholder="VD: SE180123 hoặc dever_coder"
                 value={username}
                 onChange={(e) => { setUsername(e.target.value); setError(''); }}
-                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 focus:border-[#ff6600] focus:ring-1 focus:ring-[#ff6600] text-sm text-white placeholder-slate-500 outline-none transition"
+                disabled={isLoading}
+                className="w-full px-3 py-2 rounded-lg bg-[#0f1011] border border-[#23252a] focus:border-[#ff6600] focus:ring-1 focus:ring-[#ff6600] text-sm text-white placeholder-slate-500 outline-none transition disabled:opacity-60"
               />
             </div>
 
@@ -176,15 +186,17 @@ export const LoginPage = () => {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 focus:border-[#ff6600] focus:ring-1 focus:ring-[#ff6600] text-sm text-white placeholder-slate-500 outline-none transition"
+                disabled={isLoading}
+                className="w-full px-3 py-2 rounded-lg bg-[#0f1011] border border-[#23252a] focus:border-[#ff6600] focus:ring-1 focus:ring-[#ff6600] text-sm text-white placeholder-slate-500 outline-none transition disabled:opacity-60"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full py-2.5 px-4 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] font-medium text-sm text-white transition"
+              disabled={isLoading}
+              className="w-full py-2.5 px-4 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] font-medium text-sm text-white transition disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Đăng Nhập Vào Arena
+              {isLoading ? 'Đang đăng nhập…' : 'Đăng Nhập Vào Arena'}
             </button>
           </form>
 
