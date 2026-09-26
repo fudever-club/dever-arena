@@ -92,50 +92,61 @@ export const HackRoomPage = () => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [roomData, setRoomData] = useState(ROOM_PARTICIPANTS);
   const [dataSource, setDataSource] = useState('demo'); // demo | live
+  const [myId, setMyId] = useState(null);
+  const [hackHistory, setHackHistory] = useState([]);
+  const canHack = phase === 'HACK_PHASE';
+
+  const loadRoom = async () => {
+    try {
+      const token = getToken();
+      if (!token) return false;
+      // Giải mã payload JWT (không cần secret) để biết user id của mình
+      let id = null;
+      try { id = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))?.sub || null; } catch {}
+      setMyId(id);
+      const st = await api.getStandings(contestSlug);
+      const rows = st.standings || [];
+      const myRow = id ? rows.find((r) => r.user_id === id) : null;
+      const roomId = myRow?.room_id || [...new Set(rows.map((r) => r.room_id).filter(Boolean))][0];
+      if (!roomId) return false;
+      const room = await api.getRoom(contestSlug, roomId);
+      if (!room?.members?.length) return false;
+      const mapped = room.members.map((m) => ({
+        id: m.user_id,
+        username: m.username,
+        rating: m.rating,
+        solvedProblems: (m.submissions || []).map((s) => ({
+          code: s.problem_code,
+          points: s.points,
+          solved: true,
+          isHacked: Boolean(s.is_hacked),
+          language: s.language,
+          codeContent: s.source_code,
+          submissionId: s.id,
+        })),
+      })).filter((m) => m.solvedProblems.length > 0);
+      if (mapped.length > 0) {
+        setRoomData(mapped);
+        setSelectedCoder((prev) => mapped.find((m) => m.id === prev.id) || mapped[0]);
+        setDataSource('live');
+        return true;
+      }
+      return false;
+    } catch { return false; }
+  };
 
   // Phòng thật từ backend (cần đăng nhập). Không có → giữ demo local.
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const token = getToken();
-        if (!token) return;
-        // Giải mã payload JWT (không cần secret) để biết user id của mình
-        let myId = null;
-        try { myId = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))?.sub || null; } catch {}
-        const st = await api.getStandings(contestSlug);
-        const rows = st.standings || [];
-        const myRow = myId ? rows.find((r) => r.user_id === myId) : null;
-        const roomId = myRow?.room_id || [...new Set(rows.map((r) => r.room_id).filter(Boolean))][0];
-        if (!roomId) return;
-        const room = await api.getRoom(contestSlug, roomId);
-        if (cancelled || !room?.members?.length) return;
-        const mapped = room.members.map((m) => ({
-          id: m.user_id,
-          username: m.username,
-          rating: m.rating,
-          solvedProblems: (m.submissions || []).map((s) => ({
-            code: s.problem_code,
-            points: s.points,
-            solved: true,
-            isHacked: false,
-            language: s.language,
-            codeContent: s.source_code,
-            submissionId: s.id,
-          })),
-        })).filter((m) => m.solvedProblems.length > 0);
-        if (mapped.length > 0) {
-          setRoomData(mapped);
-          setSelectedCoder(mapped[0]);
-          setSelectedProblemCode(mapped[0].solvedProblems[0].code);
-          setDataSource('live');
-        }
-      } catch { /* giữ demo */ }
-    })();
+    (async () => { if (!cancelled) await loadRoom(); })();
     return () => { cancelled = true; };
   }, [contestSlug]);
 
   const activeProblem = selectedCoder.solvedProblems?.find((p) => p.code === selectedProblemCode) || selectedCoder.solvedProblems?.[0];
+  const isSelf = Boolean(myId && selectedCoder.id === myId);
+  const openChallenges = roomData.reduce((n, c) => n + c.solvedProblems.filter((p) => !p.isHacked).length, 0);
+
+  const pushHistory = (entry) => setHackHistory((h) => [{ at: new Date().toISOString(), ...entry }, ...h].slice(0, 20));
 
   const handleTestcaseChange = (val) => {
     setCounterTestcase(val);
@@ -175,17 +186,15 @@ export const HackRoomPage = () => {
             message: 'Hack thành công (+100đ)!',
             details: `Code đối thủ sai trên testcase của bạn (máy chấm: ${res.victim_verdict || 'sai output'}). Bài nộp đã bị vô hiệu hóa.`
           });
-          setRoomData((prev) =>
-            prev.map((c) => (c.id === selectedCoder.id
-              ? { ...c, solvedProblems: c.solvedProblems.map((p) => (p.code === selectedProblemCode ? { ...p, isHacked: true } : p)) }
-              : c))
-          );
+          pushHistory({ target: selectedCoder.username, problem: selectedProblemCode, result: 'SUCCESS', delta: 100, mode: 'live' });
+          await loadRoom();
         } else {
           setHackStatus({
             type: 'FAILED',
             message: 'Hack thất bại (−50đ)!',
             details: 'Code đối thủ vẫn đúng trên testcase của bạn. Bạn bị trừ 50 điểm.'
           });
+          pushHistory({ target: selectedCoder.username, problem: selectedProblemCode, result: 'FAILED', delta: -50, mode: 'live' });
         }
       } catch (err) {
         setHackStatus({ type: 'FAILED', message: 'Không gửi được đòn hack', details: err?.message || 'Lỗi kết nối máy chủ.' });
@@ -212,6 +221,7 @@ export const HackRoomPage = () => {
           message: 'Hack thành công (+100đ, demo)!',
           details: 'Code mẫu này dùng số nguyên 32-bit nên tràn số với input lớn. Bài nộp demo bị vô hiệu hóa.'
         });
+        pushHistory({ target: selectedCoder.username, problem: selectedProblemCode, result: 'SUCCESS', delta: 100, mode: 'demo' });
 
         // Update victim problem state
         setRoomData((prev) =>
@@ -233,6 +243,7 @@ export const HackRoomPage = () => {
           message: 'Hack thất bại (−50đ, demo)!',
           details: 'Ở chế độ demo, chỉ tài khoản buggy_coder bài B mới bẻ được. Chạy backend và thi Hack Phase thật để chấm điểm.'
         });
+        pushHistory({ target: selectedCoder.username, problem: selectedProblemCode, result: 'FAILED', delta: -50, mode: 'demo' });
       }
     }, 800);
   };
@@ -251,15 +262,20 @@ export const HackRoomPage = () => {
               {dataSource === 'live' ? `Phòng thật (${phase})` : 'Demo local'}
             </span>
           </div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight">
+          <h1 className="text-2xl font-semibold text-white tracking-tight">
             Phòng Thách Đấu
           </h1>
           <p className="text-xs text-slate-400 mt-1 max-w-xl">
             Sau giờ làm bài, mỗi người được đọc code cùng phòng và gửi input để chứng minh code đối thủ sai. Hack đúng +100 điểm, hack sai −50 điểm.
           </p>
+          {!canHack && (
+            <p className="mt-2 inline-block px-2.5 py-1 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-[11px] font-semibold" role="status">
+              Đòn hack chỉ mở trong Hack Phase (hiện tại: {phase}). Ngoài giờ thi, form gửi bị khóa.
+            </p>
+          )}
         </div>
 
-        <div className="bg-black/60 p-4 rounded-xl border border-white/10 shrink-0 text-right font-mono">
+        <div className="bg-[#0f1011] p-4 rounded-xl border border-[#23252a] shrink-0 text-right font-mono">
           <span className="text-[11px] text-slate-400 block">Thời gian Hack Phase</span>
           <span className="text-2xl font-black text-red-400 tracking-wider">
             {formattedTime}
@@ -273,9 +289,10 @@ export const HackRoomPage = () => {
         {/* ======================================================== */}
         {/* LEFT COLUMN: 25 Room Participants List (4 Cols)          */}
         {/* ======================================================== */}
-        <div className="lg:col-span-4 bg-[#0e1424] border border-white/10 rounded-2xl p-4 flex flex-col space-y-3">
-          <div className="flex items-center justify-between border-b border-white/5 pb-2 text-xs font-bold text-slate-300">
+        <div className="lg:col-span-4 bg-[#0f1011] border border-[#23252a] rounded-xl p-4 flex flex-col space-y-3">
+          <div className="flex items-center justify-between border-b border-[#23252a] pb-2 text-xs font-bold text-slate-300">
             <span>Danh sách đấu thủ cùng phòng</span>
+            <span className="font-mono text-[10px] text-slate-500">{openChallenges} còn bẻ được</span>
           </div>
 
           <div className="space-y-2 overflow-y-auto max-h-[560px] pr-1">
@@ -284,11 +301,10 @@ export const HackRoomPage = () => {
               return (
                 <div
                   key={coder.id}
-                  onClick={() => setSelectedCoder(coder)}
-                  className={`p-3 rounded-xl border transition cursor-pointer ${
+                  className={`p-3 rounded-xl border transition ${
                     isSelected
-                      ? 'bg-red-500/10 border-red-500/40 shadow-md'
-                      : 'bg-white/5 border-white/5 hover:border-white/20'
+                      ? 'bg-[#141516] border-[#ff6600]/40'
+                      : 'bg-white/[0.02] border-[#23252a] hover:border-[#34343a]'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
@@ -297,10 +313,19 @@ export const HackRoomPage = () => {
                         {coder.username[0].toUpperCase()}
                       </div>
                       <div className="text-left leading-none">
-                        <span className="font-bold text-white text-xs block">{coder.username}</span>
+                        <span className="font-bold text-white text-xs block">{coder.username}{myId === coder.id ? ' (bạn)' : ''}</span>
                         <span className="text-[10px] text-slate-400 font-mono">{coder.rating} Elo</span>
                       </div>
                     </div>
+                    {!isSelected && (
+                      <button
+                        onClick={() => setSelectedCoder(coder)}
+                        aria-label={`Chọn ${coder.username} làm mục tiêu`}
+                        className="px-2 py-1 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#34343a] text-slate-300 text-[11px] transition"
+                      >
+                        Chọn
+                      </button>
+                    )}
                   </div>
 
                   {/* Problems status pills */}
@@ -334,13 +359,13 @@ export const HackRoomPage = () => {
         {/* ======================================================== */}
         {/* RIGHT COLUMN: Code Inspection & Hack Chamber (8 Cols)   */}
         {/* ======================================================== */}
-        <div className="lg:col-span-8 bg-[#0e1424] border border-white/10 rounded-2xl p-6 flex flex-col space-y-5">
-          
+        <div className="lg:col-span-8 bg-[#0f1011] border border-[#23252a] rounded-xl p-6 flex flex-col space-y-5">
+
           {/* Victim Header */}
-          <div className="flex items-center justify-between border-b border-white/10 pb-4">
+          <div className="flex items-center justify-between border-b border-[#23252a] pb-4">
             <div>
               <span className="text-xs text-slate-400 block font-medium">Mục tiêu bẻ khóa:</span>
-              <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
                 <span>{selectedCoder.username}</span>
                 <span className="text-slate-500">•</span>
                 <span className="text-[#ff6600]">Bài {selectedProblemCode}</span>
@@ -354,6 +379,11 @@ export const HackRoomPage = () => {
               </span>
                 )}
               </h2>
+              {isSelf && (
+                <p className="mt-1 text-[11px] text-yellow-300 font-semibold" role="status">
+                  Đây là bài của chính bạn — không thể tự hack (luật Codeforces).
+                </p>
+              )}
             </div>
 
             <div className="text-right text-xs font-mono text-slate-400">
@@ -366,7 +396,7 @@ export const HackRoomPage = () => {
             <div className="flex items-center justify-between text-xs font-bold text-slate-400 mb-1.5">
               <span>Mã nguồn đối thủ (chế độ đọc):</span>
             </div>
-            <pre className="p-4 rounded-xl bg-[#060912] border border-white/10 font-mono text-xs text-slate-300 overflow-x-auto max-h-60 leading-relaxed">
+            <pre className="p-4 rounded-xl bg-[#010102] border border-[#23252a] font-mono text-xs text-slate-300 overflow-x-auto max-h-60 leading-relaxed">
               {activeProblem?.codeContent || (dataSource === 'live'
                 ? `// Code đối thủ chỉ mở trong Hack Phase (hiện tại: ${phase}).`
                 : '// Không có mã nguồn khả dụng cho bài này.')}
@@ -392,11 +422,14 @@ export const HackRoomPage = () => {
               rows={3}
               value={counterTestcase}
               onChange={(e) => handleTestcaseChange(e.target.value)}
-              className="w-full p-3 rounded-xl bg-[#060912] border border-white/10 font-mono text-xs text-emerald-400 focus:border-red-500 outline-none"
+              disabled={!canHack}
+              aria-label="Input để bẻ khóa (chỉ mở trong Hack Phase)"
+              className="w-full p-3 rounded-xl bg-[#010102] border border-[#23252a] font-mono text-xs text-slate-200 focus:border-[#ff6600] outline-none disabled:opacity-50"
               placeholder="VD: 3\n100000 100000 100000\n"
             />
             <p className="text-[11px] text-slate-500">
               Input phải đúng định dạng đề bài: kết thúc bằng một ký tự xuống dòng, không dư khoảng trắng cuối dòng.
+              Đang kiểm tra theo N trong [1, 200000], phần tử trong ±10⁹ (đổi theo từng bài trong bản Polygon đầy đủ).
             </p>
           </div>
 
@@ -418,12 +451,29 @@ export const HackRoomPage = () => {
           <div className="pt-2">
             <button
               onClick={handleExecuteHack}
-              disabled={isExecuting || !testlibResult.isValid || activeProblem?.isHacked || (dataSource === 'live' && !activeProblem?.submissionId)}
+              disabled={isExecuting || !testlibResult.isValid || activeProblem?.isHacked || isSelf || !canHack || (dataSource === 'live' && !activeProblem?.submissionId)}
               className="w-full py-3 px-6 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] font-medium text-sm text-white transition disabled:opacity-50"
             >
               {isExecuting ? 'Đang chấm...' : 'Tung đòn hack (−50đ / +100đ)'}
             </button>
           </div>
+
+          {/* Lịch sử hack của tôi */}
+          {hackHistory.length > 0 && (
+            <div className="rounded-xl border border-[#23252a] overflow-hidden">
+              <div className="px-4 py-2 bg-[#141516] text-[11px] font-bold text-slate-300 uppercase tracking-wider">Lịch sử hack của tôi</div>
+              <ul className="divide-y divide-[#23252a] text-xs font-mono">
+                {hackHistory.map((h, i) => (
+                  <li key={i} className="px-4 py-2 flex items-center justify-between gap-2">
+                    <span className="text-slate-400 truncate">{h.target} · Bài {h.problem} · {new Date(h.at).toLocaleTimeString('vi-VN')}</span>
+                    <span className={`font-bold shrink-0 ${h.result === 'SUCCESS' ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {h.result === 'SUCCESS' ? `+${h.delta}` : h.delta}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
         </div>
 
