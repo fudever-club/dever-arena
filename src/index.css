@@ -112,3 +112,8 @@ body {
   background-color: var(--dv-accent);
   transition: background-color 0.15s ease;
 }
+
+/* Workspace panes: mobile 1 cột full-width (thắng inline style split desktop) */
+@media (max-width: 1023px) {
+  .ws-pane { width: 100% !important; }
+}
