@@ -180,6 +180,238 @@ const WorkflowBadge = ({ status }) => {  const s = status || 'DRAFT';
   );
 };
 
+/** Dashboard tổng quan: phase hiện tại + số contests/problems/submissions/hacks + shortcuts. */
+const OverviewPanel = ({ phase, onJump }) => {
+  const [loading, setLoading] = useState(true);
+  const [contestTitle, setContestTitle] = useState('');
+  const [stats, setStats] = useState({ contests: 0, problems: 0, submissions: 0, hacks: 0, participants: 0 });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const cData = await api.getContests();
+        const contests = Array.isArray(cData?.contests) ? cData.contests : [];
+        const main = contests.find((c) => c.id === 'contest_dever_round1') || contests[0] || null;
+        if (!main) { if (!cancelled) setLoading(false); return; }
+        if (!cancelled) setContestTitle(main.title || main.slug || main.id);
+        const [pData, sData, stData] = await Promise.all([
+          api.getProblems({ contest_id: main.id }).catch(() => ({ problems: [] })),
+          api.listSubmissions(main.id).catch(() => ({ submissions: [] })),
+          main.slug ? api.getStandings(main.slug).catch(() => ({ standings: [] })) : Promise.resolve({ standings: [] }),
+        ]);
+        if (cancelled) return;
+        const subs = sData?.submissions || [];
+        setStats({
+          contests: contests.length,
+          problems: (pData?.problems || []).length,
+          submissions: subs.length,
+          hacks: subs.filter((s) => s.verdict === 'HACKED' || s.is_hacked).length,
+          participants: (stData?.standings || []).length,
+        });
+      } catch { /* giữ số 0 khi offline */ }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const cards = [
+    ['Pha hiện tại', String(phase || '—')],
+    ['Kỳ thi', String(stats.contests)],
+    ['Đề thi', String(stats.problems)],
+    ['Bài nộp', String(stats.submissions)],
+    ['Hack thành công', String(stats.hacks)],
+    ['Thí sinh', String(stats.participants)],
+  ];
+  const shortcuts = [
+    ['phase', 'Điều khiển phase'],
+    ['polygon', 'Soạn đề thi'],
+    ['telemetry', 'Giám sát máy chấm'],
+    ['rooms', 'Phòng hack'],
+    ['anticheat', 'Soát gian lận AST'],
+    ['accounts', 'Cấp tài khoản'],
+  ];
+
+  return (
+    <div className="space-y-6">
+      <AdminSection eyebrow="Tổng quan" title="Dashboard điều hành" desc={contestTitle ? `Contest trọng tâm: ${contestTitle}. Số liệu live từ máy chủ.` : 'Số liệu live từ máy chủ (getContests / getProblems / submissions / standings).'} />
+      {loading ? (
+        <p className="text-xs text-slate-400">Đang tải số liệu tổng quan…</p>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {cards.map(([label, value]) => (
+            <div key={label} className="p-4 rounded-xl bg-[#0f1011] border border-[#23252a]">
+              <span className="text-[11px] text-slate-400 block">{label}</span>
+              <span className="text-lg font-bold text-white font-mono">{value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="p-5 rounded-xl bg-[#0f1011] border border-[#23252a]">
+        <h3 className="text-sm font-bold text-white mb-3">Lối tắt tác vụ</h3>
+        <div className="flex flex-wrap gap-2">
+          {shortcuts.map(([tab, label]) => (
+            <button
+              key={tab}
+              onClick={() => onJump?.(tab)}
+              className="px-3 py-2 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#23252a] text-slate-200 text-xs font-medium transition"
+            >
+              {label} →
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/** CRUD testcase (pretests/system) cho đề đang chọn. Sample do server giữ (409 khi xóa). */
+const TestcasePanel = ({ problems, notify }) => {
+  const [problemId, setProblemId] = useState('');
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [form, setForm] = useState({ stdin: '', expected_stdout: '', is_pretest: true, strategy: 'manual' });
+  const [saving, setSaving] = useState(false);
+
+  const activeId = problemId || (problems?.[0]?.id ?? '');
+  useEffect(() => {
+    if (!problemId && problems?.length) setProblemId(problems[0].id);
+  }, [problems, problemId]);
+
+  const load = async (pid) => {
+    const id = pid || activeId;
+    if (!id) return;
+    setLoading(true); setMsg('');
+    try {
+      const data = await api.listTestcases(id);
+      setRows(data?.testcases || []);
+    } catch (e) {
+      setMsg(e?.message || 'Không tải được testcase (cần backend + đăng nhập admin).');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeId) load(activeId);
+  }, [activeId]);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!activeId || !form.stdin) {
+      setMsg('Chọn đề và nhập stdin trước khi lưu.');
+      return;
+    }
+    setSaving(true); setMsg('');
+    try {
+      await api.saveTestcase({
+        problem_id: activeId,
+        stdin: form.stdin,
+        expected_stdout: form.expected_stdout,
+        is_pretest: !!form.is_pretest,
+        strategy: form.strategy.trim() || 'manual',
+      });
+      setForm({ stdin: '', expected_stdout: '', is_pretest: true, strategy: 'manual' });
+      await load(activeId);
+      notify?.('Đã lưu testcase.');
+    } catch (err) {
+      setMsg(err?.message || 'Lưu testcase thất bại.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (tc) => {
+    if (tc.is_sample) {
+      setMsg('Test mẫu sửa qua đề bài (tab Soạn đề), không xóa lẻ — máy chủ trả 409.');
+      return;
+    }
+    if (!window.confirm(`Xóa testcase ${tc.id.slice(0, 12)}…?`)) return;
+    try {
+      await api.deleteTestcase(tc.id);
+      await load(activeId);
+    } catch (err) {
+      setMsg(err?.message || 'Xóa testcase thất bại.');
+    }
+  };
+
+  const inputCls = 'w-full px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-slate-200 font-mono text-xs outline-none';
+
+  return (
+    <div className="p-5 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-semibold tracking-widest text-[#62666d] uppercase mb-1">Polygon · Testcase</div>
+          <h3 className="text-sm font-bold text-white">Pretests / System tests của đề đang chọn</h3>
+          <p className="text-[11px] text-slate-400 mt-0.5">Hiện strategy + is_pretest. Test mẫu (is_sample) không xóa lẻ.</p>
+        </div>
+        <select value={activeId} onChange={(e) => setProblemId(e.target.value)} className="px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-white text-xs outline-none">
+          {(problems || []).map((p) => (<option key={p.id} value={p.id}>{p.code} · {p.title}</option>))}
+        </select>
+      </div>
+      {msg && <div className="p-2.5 rounded-lg bg-white/5 border border-[#23252a] text-[11px] text-slate-300" role="status">{msg}</div>}
+      {loading ? (
+        <p className="text-xs text-slate-400">Đang tải testcase…</p>
+      ) : (
+        <div className="bg-black/40 border border-white/5 rounded-xl overflow-hidden">
+          <table className="w-full text-left text-[11px]">
+            <thead className="text-slate-500 uppercase tracking-wider">
+              <tr>
+                <th className="py-2 px-3">Testcase</th>
+                <th className="py-2 px-3">Strategy</th>
+                <th className="py-2 px-3">Pretest?</th>
+                <th className="py-2 px-3">Sample?</th>
+                <th className="py-2 px-3 text-right">Xóa</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5 font-mono">
+              {rows.length === 0 && (
+                <tr><td colSpan={5} className="py-3 px-3 text-slate-500">Chưa có testcase cho đề này.</td></tr>
+              )}
+              {rows.map((t) => (
+                <tr key={t.id}>
+                  <td className="py-2 px-3 text-slate-300">{t.id.slice(0, 16)}… <span className="text-slate-500">#{t.order_index ?? '-'}</span></td>
+                  <td className="py-2 px-3 text-slate-200">{t.strategy || 'manual'}</td>
+                  <td className="py-2 px-3 text-slate-200">{t.is_pretest ? 'pretest' : 'system'}</td>
+                  <td className="py-2 px-3 text-slate-400">{t.is_sample ? 'sample' : '—'}</td>
+                  <td className="py-2 px-3 text-right">
+                    <button
+                      onClick={() => handleDelete(t)}
+                      disabled={!!t.is_sample}
+                      title={t.is_sample ? 'Test mẫu: sửa qua đề bài, không xóa lẻ (409)' : 'Xóa testcase'}
+                      className="px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 text-[11px] transition disabled:opacity-40"
+                    >
+                      {t.is_sample ? 'Khóa' : 'Xóa'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <form onSubmit={handleSave} className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <textarea value={form.stdin} onChange={(e) => setForm((f) => ({ ...f, stdin: e.target.value }))} rows={3} placeholder="stdin (bắt buộc)"
+          className={`${inputCls} resize-none`} />
+        <textarea value={form.expected_stdout} onChange={(e) => setForm((f) => ({ ...f, expected_stdout: e.target.value }))} rows={3} placeholder="expected_stdout (có thể trống)"
+          className={`${inputCls} resize-none`} />
+        <label className="flex items-center gap-2 text-slate-300">
+          <input type="checkbox" checked={form.is_pretest} onChange={(e) => setForm((f) => ({ ...f, is_pretest: e.target.checked }))} />
+          Pretest (bỏ tick = system test)
+        </label>
+        <div className="flex items-center gap-2">
+          <input value={form.strategy} onChange={(e) => setForm((f) => ({ ...f, strategy: e.target.value }))} placeholder="strategy (vd: edge-min, random)"
+            className={inputCls} />
+          <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-medium shrink-0 disabled:opacity-50">
+            {saving ? 'Đang lưu…' : 'Thêm test'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
 export const AdminLayout = ({ children }) => {
   const { user, isAdmin, logout } = useAuth();
   const { 
@@ -194,7 +426,7 @@ export const AdminLayout = ({ children }) => {
     else setAdminNotice('');
   };
 
-  const [activeTab, setActiveTab] = useState('phase'); // phase | anticheat | polygon | telemetry | rooms
+  const [activeTab, setActiveTab] = useState('overview'); // overview | phase | anticheat | polygon | telemetry | rooms | accounts
 
   // Polygon Problem Studio States
   const [polygonView, setPolygonView] = useState('list'); // 'list' | 'editor'
@@ -262,11 +494,30 @@ export const AdminLayout = ({ children }) => {
     tags: 'math, data-structures',
     timeLimit: '1.0s',
     memoryLimit: '256 MB',
+    minN: 1,
+    maxN: 200000,
+    minVal: -1000000000,
+    maxVal: 1000000000,
     statement: `Cho số nguyên $N$ ($1 \\le N \\le 10^5$). Tính giá trị:\n$$S = \\sum_{i=1}^N (i^2 + 2i)$$\nIn ra kết quả theo modulo $10^9 + 7$.`,
     sampleInput: '3',
     sampleOutput: '26',
     editorial: `### Hướng dẫn giải:\nÁp dụng công thức tổng bình phương:\n$$\\sum_{i=1}^N i^2 = \\frac{N(N+1)(2N+1)}{6}$$`
   });
+  const [touched, setTouched] = useState({});
+  const [submitTried, setSubmitTried] = useState(false);
+  const markTouched = (k) => setTouched((t) => (t[k] ? t : { ...t, [k]: true }));
+  const fieldError = (k) => {
+    if (k === 'code' && !String(formData.code || '').trim()) return 'Nhập mã bài (vd: A, B, C).';
+    if (k === 'title' && !String(formData.title || '').trim()) return 'Nhập tên bài toán.';
+    if (k === 'rating') {
+      const v = Number(formData.rating);
+      if (!Number.isFinite(v) || v < 500 || v > 3500) return 'Điểm cơ sở 500–3500.';
+    }
+    if (k === 'statement' && !String(formData.statement || '').trim()) return 'Nhập nội dung đề bài.';
+    return '';
+  };
+  const showError = (k) => (touched[k] || submitTried) && !!fieldError(k);
+  const errCls = 'mt-1 text-[11px] text-red-400 font-medium';
 
   const handleOpenCreateProblem = () => {
     const nextCode = String.fromCharCode(65 + problems.length);
@@ -277,12 +528,18 @@ export const AdminLayout = ({ children }) => {
       tags: 'math, implementation',
       timeLimit: '1.0s',
       memoryLimit: '256 MB',
+      minN: 1,
+      maxN: 200000,
+      minVal: -1000000000,
+      maxVal: 1000000000,
       statement: `Cho dãy gồm $N$ số nguyên $A_1, A_2, \\dots, A_N$.\nTính tổng tất cả các phần tử chẵn trong dãy.`,
       sampleInput: `4\n1 2 3 4`,
       sampleOutput: `6`,
       editorial: `Duyệt tuần tự qua mảng với độ phức tạp $O(N)$.`
     });
     setEditingId(null);
+    setTouched({});
+    setSubmitTried(false);
     setPolygonView('editor');
   };
 
@@ -294,19 +551,39 @@ export const AdminLayout = ({ children }) => {
       tags: Array.isArray(prob.tags) ? prob.tags.join(', ') : prob.tags || '',
       timeLimit: prob.timeLimit || '1.0s',
       memoryLimit: prob.memoryLimit || '256 MB',
+      minN: prob.minN ?? prob.min_n ?? 1,
+      maxN: prob.maxN ?? prob.max_n ?? 200000,
+      minVal: prob.minVal ?? prob.min_val ?? -1000000000,
+      maxVal: prob.maxVal ?? prob.max_val ?? 1000000000,
       statement: prob.statement || '',
       sampleInput: prob.sampleInput || '',
       sampleOutput: prob.sampleOutput || '',
       editorial: prob.editorial || ''
     });
     setEditingId(prob.id);
+    setTouched({});
+    setSubmitTried(false);
     setPolygonView('editor');
   };
 
   const handleSaveProblem = async (e) => {
     e.preventDefault();
-    if (!formData.title.trim() || !formData.statement.trim()) {
-      setPolygonNotification({ type: 'error', message: 'Vui lòng nhập đầy đủ tiêu đề và nội dung đề bài!' });
+    setSubmitTried(true);
+    setTouched({ code: true, title: true, rating: true, statement: true });
+    const inlineErrors = ['code', 'title', 'rating', 'statement']
+      .map((k) => {
+        if (k === 'code' && !String(formData.code || '').trim()) return 'Nhập mã bài (vd: A, B, C).';
+        if (k === 'title' && !String(formData.title || '').trim()) return 'Nhập tên bài toán.';
+        if (k === 'rating') {
+          const v = Number(formData.rating);
+          if (!Number.isFinite(v) || v < 500 || v > 3500) return 'Điểm cơ sở 500–3500.';
+        }
+        if (k === 'statement' && !String(formData.statement || '').trim()) return 'Nhập nội dung đề bài.';
+        return '';
+      })
+      .filter(Boolean);
+    if (inlineErrors.length > 0) {
+      setPolygonNotification({ type: 'error', message: inlineErrors[0] });
       return;
     }
 
@@ -319,6 +596,10 @@ export const AdminLayout = ({ children }) => {
       tags: tagList,
       timeLimit: formData.timeLimit,
       memoryLimit: formData.memoryLimit,
+      minN: Number(formData.minN) || 0,
+      maxN: Number(formData.maxN) || 0,
+      minVal: Number(formData.minVal) || 0,
+      maxVal: Number(formData.maxVal) || 0,
       statement: formData.statement,
       sampleInput: formData.sampleInput,
       sampleOutput: formData.sampleOutput,
@@ -435,6 +716,17 @@ export const AdminLayout = ({ children }) => {
           <div className="px-3 pt-2 pb-1 text-[10px] font-semibold tracking-widest text-[#62666d] uppercase">
             Quản trị
           </div>
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`w-full px-3 py-2.5 rounded-lg font-semibold transition text-left ${
+              activeTab === 'overview'
+                ? 'bg-[#141516] text-white border border-[#34343a]'
+                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            0. Tổng quan
+          </button>
+
           <button
             onClick={() => setActiveTab('phase')}
             className={`w-full px-3 py-2.5 rounded-lg font-semibold transition text-left ${
@@ -579,6 +871,11 @@ export const AdminLayout = ({ children }) => {
         {/* Tab Content Display */}
         <div className="p-6 lg:p-8 space-y-6">
           
+          {/* TAB 0: OVERVIEW DASHBOARD */}
+          {activeTab === 'overview' && (
+            <OverviewPanel phase={phase} onJump={setActiveTab} />
+          )}
+
           {/* TAB 1: PHASE ORCHESTRATOR */}
           {activeTab === 'phase' && (
             <div className="space-y-6">
@@ -953,6 +1250,12 @@ export const AdminLayout = ({ children }) => {
                     notify={(m) => { setPolygonNotification(m); setTimeout(() => setPolygonNotification(null), 5000); }}
                     refresh={loadProblemsFromServer}
                   />
+
+                  {/* CRUD pretests/system tests cho đề đang chọn */}
+                  <TestcasePanel
+                    problems={problems}
+                    notify={(m) => { setPolygonNotification(m); setTimeout(() => setPolygonNotification(null), 5000); }}
+                  />
                 </div>
               )}
 
@@ -990,9 +1293,12 @@ export const AdminLayout = ({ children }) => {
                           maxLength={3}
                           value={formData.code}
                           onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                          onBlur={() => markTouched('code')}
+                          aria-invalid={showError('code')}
                           className="w-full px-3 py-2 rounded-lg bg-[#141516] border border-white/15 text-white font-mono font-bold text-sm text-center focus:border-[#ff6600] outline-none"
                           placeholder="F"
                         />
+                        {showError('code') && <p className={errCls} role="alert">{fieldError('code')}</p>}
                       </div>
 
                       {/* Title */}
@@ -1003,9 +1309,12 @@ export const AdminLayout = ({ children }) => {
                           required
                           value={formData.title}
                           onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                          onBlur={() => markTouched('title')}
+                          aria-invalid={showError('title')}
                           className="w-full px-3 py-2 rounded-lg bg-[#141516] border border-white/15 text-white text-xs font-semibold focus:border-[#ff6600] outline-none"
                           placeholder="Ví dụ: Da Nang Bridge Network Maximum Flow"
                         />
+                        {showError('title') && <p className={errCls} role="alert">{fieldError('title')}</p>}
                       </div>
 
                       {/* Rating */}
@@ -1019,8 +1328,11 @@ export const AdminLayout = ({ children }) => {
                           step={100}
                           value={formData.rating}
                           onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
+                          onBlur={() => markTouched('rating')}
+                          aria-invalid={showError('rating')}
                           className="w-full px-3 py-2 rounded-lg bg-[#141516] border border-white/15 text-slate-200 font-mono font-bold text-xs focus:border-[#ff6600] outline-none"
                         />
+                        {showError('rating') && <p className={errCls} role="alert">{fieldError('rating')}</p>}
                       </div>
 
                       {/* Tags */}
@@ -1058,6 +1370,44 @@ export const AdminLayout = ({ children }) => {
                           placeholder="256 MB"
                         />
                       </div>
+
+                      {/* Ràng buộc sinh test (server hỗ trợ sau, cứ gửi kèm) */}
+                      <div className="sm:col-span-1.5">
+                        <label className="block font-semibold text-slate-300 mb-1">N tối thiểu:</label>
+                        <input
+                          type="number"
+                          value={formData.minN}
+                          onChange={(e) => setFormData({ ...formData, minN: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg bg-[#141516] border border-white/15 text-slate-200 font-mono text-xs focus:border-[#ff6600] outline-none"
+                        />
+                      </div>
+                      <div className="sm:col-span-1.5">
+                        <label className="block font-semibold text-slate-300 mb-1">N tối đa:</label>
+                        <input
+                          type="number"
+                          value={formData.maxN}
+                          onChange={(e) => setFormData({ ...formData, maxN: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg bg-[#141516] border border-white/15 text-slate-200 font-mono text-xs focus:border-[#ff6600] outline-none"
+                        />
+                      </div>
+                      <div className="sm:col-span-1.5">
+                        <label className="block font-semibold text-slate-300 mb-1">Giá trị tối thiểu:</label>
+                        <input
+                          type="number"
+                          value={formData.minVal}
+                          onChange={(e) => setFormData({ ...formData, minVal: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg bg-[#141516] border border-white/15 text-slate-200 font-mono text-xs focus:border-[#ff6600] outline-none"
+                        />
+                      </div>
+                      <div className="sm:col-span-1.5">
+                        <label className="block font-semibold text-slate-300 mb-1">Giá trị tối đa:</label>
+                        <input
+                          type="number"
+                          value={formData.maxVal}
+                          onChange={(e) => setFormData({ ...formData, maxVal: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg bg-[#141516] border border-white/15 text-slate-200 font-mono text-xs focus:border-[#ff6600] outline-none"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -1081,9 +1431,12 @@ export const AdminLayout = ({ children }) => {
                           required
                           value={formData.statement}
                           onChange={(e) => setFormData({ ...formData, statement: e.target.value })}
+                          onBlur={() => markTouched('statement')}
+                          aria-invalid={showError('statement')}
                           className="w-full p-3 rounded-lg bg-[#141516] border border-white/15 text-slate-200 font-mono text-xs leading-relaxed focus:border-[#ff6600] outline-none"
                           placeholder="Mô tả đề bài. Dùng $N$ cho công thức trong dòng, $$...$$ cho công thức khối."
                         />
+                        {showError('statement') && <p className={errCls} role="alert">{fieldError('statement')}</p>}
                       </div>
 
                       {/* Right: Live KaTeX Math Preview */}
@@ -1267,18 +1620,23 @@ const CreateContestPanel = () => {
   );
 };
 
-/** Số liệu máy chấm thật từ API (số bài nộp theo verdict, số thí sinh). */
+/** Số liệu máy chấm thật từ API (số bài nộp theo verdict, số thí sinh). Chọn contest qua dropdown. */
 const TelemetryPanel = () => {
   const [stats, setStats] = useState(null);
   const [recent, setRecent] = useState([]);
   const [confirmRejudgeId, setConfirmRejudgeId] = useState(null);
   const [notice, setNotice] = useState('');
+  const [contests, setContests] = useState([]);
+  const [contestId, setContestId] = useState('contest_dever_round1');
 
-  const load = async () => {
+  const load = async (cid) => {
+    const id = cid || contestId;
     try {
+      const contest = contests.find((c) => c.id === id);
+      const slug = contest?.slug || (id === 'contest_dever_round1' ? 'dever-round-1-div3' : null);
       const [subs, st] = await Promise.all([
-        api.listSubmissions('contest_dever_round1'),
-        api.getStandings('dever-round-1-div3'),
+        api.listSubmissions(id),
+        slug ? api.getStandings(slug) : Promise.resolve({ standings: [] }),
       ]);
       const byVerdict = {};
       (subs.submissions || []).forEach((s) => { byVerdict[s.verdict] = (byVerdict[s.verdict] || 0) + 1; });
@@ -1289,9 +1647,23 @@ const TelemetryPanel = () => {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => { if (!cancelled) await load(); })();
+    (async () => {
+      try {
+        const data = await api.getContests();
+        if (cancelled) return;
+        const list = Array.isArray(data?.contests) ? data.contests : [];
+        setContests(list);
+        if (list.length && !list.some((c) => c.id === contestId)) setContestId(list[0].id);
+      } catch { /* giữ mặc định khi offline */ }
+    })();
     return () => { cancelled = true; };
-    }, []);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => { if (!cancelled) await load(contestId); })();
+    return () => { cancelled = true; };
+  }, [contestId, contests.length]);
 
   const handleRejudge = async (id) => {
     if (confirmRejudgeId !== id) {
@@ -1303,7 +1675,7 @@ const TelemetryPanel = () => {
     try {
       const data = await api.rejudge(id);
       setNotice(`Đã chấm lại ${id}: ${data.submission.verdict} (${data.submission.points_awarded}đ).`);
-      load();
+      load(contestId);
     } catch (err) {
       setNotice(err?.message || 'Chấm lại thất bại.');
     }
@@ -1324,7 +1696,22 @@ const TelemetryPanel = () => {
 
   return (
     <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-4">
-      <h2 className="text-base font-bold text-white">Giám sát máy chấm</h2>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h2 className="text-base font-bold text-white">Giám sát máy chấm</h2>
+        <label className="flex items-center gap-2 text-xs text-slate-400">
+          Kỳ thi:
+          <select
+            value={contestId}
+            onChange={(e) => setContestId(e.target.value)}
+            className="px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-white outline-none"
+          >
+            {contests.length === 0 && <option value={contestId}>DEVER Round #1 (mặc định)</option>}
+            {contests.map((c) => (
+              <option key={c.id} value={c.id}>{c.title || c.slug || c.id} ({c.status})</option>
+            ))}
+          </select>
+        </label>
+      </div>
       {!stats ? (
         <p className="text-xs text-slate-400">Chưa kết nối được máy chủ (npm run server). Số liệu sẽ hiện ở đây khi online.</p>
       ) : (
@@ -1380,33 +1767,52 @@ const TelemetryPanel = () => {
   );
 };
 
-/** Phòng thi thật từ API (nhóm theo room_id). */
+/** Phòng thi thật từ API (nhóm theo room_id). Hiện sức chứa + lọc hack theo room. */
 const RoomsPanel = () => {
+  const ROOM_CAPACITY = 25;
   const [rooms, setRooms] = useState(null);
+  const [hacks, setHacks] = useState([]);
+  const [roomFilter, setRoomFilter] = useState('all');
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const st = await api.getStandings('dever-round-1-div3');
+        const [st, subs] = await Promise.all([
+          api.getStandings('dever-round-1-div3'),
+          api.listSubmissions('contest_dever_round1').catch(() => ({ submissions: [] })),
+        ]);
         if (cancelled) return;
+        const userRoom = {};
         const groups = {};
         (st.standings || []).forEach((r) => {
           const id = r.room_id || 'Chưa xếp phòng';
+          userRoom[r.user_id || r.username] = id;
+          if (r.username) userRoom[r.username] = id;
           if (!groups[id]) groups[id] = { id, members: [], ratings: [] };
           groups[id].members.push(r.username);
           groups[id].ratings.push(r.rating);
         });
+        const allSubs = subs.submissions || [];
+        const hacked = allSubs
+          .filter((s) => s.verdict === 'HACKED' || s.is_hacked)
+          .map((s) => ({ ...s, room_id: userRoom[s.user_id] || userRoom[s.username] || 'Chưa xếp phòng' }));
+        Object.values(groups).forEach((g) => {
+          g.hackCount = hacked.filter((h) => h.room_id === g.id).length;
+        });
         setRooms(Object.values(groups));
+        setHacks(hacked);
       } catch { /* giữ null */ }
     })();
     return () => { cancelled = true; };
   }, []);
 
+  const visibleHacks = roomFilter === 'all' ? hacks : hacks.filter((h) => h.room_id === roomFilter);
+
   return (
     <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-4">
       <h2 className="text-base font-bold text-white">Phân phối phòng thi</h2>
-      <p className="text-xs text-slate-400">Mỗi phòng tối đa 25 thí sinh. Phòng dùng để bẻ khóa bài nhau trong Hack Phase.</p>
+      <p className="text-xs text-slate-400">Mỗi phòng sức chứa tối đa {ROOM_CAPACITY} thí sinh. Phòng dùng để bẻ khóa bài nhau trong Hack Phase.</p>
       {!rooms ? (
         <p className="text-xs text-slate-400">Chưa kết nối được máy chủ (npm run server).</p>
       ) : rooms.length === 0 ? (
@@ -1417,13 +1823,56 @@ const RoomsPanel = () => {
             <div key={room.id} className="p-3 rounded-lg bg-black/40 border border-white/5 text-xs">
               <div className="flex items-center justify-between font-bold text-white mb-1">
                 <span>{room.id}</span>
-                <span className="text-emerald-400">{room.members.length}/25 thí sinh</span>
+                <span className="text-slate-200 font-mono">Sức chứa {room.members.length}/{ROOM_CAPACITY}</span>
               </div>
               <span className="text-[11px] text-slate-500 block">{room.members.join(', ')}</span>
+              <span className="text-[11px] text-slate-400 block mt-1 font-mono">{room.hackCount || 0} bài bị hack</span>
             </div>
           ))}
         </div>
       )}
+      <div className="pt-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+          <h3 className="text-xs font-bold text-slate-300">Hack theo phòng ({visibleHacks.length})</h3>
+          <label className="flex items-center gap-2 text-xs text-slate-400">
+            Lọc theo phòng:
+            <select
+              value={roomFilter}
+              onChange={(e) => setRoomFilter(e.target.value)}
+              className="px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-white outline-none"
+            >
+              <option value="all">Tất cả phòng</option>
+              {(rooms || []).map((r) => (
+                <option key={r.id} value={r.id}>{r.id} ({r.members.length}/{ROOM_CAPACITY})</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {visibleHacks.length === 0 ? (
+          <p className="text-[11px] text-slate-500">Chưa có bài bị hack{roomFilter === 'all' ? '.' : ' trong phòng này.'}</p>
+        ) : (
+          <div className="bg-black/40 border border-white/5 rounded-xl overflow-hidden">
+            <table className="w-full text-left text-[11px]">
+              <thead className="text-slate-500 uppercase tracking-wider">
+                <tr>
+                  <th className="py-2 px-3">Bài nộp</th>
+                  <th className="py-2 px-3">Phòng</th>
+                  <th className="py-2 px-3 text-right">Điểm</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 font-mono">
+                {visibleHacks.slice(0, 30).map((h) => (
+                  <tr key={h.id}>
+                    <td className="py-2 px-3 text-slate-300">{String(h.id).slice(0, 14)}…</td>
+                    <td className="py-2 px-3 text-slate-200">{h.room_id}</td>
+                    <td className="py-2 px-3 text-right text-slate-300">{h.points_awarded}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
