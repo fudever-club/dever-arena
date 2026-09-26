@@ -1,5 +1,6 @@
 # KIẾN TRÚC HỆ THỐNG MÁY CHẤM AN TOÀN (JUDGE ARCHITECTURE & SANDBOX SPEC)
 > **Thiết kế kỹ thuật đảm bảo tính bảo mật, độ chính xác microsecond và khả năng chịu tải đồng thời của DEVER-Forces.**
+> **Thực tế hiện tại (Phase 21):** API dùng **fork pool nội bộ** `server/queue.js` + `server/judgeWorker.js` (FIFO, `DEVER_JUDGE_WORKERS` mặc định 2 / tối đa 4, timeout job 60s + respawn worker chết, `unref` + shutdown tường minh) + browser `src/engine/workerQueue.js` (3-tier Hack > Pretest > System Test) và `src/engine/isolateRunner.js` (fail-fast). Sơ đồ Redis Streams / Isolate / Docker dưới đây là **hợp đồng mở rộng đa máy**, chưa phải đường chạy mặc định của `docker-compose.yml` (web + api + db Postgres).
 
 ---
 

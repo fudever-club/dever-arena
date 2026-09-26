@@ -13,10 +13,12 @@ docker compose up --build -d
 * `Dockerfile.api` — image backend Node 20 + toolchains chấm thật (`python3`, JDK 17, `g++`). Thiếu `DEVER_JWT_SECRET` ở production thì server từ chối khởi động.
 * `Dockerfile.web` — build SPA (`npm run build`) rồi phục vụ bằng nginx; copy kèm `manifest.json` (nằm ở root repo).
 * `nginx.conf` — fallback SPA về `app.html`, proxy `/api/` sang `api:8787`, SSE (`/api/v1/stream/`) tắt buffer + timeout đọc 1h, assets hash cache 30 ngày, manifest đúng content-type.
-* Volume `dever-data` giữ `server/data/db.json` qua restart. Sao lưu file này là sao lưu toàn bộ dữ liệu giải.
-* Giới hạn đã biết: judge chạy tuần tự trong process API (`spawnSync` block event-loop) — phù hợp vòng CLB vài chục thí sinh; muốn 500+ concurrent thì tách worker + hàng đợi (mục 1–2 bên dưới là hướng mở rộng).
+* Volume `dever-data` giữ `server/data/db.json` qua restart. Sao lưu file này là sao lưu toàn bộ dữ liệu giải (xem `docs/ops/BACKUP_RESTORE.md`; bản Postgres dùng volume `dever-pgdata`).
+* Judge hiện tại: **worker pool riêng** (`server/queue.js` + `server/judgeWorker.js` — fork pool FIFO, `DEVER_JUDGE_WORKERS` mặc định 2 / tối đa 4, timeout job 60s + respawn, `unref` + shutdown tường minh). API không chạy code thí sinh trên event-loop. Quy mô lab vài chục → trăm concurrent; muốn 500+ concurrent đa máy thì tách Redis Streams + judge cluster (mục 1–2 bên dưới là hướng mở rộng).
 
-## 1. SƠ ĐỒ KIẾN TRÚC HẠ TẦNG MỤC TIÊU (MỞ RỘNG TƯƠNG LAI)
+## 1. SƠ ĐỒ KIẾN TRÚC HẠ TẦNG MỤC TIÊU (MỞ RỘNG TƯƠNG LAI — ĐA MÁY)
+
+> **Lưu ý:** compose thật trong repo (`docker-compose.yml`) hiện chỉ gồm 3 service `web + api + db` (Postgres 16, không Redis). Sơ đồ + file mẫu dưới đây là **template mở rộng** (Redis Streams + judge cluster đa máy), chưa phải compose đang chạy.
 
 ```mermaid
 graph TD

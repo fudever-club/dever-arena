@@ -12,11 +12,11 @@ Seed: `dever_hero/hero123` (thí sinh), `dever_admin/admin123` (giám khảo).
 
 ## 2. Vòng verify bắt buộc trước mọi PR
 ```bash
-npm run test    # 136 tests, phải 136 pass
+npm run test    # 150 tests / 21 suites, phải 150 pass
 node detect.mjs # 0 error
 npm run build   # bundle sạch
 ```
-CI (`.github/workflows/ci.yml`) chạy đúng 3 lệnh trên + `npm audit --audit-level=high`.
+CI (`.github/workflows/ci.yml`) chạy detect + test + build + `lint:js` (0 errors) + `npm audit --audit-level=high`.
 
 ## 3. Quy ước chạm code
 - Core (`src/core/`, `src/engine/`): hàm thuần, không động DOM — mọi luật điểm/hack/Elo/AST phải có unit test.

@@ -136,7 +136,7 @@ Mọi quyết định thiết kế quan trọng của hệ thống đều đư�
 |---|---|---|---|
 | [**ADR-001**](docs/decisions/ADR-001-three-page-architecture.md) | Kiến trúc 3 trang HTML độc lập | **Accepted** | Tối ưu SEO (1 H1/trang), FCP < 360ms, cô lập ranh giới an ninh Thí sinh và Giám khảo. |
 | [**ADR-002**](docs/decisions/ADR-002-isolate-sandbox-execution.md) | Cơ chế Isolate Sandbox & Dừng sớm | **Accepted** | Chặn 18 API trình duyệt độc hại, TLE 1.0s, MLE 256MB, Fail-Fast khi WA test đầu. |
-| [**ADR-003**](docs/decisions/ADR-003-pure-core-engine-and-zero-ai.md) | Core Engine hàm thuần & Zero-AI Client | **Accepted** | Tách biệt logic nghiệp vụ khỏi DOM, 136/136 test pass, giữ vững liêm chính thi đấu. |
+| [**ADR-003**](docs/decisions/ADR-003-pure-core-engine-and-zero-ai.md) | Core Engine hàm thuần & Zero-AI Client | **Accepted** | Tách biệt logic nghiệp vụ khỏi DOM, 150/150 test pass, giữ vững liêm chính thi đấu. |
 | [**ADR-004**](docs/decisions/ADR-004-ast-winnowing-anti-cheat.md) | AST Tokenizer & Thuật toán Winnowing 3-Gram | **Accepted** | Khử đổi tên biến và comment rác, tính khoảng cách Jaccard phát hiện gian lận tự động. |
 
 ---
@@ -195,14 +195,11 @@ Bản build tối ưu hóa sẽ được tạo tại thư mục `dist/`.
 Dự án áp dụng quy chuẩn kiểm thử nghiêm ngặt với bộ Test Runner tích hợp sẵn trong Node.js (Zero external test runner bloatware):
 
 ```bash
-# Chạy toàn bộ Test Suites (150 tests)
+# Chạy toàn bộ Test Suites (150 tests / 21 suites)
 npm run test
 
 # Chạy chế độ theo dõi (Watch mode)
 npm run test:watch
-
-# Chạy kiểm thử End-to-End với Playwright
-npm run test:e2e
 
 # Quét kiểm tra kiến trúc bất biến (Linter)
 npm run lint
@@ -214,7 +211,7 @@ npm run lint
 ✔ DEVER Server API Lifecycle Tests (judge thật, hack oracle, Elo, SSE)
 ...
 ℹ tests 150
-ℹ suites 25
+ℹ suites 21
 ℹ pass 150
 ℹ fail 0
 ```
@@ -226,41 +223,46 @@ npm run lint
 
 ```
 dever-arena/
-├── .agents/                    # Bộ Agent Skills dành cho phát triển tự động
-│   └── skills/
-│       ├── dever-anti-cheat-sentinel/
-│       ├── dever-arena-orchestrator/
-│       └── polygon-problemsetter/
+├── .agents/                    # Bộ Agent Skills (orchestrator, anti-cheat sentinel, polygon-problemsetter, deploy-release, live-ops, ui-craft, quality-gate)
 ├── docs/                       # Tài liệu thiết kế, assets & đặc tả hệ thống
 │   ├── assets/                 # Logo nhận diện thương hiệu (Light & Dark mode)
 │   ├── decisions/              # Sổ bộ ADR (ADR-001 -> ADR-004)
+│   ├── ops/                    # INCIDENT_RUNBOOK, BACKUP_RESTORE, DATA_RETENTION
+│   ├── PAGE_BRANCHES.md        # Manifest chương trình nhánh page/* + quy trình merge về main
 │   ├── ANTI_CHEAT_POLICY.md    # Quy chuẩn chống gian lận & liêm chính
 │   ├── CONTEST_RULEBOOK.md     # Luật thi đấu, thang điểm & hack room
-│   ├── DATABASE_SCHEMA.md      # Thiết kế cơ sở dữ liệu IndexedDB & SQL
-│   ├── DESIGN_SYSTEM.md        # Bảng màu, typography & quy tắc UI
-│   └── JUDGE_ARCHITECTURE.md   # Thiết kế hệ thống máy chấm Isolate Sandbox
+│   ├── DATABASE_SCHEMA.md      # Thiết kế cơ sở dữ liệu PostgreSQL + IndexedDB
+│   ├── DESIGN_SYSTEM.md        # Tokens Luxury-Minimal, component specs & WCAG contracts
+│   ├── PROBLEM_SETTING_GUIDE.md # Chuẩn Polygon: generator + stress + blind-tester
+│   └── JUDGE_ARCHITECTURE.md   # Fork pool queue.js/judgeWorker.js + hợp đồng mở rộng Redis/Isolate
 ├── db/
 │   └── schema.sql              # Cấu trúc bảng SQL chuẩn cho production
-├── src/                        # Mã nguồn chính của ứng dụng
-│   ├── components/             # React components (Workspace, Splitters, Math)
-│   ├── core/                   # Scoring, rating, contest state machine
-│   ├── engine/                 # AST diff, runner, sound, testlib validator
-│   ├── pages/                  # Các trang SPA (Arena, Problemset, Admin, Standings)
-│   └── index.css               # Thiết lập Tailwind v4 & Cyber Dark theme
+├── src/                        # Mã nguồn chính của ứng dụng (React 19 + Tailwind v4)
+│   ├── components/layout/      # GuestLayout, UserLayout, AdminLayout (+StressPanel), Navbar
+│   ├── components/common/      # MathRenderer (KaTeX, escape XSS)
+│   ├── context/                # AuthContext, ContestContext (BroadcastChannel sync)
+│   ├── core/                   # Scoring, rating, contest state machine, freeze, contestResults, virtualContest
+│   ├── engine/                 # AST diff, runner, workerQueue, isolateRunner, testlibValidator, testGenerator
+│   ├── lib/                    # apiClient (fetch + JWT + SSE)
+│   ├── pages/                  # LandingPage, LoginPage, ContestHub (+TestingQueue), ProblemWorkspace, StandingsPage, HackRoomPage
+│   └── index.css               # Tailwind v4 + Luxury-Minimal tokens (canvas #010102, accent #ff6600)
 ├── server/                     # Backend API thật (REST + SSE + judge JS/Python/Java/C++)
 │   ├── index.js                # Router, phase machine, system test, Elo, rate-limit
+│   ├── queue.js + judgeWorker.js # Fork pool chấm riêng (FIFO, timeout 60s + respawn)
 │   ├── judge.js                # Thực thi code thật (tự phát hiện toolchain)
 │   ├── oracles.js              # Lời giải chuẩn chấm hack
 │   ├── auth.js                 # SHA-256 + JWT HS256
+│   ├── pg.js                   # Adapter Postgres (KV + meta)
 │   └── db.js                   # JSON store (server/data, tự seed)
 ├── public/brand/               # Logo CLB (nguồn thật duy nhất cho web)
 ├── public/icons/               # SVG ngôn ngữ từ svgl.app (python/java/js/node)
-├── Dockerfile.api              # Image backend + toolchains chấm
+├── Dockerfile.api              # Image backend Node 22 + toolchains chấm
 ├── Dockerfile.web              # Image nginx phục vụ SPA
 ├── nginx.conf                  # SPA fallback + proxy /api + SSE
-├── docker-compose.yml          # Production: web + api
+├── docker-compose.yml          # Production: web + api + db (Postgres)
 ├── .env.example                # Mẫu biến môi trường production
-├── tests/                      # Bộ test suites kiểm thử tự động (150 tests)
+├── DESIGN.md                   # Design library (Linear consensus)
+├── tests/                      # Bộ test suites kiểm thử tự động (150 tests / 21 suites)
 ├── app.html                    # Giao diện ứng dụng SPA (duy nhất)
 ├── detect.mjs                  # Bộ kiểm tra ràng buộc kiến trúc bất biến
 ├── package.json

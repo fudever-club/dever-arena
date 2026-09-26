@@ -166,3 +166,10 @@
 - [x] Task 86: `POST /api/v1/admin/stress` (model vs brute qua worker pool, mismatches ≤5, gợi ý TL = 2× model max) + testcase CRUD + workflow DRAFT→IN_TESTING→APPROVED (queue ẩn editorial, cấm tự giao) + `tests/stress_workflow.test.js` (5 tests).
 - [x] Task 87: Studio `StressPanel` (xem trước → chạy → áp TL → lưu pretests) + badge/nút Gửi duyệt/Duyệt/Từ chối + `TestingQueue` ở ContestHub; verify 150/150 tests, lint 0, build sạch.
 
+## Phase 27: Page-Branch Program (page/* song song → main)
+- [x] Task 88: Viết `docs/PAGE_BRANCHES.md` (manifest 9 nhánh page/*: mục tiêu, files sở hữu, trạng thái + quy trình merge: thứ tự, giải quyết xung đột, gate trước merge).
+- [ ] Task 89: Merge hạ tầng chung (`eslint.config.mjs` jsx coverage + `ContestContext.jsx` gỡ eslint-disable — 5 nhánh đã tách đang mang diff giống hệt nhau) vào `main`, rebase `page/landing,contesthub,workspace,hackroom,standings`.
+- [ ] Task 90: Merge nhánh lá theo thứ tự `landing → contesthub → workspace → hackroom → standings` (mỗi nhánh 1 file page riêng), gate mỗi PR: `npm run test` 150/150 (21 suites) + `detect.mjs` 0 + `build` sạch + `lint:js` 0 errors.
+- [ ] Task 91: Triển khai commit thật cho nhánh giữ chỗ `page/auth` (LoginPage/AuthContext/guards), `page/admin` (AdminLayout/StressPanel/routes admin), `page/backend` (server/queue/judgeWorker/pg) rồi merge theo files sở hữu.
+- [ ] Task 92: Merge `page/docs` cuối (docs-only), đồng bộ `CHANGELOG` + số liệu tests (`README`/`PRODUCT`/`SPEC`: 150/150, 21 suites) sau mỗi merge.
+

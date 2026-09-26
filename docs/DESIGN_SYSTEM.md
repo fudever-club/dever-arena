@@ -49,7 +49,7 @@ Quy tắc Linear đã áp: hierarchy bằng surface ladder + hairline (cấm glo
 - Nền canvas `#010102`, viền hairline `#23252a`, cao `h-14`.
 
 ### 3.2 Contest Hero
-- Gradient `rgba(255,102,0,0.14)` + timer box `border: rgba(255,102,0,0.35)` như hiện tại.
+- Panel surface-1 + hairline, timer box solid (cấm gradient trang trí theo Luxury-Minimal Phase 23).
 - Thêm progress bar `width = elapsed/135min`.
 
 ### 3.3 Tables (Standings / Problemset)
@@ -59,15 +59,14 @@ Quy tắc Linear đã áp: hierarchy bằng surface ladder + hairline (cấm glo
 
 ### 3.4 Workspace (LeetCode pattern)
 - Grid `problem-statement (min 380px) | editor (1fr)` + splitter draggable (8px).
-- Editor toolbar: language + theme + A-/A+ + ⛶ fullscreen + 📥 Download + 🧪 Custom Test + 🔍 Diff + ▶ Submit
+- Editor toolbar: language + theme + A-/A+ + fullscreen + Download + Custom Test + Diff + Submit (chữ + SVG `public/icons/`, không emoji trang trí).
 - Console 180px, font-code 13px, metrics `Time: 36ms | Mem: 2840KB`
 
 ### 3.5 Verdict & Phase Pills
 - `phase-coding` xanh puls 2s, `phase-hack` đỏ 1s, `phase-system` vàng tĩnh. Tôn trọng `prefers-reduced-motion: none`.
 
-### 3.6 Hack Room & Clan Cards
-- `room-card` hover `translateY(-2px) + border orange 0.4`
-- `clan-card` header color theo khóa.
+### 3.6 Hack Room (Clan Wars đã xóa Phase 15)
+- `room-card` hover `translateY(-2px) + border accent 0.4`
 
 ---
 
@@ -109,17 +108,19 @@ Quy tắc Linear đã áp: hierarchy bằng surface ladder + hairline (cấm glo
 
 - `app.html` — SPA shell duy nhất (`<div id="root">`, favicon, fonts Space Grotesk + JetBrains Mono, KaTeX CDN)
 - `src/index.css` — Tailwind v4 + Cyber Dark theme tokens (single source of truth cho style)
-- `src/App.jsx` — 3 shell tách biệt + guards: `GuestLayout` (`/`, `/login`), `UserLayout` + `RequireAuth` (`/arena`, `/problem/:id`, `/standings`, `/hack-room`), `RequireAdmin` + `AdminLayout` (`/admin`, sidebar 6 modules + `AdminSection` headers) (không còn `/clans`)
+- `src/App.jsx` — 3 shell tách biệt + guards: `GuestLayout` (`/`, `/login`), `UserLayout` + `RequireAuth` (`/arena`, `/problem/:id`, `/standings`, `/hack-room`), `RequireAdmin` + `AdminLayout` (`/admin`, sidebar 6 modules + `AdminSection` headers). Layouts: `src/components/layout/GuestLayout.jsx`, `UserLayout.jsx`, `AdminLayout.jsx` (chứa `StressPanel` Polygon), `Navbar.jsx`.
+- `src/pages/ContestHub.jsx` — ContestHub + `TestingQueue` (blind-tester queue, ẩn editorial); `src/pages/ProblemWorkspace.jsx` — workspace 3-pane + Monaco; `src/pages/StandingsPage.jsx`, `HackRoomPage.jsx`, `LandingPage.jsx`, `LoginPage.jsx`.
+- `src/engine/testGenerator.js` — seeded mulberry32 generator (5 bẫy biên, dùng chung browser + server stress).
 - `manifest.json` — PWA manifest (`name: DEVER Arena`, `short_name: DEVER`, icons 192/512 trỏ `/brand/`, `start_url: app.html`, `display: standalone`, `theme_color: #ff6600`)
 - `public/brand/` — Brand assets chính thức CLB FU-DEVER (single source of truth cho logo web): `logo-dark.png` (nền tối, dùng Navbar/Login/Landing hero), `logo-light.png` (nền sáng), `icon-192.png` / `icon-512.png` (cube mark đã crop + padding, dùng PWA + Navbar thumb), `apple-touch-icon.png`, `og.png` (share preview 1200×630). Nguồn gốc: `docs/assets/*.png`. Vite copy nguyên thư mục `public/` vào `dist/`.
 - `public/icons/` — SVG logo ngôn ngữ duy nhất được phép dùng làm icon (nguồn svgl.app): `python.svg`, `javascript.svg`, `java.svg`, `nodejs.svg`. Mọi icon trang trí khác (lucide, emoji) đã gỡ — UI dùng chữ và số.
 - Typography: UI dùng Space Grotesk (có subset tiếng Việt, đã kiểm chứng), code dùng JetBrains Mono (có subset tiếng Việt).
-- `server/` — Backend API thật (Node thuần, 0 dependency): `index.js` (REST theo API_SPECIFICATION + SSE stream + phase machine + system test + Elo), `db.js` (JSON store `server/data/db.json`, tự seed), `auth.js` (SHA-256 + JWT HS256), `judge.js` (thực thi javascript/python thật qua child_process, cpp/java 422 trung thực), `oracles.js` (lời giải chuẩn chấm hack). Chạy: `npm run server` (port 8787, DB riêng qua `DEVER_DB_PATH`).
+- `server/` — Backend API thật (Node thuần, 0 dependency): `index.js` (REST theo API_SPECIFICATION + SSE stream + phase machine + system test + Elo), `db.js` (JSON store `server/data/db.json`, tự seed), `auth.js` (SHA-256 + JWT HS256), `judge.js` (thực thi javascript/python/java/cpp thật qua worker pool, 422 trung thực khi thiếu toolchain), `queue.js` + `judgeWorker.js` (fork pool FIFO, timeout 60s + respawn), `oracles.js` (lời giải chuẩn chấm hack), `pg.js` (adapter Postgres KV + meta). Chạy: `npm run server` (port 8787, DB riêng qua `DEVER_DB_PATH`).
 - `src/lib/apiClient.js` — Fetch client + JWT (`dever_jwt`) + SSE; Vite proxy `/api` → `localhost:8787` ở dev.
 - `src/db/api.js` — IndexedDB wrapper + seed cho problems/submissions/hacks (dev) đối ứng `db/schema.sql` (prod)
-- `src/db/index.js` — IndexedDB wrapper (`DB_VERSION=3`, 10 stores incl. `analytics`, fallback localStorage/memory cho Node tests)
-- `tests: 56 tests (db, api, e2e, scoring, rating, contest, astDiff, auth)`
-- `db: 10 stores (users, contests, problems, testcases, submissions, hack_events, discussions, clans, contest_participants, analytics)`
+- `src/db/index.js` — IndexedDB wrapper (`DB_VERSION=4`, 11 stores incl. `virtual_sessions` + `analytics` + `clans` frozen, fallback localStorage/memory cho Node tests)
+- `tests: 150 tests / 21 suites` (`test_generator`, `stress_workflow`, `health`, `spa_e2e`, `contest_results`, `pg_store`, …; `clan_wars.test.js` đã xóa Phase 15)
+- `db: 11 stores (users, contests, problems, testcases, submissions, hack_events, discussions, clans [frozen], contest_participants, analytics, virtual_sessions)`
 - `Analytics` — `src/db` analytics store (`analytics` table: `{id, event, props, at}`), dùng cho `contest_view`, `problems_render`, `standings_render` tracking
 
 *Tài liệu này là nguồn chân lý cho mọi thay đổi UI tiếp theo.*
