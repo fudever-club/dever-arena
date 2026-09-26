@@ -1,5 +1,6 @@
 # THIẾT KẾ CƠ SỞ DỮ LIỆU CHUẨN DOANH NGHIỆP (DATABASE ARCHITECTURE & ERD)
 > **Hệ quản trị CSDL đề xuất:** PostgreSQL 16+ với các phần mở rộng `uuid-ossp`, `pg_trgm` (Full-Text Search) và `btree_gist`.
+> **Lưu ý Phase 15+:** tính năng Clan Wars đã xóa khỏi UI/server/tests; tài khoản thi đấu là cá nhân hoặc đội (`team`, `members`) do admin cấp. Bảng `CLANS` / cột `users.clan_id` / store IndexedDB `clans` trong ERD dưới đây là **di sản frozen** (giữ để tương thích seed cũ, không dùng cho tính năng mới). Adapter Postgres thật: `server/pg.js` (KV + meta, write-through + flush).
 
 ---
 

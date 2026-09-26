@@ -6,15 +6,15 @@ Xây dựng nền tảng thi đấu giải thuật độc lập cho CLB FU-DEVER
 - Cơ chế tính điểm suy giảm theo thời gian (Dynamic Point Decay) và thể thức ICPC penalty / IOI subtasks.
 - Cơ chế Hack/Challenge trong Room (mở mã nguồn đối thủ để tìm testcase phản ví dụ).
 - Hệ thống System Testing sau contest để tái kiểm tra toàn bộ bài nộp bằng test suite đầy đủ.
-- Giao diện single-stack React SPA (`app.html` + `src/App.jsx`: Landing `/`, Arena `/arena`, Workspace `/problem/:id`, Standings `/standings`, Hack Room `/hack-room`, Admin `/admin`), phong cách Cyber Dark & FPT Orange Pro.
+- Giao diện single-stack React SPA (`app.html` + `src/App.jsx`: 3 shell `GuestLayout` `/,/login` + `UserLayout` `/arena,/problem/:id,/standings,/hack-room` + `AdminLayout` `/admin`, guards `RequireAuth`/`RequireAdmin`), phong cách Luxury-Minimal + FPT Orange Pro.
 - Hệ thống Virtual Contest Simulator (thi lại contest quá khứ với cơ chế Ghost Submissions Replay theo từng phút thực tế).
 
 ## 2. Tech Stack & Environment
 - **Core Algorithms & Logic:** JavaScript (ESM / Node.js standard) for deterministic testable engines.
-- **Testing:** Node.js built-in `node:test` and `node:assert` for zero-overhead, ultra-fast test execution (136 tests across 25 suites).
+- **Testing:** Node.js built-in `node:test` and `node:assert` for zero-overhead, ultra-fast test execution (150 tests across 21 suites).
 - **Design System & Linter:** Design tokens trong `src/index.css` (Tailwind v4), automated architectural linter `detect.mjs` (0 errors required).
 - **Frontend Web Arena:** React 19 SPA (`app.html` shell + `<div id="root">`), build bằng Vite, PWA installable with `manifest.json`.
-- **Client Storage & Offline:** IndexedDB with 11 object stores (`users`, `contests`, `problems`, `testcases`, `submissions`, `hack_events`, `discussions`, `clans`, `contest_participants`, `analytics`, `virtual_sessions`) and local in-memory fallback for headless Node.js tests.
+- **Client Storage & Offline:** IndexedDB with 11 object stores (`users`, `contests`, `problems`, `testcases`, `submissions`, `hack_events`, `discussions`, `clans` [frozen Phase 15], `contest_participants`, `analytics`, `virtual_sessions`) and local in-memory fallback for headless Node.js tests.
 - **Documentation:** Markdown với sơ đồ Mermaid, công thức LaTeX và hệ thống 14 tài liệu chi tiết trong `docs/`.
 
 ## 3. Commands
@@ -46,19 +46,22 @@ DEVER Arena/
 ├── server/                         # Backend API thật (Node thuần, 0 dependency)
 │   ├── index.js                    # REST + SSE + phase machine + system test + Elo + rate-limit
 │   ├── judge.js                    # Thực thi JS/Python/Java/C++ thật (tự phát hiện toolchain)
+│   ├── queue.js + judgeWorker.js   # Fork pool chấm riêng (FIFO, timeout 60s + respawn)
 │   ├── oracles.js                  # Lời giải chuẩn chấm hack
 │   ├── auth.js                     # SHA-256 + JWT HS256
+│   ├── pg.js                       # Adapter Postgres (KV + meta, write-through + flush)
 │   └── db.js                       # JSON store + seed
 ├── public/brand/                   # Logo CLB (nguồn thật duy nhất)
 ├── public/icons/                   # SVG ngôn ngữ từ svgl.app
 ├── src/
-│   ├── core/                      # rating.js, scoring.js, contestStateMachine.js, auth.js, virtualContest.js, scoreboardFreeze.js
-│   ├── engine/                    # runner.js, astDiff.js, workerQueue.js, isolateRunner.js, testlibValidator.js
+│   ├── core/                      # rating.js, scoring.js, contestStateMachine.js, auth.js, virtualContest.js, scoreboardFreeze.js, contestResults.js
+│   ├── engine/                    # runner.js, astDiff.js, workerQueue.js, isolateRunner.js, testlibValidator.js, testGenerator.js
 │   ├── db/                        # index.js (11 stores), seed.js, api.js (mock REST)
-│   ├── components/                # React layouts (MemberLayout, AdminLayout) and MathRenderer
-│   ├── pages/                     # ProblemWorkspace (LeetCode 3-pane), Landing, Standings, etc.
+│   ├── components/                # layouts (GuestLayout, UserLayout, AdminLayout + StressPanel, Navbar) and common/MathRenderer
+│   ├── pages/                     # LandingPage, LoginPage, ContestHub (+TestingQueue), ProblemWorkspace, StandingsPage, HackRoomPage
+│   └── context/                   # AuthContext, ContestContext (BroadcastChannel sync)
 │   └── data/problems.js           # Built-in problems database & editorials
-├── tests/                         # 150 tests across 27 test suites (Node.js test runner)
+├── tests/                         # 150 tests across 21 test suites (Node.js test runner)
 │   ├── scoring.test.js            # Codeforces dynamic decay tests
 │   ├── rating.test.js             # Elo rating engine tests
 │   ├── contest.test.js            # Contest state machine transitions
@@ -68,12 +71,18 @@ DEVER Arena/
 │   ├── db.test.js                 # IndexedDB fallback CRUD & seed integrity
 │   ├── api.test.js                # REST mock API hack, standings & division gates
 │   ├── e2e.test.js                # 4 end-to-end user & admin flows
-│   ├── platform_quality.test.js   # Ticker, sample runner diff, hash router, HTML integrity
+│   ├── platform_quality.test.js   # SPA shell/manifest/assets/routes + ticker/diff/router
 │   ├── virtual_contest.test.js    # Virtual simulator & ghost replay tests
-│   ├── clan_wars.test.js          # Clan Wars harmonic sum & leaderboard tests
 │   ├── worker_queue.test.js       # 3-tier priority judge queue tests
 │   ├── freeze_scoreboard.test.js  # Scoreboard freeze & ICPC unfreeze tests
-│   └── testlib.test.js            # Polygon testlib validator & custom checkers
+│   ├── testlib.test.js            # Polygon testlib validator & custom checkers
+│   ├── test_generator.test.js     # Seeded generator + edge-case traps
+│   ├── stress_workflow.test.js    # Stress + blind-tester workflow
+│   ├── server_api.test.js         # Backend lifecycle (judge thật, hack oracle, Elo, SSE)
+│   ├── health.test.js             # /api/health, /api/v1/health, /api/ready
+│   ├── pg_store.test.js           # Postgres adapter (pool giả)
+│   ├── contest_results.test.js    # Freeze/ICPC phía server
+│   └── spa_e2e.test.js            # Playwright Chromium E2E (port riêng, kill cây process)
 ├── package.json                   # Scripts: test, lint, dev, build
 └── tasks/
     ├── plan.md                    # Roadmap & engineering phase plans
@@ -95,6 +104,8 @@ DEVER Arena/
 3. **Polygon Testlib Validator & Custom Floating-Point Checker (Phase 10):** Bộ xác thực input đề bài chuẩn Polygon và so khớp nghiệm thực số với dung sai sai số $\le 10^{-6}$.
 4. **UI/UX Redesign Cyber Dark & Playwright E2E Testing (Phases 11–12):** Thẩm mỹ eSports hiện đại và kiểm thử trình duyệt thực tế 47/47 assertions pass.
 5. **Full-System React SPA & LeetCode Workspace Ergonomics (Phase 13):** Không gian làm bài 3 phân vùng Monaco Editor, Resizable Splitters (20-80%), Zen Mode (Esc), KaTeX Math Typography, Polygon Studio trong Admin, và triệt tiêu hoàn toàn 9Router (Zero-AI).
+
+> **Phases 14–26:** xem `docs/CHANGELOG.md` (Vòng 14–26: backend thật + judge thật, xóa Clan Wars, single-stack React SPA, CRUD đề + freeze server, worker pool `queue.js`/`judgeWorker.js` + Postgres `pg.js`, CI/observability/backup/load, Luxury-Minimal, 3-shell `GuestLayout/UserLayout/AdminLayout`, Polygon generator + stress + blind-tester) và `tasks/todo.md` (Phase 14–26, tổng **150/150 tests PASS / 21 suites**). Chi tiết chương trình nhánh song song: `docs/PAGE_BRANCHES.md`.
 
 ## 7. Boundaries & Invariants
 - **Always:** Giữ nguyên các quy tắc cốt lõi của Codeforces (Hack phase, System test, Elo distribution).
