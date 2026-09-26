@@ -44,8 +44,7 @@ export const ContestProvider = ({ children }) => {
       } catch { /* giữ fallback demo */ }
     })();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
