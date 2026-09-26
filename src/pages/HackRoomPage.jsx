@@ -1,12 +1,7 @@
-import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import React, { useState, useEffect } from 'react';
 import { useContest } from '../context/ContestContext';
-import { sound } from '../engine/sound.js';
 import { validateInput } from '../engine/testlibValidator.js';
-import { 
-  Zap, Shield, AlertTriangle, CheckCircle, XCircle, 
-  Terminal, User, FileCode, Flame, Sparkles, Send 
-} from 'lucide-react';
+import { api, getToken } from '../lib/apiClient';
 
 const ROOM_PARTICIPANTS = [
   {
@@ -87,8 +82,7 @@ if __name__ == '__main__':
 ];
 
 export const HackRoomPage = () => {
-  const { user, isAuthenticated } = useAuth();
-  const { phase, formattedTime } = useContest();
+  const { phase, formattedTime, contestId, contestSlug } = useContest();
 
   const [selectedCoder, setSelectedCoder] = useState(ROOM_PARTICIPANTS[0]);
   const [selectedProblemCode, setSelectedProblemCode] = useState('B');
@@ -97,6 +91,49 @@ export const HackRoomPage = () => {
   const [hackStatus, setHackStatus] = useState(null); // 'SUCCESS' | 'FAILED' | null
   const [isExecuting, setIsExecuting] = useState(false);
   const [roomData, setRoomData] = useState(ROOM_PARTICIPANTS);
+  const [dataSource, setDataSource] = useState('demo'); // demo | live
+
+  // Phòng thật từ backend (cần đăng nhập). Không có → giữ demo local.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = getToken();
+        if (!token) return;
+        // Giải mã payload JWT (không cần secret) để biết user id của mình
+        let myId = null;
+        try { myId = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))?.sub || null; } catch {}
+        const st = await api.getStandings(contestSlug);
+        const rows = st.standings || [];
+        const myRow = myId ? rows.find((r) => r.user_id === myId) : null;
+        const roomId = myRow?.room_id || [...new Set(rows.map((r) => r.room_id).filter(Boolean))][0];
+        if (!roomId) return;
+        const room = await api.getRoom(contestSlug, roomId);
+        if (cancelled || !room?.members?.length) return;
+        const mapped = room.members.map((m) => ({
+          id: m.user_id,
+          username: m.username,
+          rating: m.rating,
+          solvedProblems: (m.submissions || []).map((s) => ({
+            code: s.problem_code,
+            points: s.points,
+            solved: true,
+            isHacked: false,
+            language: s.language,
+            codeContent: s.source_code,
+            submissionId: s.id,
+          })),
+        })).filter((m) => m.solvedProblems.length > 0);
+        if (mapped.length > 0) {
+          setRoomData(mapped);
+          setSelectedCoder(mapped[0]);
+          setSelectedProblemCode(mapped[0].solvedProblems[0].code);
+          setDataSource('live');
+        }
+      } catch { /* giữ demo */ }
+    })();
+    return () => { cancelled = true; };
+  }, [contestSlug]);
 
   const activeProblem = selectedCoder.solvedProblems?.find((p) => p.code === selectedProblemCode) || selectedCoder.solvedProblems?.[0];
 
@@ -114,15 +151,53 @@ export const HackRoomPage = () => {
     setTestlibResult(validation);
   };
 
-  const handleExecuteHack = () => {
+  const handleExecuteHack = async () => {
     if (!testlibResult.isValid) {
-      alert(`Không thể tung đòn Hack: Testlib Validator phát hiện lỗi "${testlibResult.error}". Hãy sửa lại format để tránh mất -50 điểm phạt!`);
+      setHackStatus({
+        type: 'FAILED',
+        message: 'Testcase chưa hợp lệ!',
+        details: `Testlib Validator: "${testlibResult.error}". Hãy sửa lại format để tránh mất -50 điểm phạt!`
+      });
       return;
     }
 
+    // Chế độ live: chấm thật trên máy chủ
+    if (dataSource === 'live' && activeProblem?.submissionId) {
+      setIsExecuting(true);
+      setHackStatus(null);
+      try {
+        const res = await api.executeHack({
+          contest_id: contestId, target_submission_id: activeProblem.submissionId, test_payload: counterTestcase,
+        });
+        if (res.success) {
+          setHackStatus({
+            type: 'SUCCESS',
+            message: 'Hack thành công (+100đ)!',
+            details: `Code đối thủ sai trên testcase của bạn (máy chấm: ${res.victim_verdict || 'sai output'}). Bài nộp đã bị vô hiệu hóa.`
+          });
+          setRoomData((prev) =>
+            prev.map((c) => (c.id === selectedCoder.id
+              ? { ...c, solvedProblems: c.solvedProblems.map((p) => (p.code === selectedProblemCode ? { ...p, isHacked: true } : p)) }
+              : c))
+          );
+        } else {
+          setHackStatus({
+            type: 'FAILED',
+            message: 'Hack thất bại (−50đ)!',
+            details: 'Code đối thủ vẫn đúng trên testcase của bạn. Bạn bị trừ 50 điểm.'
+          });
+        }
+      } catch (err) {
+        setHackStatus({ type: 'FAILED', message: 'Không gửi được đòn hack', details: err?.message || 'Lỗi kết nối máy chủ.' });
+      } finally {
+        setIsExecuting(false);
+      }
+      return;
+    }
+
+    // Demo local (không có backend): mô phỏng
     setIsExecuting(true);
     setHackStatus(null);
-    sound.playTick();
 
     setTimeout(() => {
       setIsExecuting(false);
@@ -132,11 +207,10 @@ export const HackRoomPage = () => {
       const isVictimBuggy = selectedCoder.username === 'buggy_coder' && selectedProblemCode === 'B';
 
       if (isVictimBuggy) {
-        sound.playHackSuccess();
         setHackStatus({
           type: 'SUCCESS',
-          message: '🎯 HACK THÀNH CÔNG (+100đ)!',
-          details: 'Mã nguồn đối thủ bị tràn số kiểu số nguyên 32-bit (Integer Overflow). Điểm bài nộp của đối thủ đã bị vô hiệu hóa!'
+          message: 'Hack thành công (+100đ, demo)!',
+          details: 'Code mẫu này dùng số nguyên 32-bit nên tràn số với input lớn. Bài nộp demo bị vô hiệu hóa.'
         });
 
         // Update victim problem state
@@ -154,11 +228,10 @@ export const HackRoomPage = () => {
           })
         );
       } else {
-        sound.playHackFailed();
         setHackStatus({
           type: 'FAILED',
-          message: '❌ HACK THẤT BẠI (-50đ)!',
-          details: 'Mã nguồn đối thủ đã xử lý đúng testcase của bạn và cho ra kết quả hoàn hảo. Bạn bị trừ 50 điểm phạt!'
+          message: 'Hack thất bại (−50đ, demo)!',
+          details: 'Ở chế độ demo, chỉ tài khoản buggy_coder bài B mới bẻ được. Chạy backend và thi Hack Phase thật để chấm điểm.'
         });
       }
     }, 800);
@@ -171,17 +244,18 @@ export const HackRoomPage = () => {
       <div className="p-6 rounded-2xl bg-gradient-to-r from-red-950/40 via-[#131124] to-slate-900 border border-red-500/20 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1.5">
-              <Flame className="w-3.5 h-3.5 text-red-500" />
-              Hack Room #1 (Phòng 25 Người)
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30">
+              Hack Room
             </span>
-            <span className="text-xs text-slate-400 font-mono">Rating trung bình: 1680 Elo</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${dataSource === 'live' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-white/5 text-slate-400 border-white/10'}`}>
+              {dataSource === 'live' ? `Phòng thật (${phase})` : 'Demo local'}
+            </span>
           </div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
-            ⚔️ Phòng Thách Đấu — Đấu Trường Bẻ Khóa Mã Nguồn
+          <h1 className="text-2xl font-extrabold text-white tracking-tight">
+            Phòng Thách Đấu
           </h1>
           <p className="text-xs text-slate-400 mt-1 max-w-xl">
-            Trong 15 phút Hack Phase, hãy mở code của các đối thủ cùng phòng, tìm bẫy tràn số hoặc ca biên và tung counter-testcase để ghi điểm!
+            Sau giờ làm bài, mỗi người được đọc code cùng phòng và gửi input để chứng minh code đối thủ sai. Hack đúng +100 điểm, hack sai −50 điểm.
           </p>
         </div>
 
@@ -201,8 +275,7 @@ export const HackRoomPage = () => {
         {/* ======================================================== */}
         <div className="lg:col-span-4 bg-[#0e1424] border border-white/10 rounded-2xl p-4 flex flex-col space-y-3">
           <div className="flex items-center justify-between border-b border-white/5 pb-2 text-xs font-bold text-slate-300">
-            <span>Danh Sách Đấu Thủ Cùng Phòng</span>
-            <span className="text-slate-500 font-mono">25 Coder</span>
+            <span>Danh sách đấu thủ cùng phòng</span>
           </div>
 
           <div className="space-y-2 overflow-y-auto max-h-[560px] pr-1">
@@ -248,7 +321,7 @@ export const HackRoomPage = () => {
                             : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
                         }`}
                       >
-                        {prob.isHacked ? `Bài ${prob.code} ✗` : `Bài ${prob.code} (+${prob.points})`}
+                        {prob.isHacked ? `Bài ${prob.code} (bị hack)` : `Bài ${prob.code} (+${prob.points})`}
                       </button>
                     ))}
                   </div>
@@ -273,12 +346,12 @@ export const HackRoomPage = () => {
                 <span className="text-[#ff6600]">Bài {selectedProblemCode}</span>
                 {activeProblem?.isHacked ? (
                   <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-400 text-xs font-bold border border-red-500/30">
-                    ĐÃ BỊ BẺ KHÓA
+                    Đã bị bẻ khóa
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30">
-                    Passed Pretests ({activeProblem?.points || 0}đ)
-                  </span>
+              <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30">
+                Qua pretest ({activeProblem?.points || 0}đ)
+              </span>
                 )}
               </h2>
             </div>
@@ -291,25 +364,26 @@ export const HackRoomPage = () => {
           {/* Victim Source Code Viewer */}
           <div>
             <div className="flex items-center justify-between text-xs font-bold text-slate-400 mb-1.5">
-              <span>Mã nguồn đối thủ (Chế độ đọc):</span>
-              <span className="text-[11px] text-orange-400">⚠️ Tìm lỗi tràn int32 hoặc chia cho 0</span>
+              <span>Mã nguồn đối thủ (chế độ đọc):</span>
             </div>
             <pre className="p-4 rounded-xl bg-[#060912] border border-white/10 font-mono text-xs text-slate-300 overflow-x-auto max-h-60 leading-relaxed">
-              {activeProblem?.codeContent || `// Không có mã nguồn khả dụng cho bài tập này.`}
+              {activeProblem?.codeContent || (dataSource === 'live'
+                ? `// Code đối thủ chỉ mở trong Hack Phase (hiện tại: ${phase}).`
+                : '// Không có mã nguồn khả dụng cho bài này.')}
             </pre>
           </div>
 
           {/* Counter-Testcase Input & Live Testlib Validator */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-slate-300">Nhập dữ liệu bẻ khóa (Counter-Testcase):</span>
+              <span className="font-bold text-slate-300">Nhập input để bẻ khóa bài trên:</span>
               {testlibResult.isValid ? (
-                <span className="text-[11px] text-emerald-400 flex items-center gap-1 font-semibold">
-                  <CheckCircle className="w-3.5 h-3.5" /> Testlib Validator: Hợp lệ
+                <span className="text-[11px] text-emerald-400 font-semibold">
+                  Testlib Validator: Hợp lệ
                 </span>
               ) : (
-                <span className="text-[11px] text-red-400 flex items-center gap-1 font-semibold">
-                  <XCircle className="w-3.5 h-3.5" /> Testlib Error: {testlibResult.error}
+                <span className="text-[11px] text-red-400 font-semibold">
+                  Testlib Error: {testlibResult.error}
                 </span>
               )}
             </div>
@@ -322,22 +396,17 @@ export const HackRoomPage = () => {
               placeholder="VD: 3\n100000 100000 100000\n"
             />
             <p className="text-[11px] text-slate-500">
-              * Quy chuẩn Testlib: Kết thúc bằng đúng một ký tự xuống dòng (\n), không có khoảng trắng thừa ở cuối dòng.
+              Input phải đúng định dạng đề bài: kết thúc bằng một ký tự xuống dòng, không dư khoảng trắng cuối dòng.
             </p>
           </div>
 
           {/* Hack Result Banner */}
           {hackStatus && (
-            <div className={`p-4 rounded-xl border flex items-start gap-3 animate-fadeIn ${
+            <div className={`p-4 rounded-xl border animate-fadeIn ${
               hackStatus.type === 'SUCCESS'
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
                 : 'bg-red-500/10 border-red-500/30 text-red-300'
             }`}>
-              {hackStatus.type === 'SUCCESS' ? (
-                <Sparkles className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-              ) : (
-                <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-              )}
               <div>
                 <h4 className="font-bold text-sm">{hackStatus.message}</h4>
                 <p className="text-xs mt-0.5 opacity-90">{hackStatus.details}</p>
@@ -349,11 +418,10 @@ export const HackRoomPage = () => {
           <div className="pt-2">
             <button
               onClick={handleExecuteHack}
-              disabled={isExecuting || !testlibResult.isValid || activeProblem?.isHacked}
-              className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 font-extrabold text-sm text-white transition flex items-center justify-center gap-2 shadow-lg shadow-red-500/25 disabled:opacity-50"
+              disabled={isExecuting || !testlibResult.isValid || activeProblem?.isHacked || (dataSource === 'live' && !activeProblem?.submissionId)}
+              className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 font-extrabold text-sm text-white transition shadow-lg shadow-red-500/25 disabled:opacity-50"
             >
-              <Zap className="w-4 h-4" />
-              {isExecuting ? 'Đang kích hoạt Isolate Sandbox...' : '⚡ TUNG ĐÒN HACK (-50đ / +100đ)'}
+              {isExecuting ? 'Đang chấm...' : 'Tung đòn hack (−50đ / +100đ)'}
             </button>
           </div>
 

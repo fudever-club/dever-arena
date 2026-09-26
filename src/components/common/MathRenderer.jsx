@@ -67,7 +67,16 @@ export const MathRenderer = ({ content, className = '' }) => {
       return id;
     });
 
-    // 5. Định dạng Markdown cơ bản:
+    // 5. Escape HTML còn lại (chống stored-XSS từ đề bài/editorial).
+    // Các placeholder ___...___ không chứa ký tự đặc biệt nên an toàn;
+    // code/math đã tách ra trước đó, KaTeX tự escape output của nó.
+    processed = processed
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+    // 6. Định dạng Markdown cơ bản:
     // Tiêu đề h3 (### ...)
     processed = processed.replace(/^### (.*$)/gim, '<h3 class="text-sm font-extrabold text-white mt-4 mb-2 flex items-center gap-2 tracking-tight"><span class="w-1.5 h-1.5 rounded-full bg-[#ff6600]"></span>$1</h3>');
     // Tiêu đề h2 (## ...)

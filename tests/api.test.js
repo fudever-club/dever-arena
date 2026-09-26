@@ -212,7 +212,7 @@ describe('Crew-G Contract — Division Eligibility Gate (Rating Constraints)', (
   });
 });
 
-describe('Crew-G Contract — Virtual Contest & Clan Standings API', () => {
+describe('Crew-G Contract — Virtual Contest API', () => {
   beforeEach(async () => {
     await resetSeed();
   });
@@ -237,14 +237,6 @@ describe('Crew-G Contract — Virtual Contest & Clan Standings API', () => {
     assert.equal(state.session.id, session.id);
     assert.equal(state.isFinished, false);
     assert.ok(Array.isArray(state.standings));
-  });
-
-  it('api.getClanStandings trả về danh sách xếp hạng bang hội có rank và score', async () => {
-    const clanStandings = await api.getClanStandings('top5_harmonic');
-    assert.ok(Array.isArray(clanStandings));
-    assert.ok(clanStandings.length >= 4);
-    assert.equal(clanStandings[0].rank, 1);
-    assert.ok(clanStandings[0].score >= clanStandings[1].score);
   });
 });
 

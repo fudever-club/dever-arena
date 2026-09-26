@@ -93,13 +93,51 @@
 - [x] Task 41: Kiểm thử trọn vẹn Admin Command Center `admin.html` (Freeze board, Phase transition, AST Anti-cheat similarity scanner, Polygon live preview, Telemetry judge cluster).
 - [x] Task 42: Đạt 100% tỷ lệ vượt qua: 47/47 tests PASS, chụp 4 ảnh bằng chứng giao diện HD tại thư mục artifacts.
 
-## Phase 13: Modern React SPA, LeetCode Workspace Ergonomics, KaTeX Typography, Polygon Problemsetter Studio & 9Router De-integration (Completed)
+## Phase 13: Modern React SPA, Workspace Ergonomics, KaTeX Typography, Polygon Problemsetter Studio & 9Router De-integration (Completed)
 - [x] Task 43: Tách biệt hoàn toàn Member Portal (`MemberLayout`) và Admin Command Center (`AdminLayout`) trên React 18 + Vite + Tailwind CSS v4.
-- [x] Task 44: Xây dựng Không gian làm bài LeetCode 3 phân vùng với Monaco Editor Pro (`ProblemWorkspace.jsx`).
+- [x] Task 44: Xây dựng Không gian làm bài 3 phân vùng với Monaco Editor Pro (`ProblemWorkspace.jsx`).
 - [x] Task 45: Tích hợp Resizable Splitters kéo thả 2 chiều (20-80%) và lưu cấu hình vào `localStorage`.
 - [x] Task 46: Xây dựng Zen Mode 2 cấp độ (ẩn testcase & toàn màn hình phóng đại) kích hoạt nhanh bằng phím tắt `Esc`.
 - [x] Task 47: Tích hợp KaTeX Math Typography Engine (`MathRenderer.jsx`) cho công thức toán học inline `$x$` và block `$$\sum$$`.
 - [x] Task 48: Xây dựng Polygon Problemsetter Studio trong Admin Center: Thêm/Sửa/Xóa bài toán, KaTeX Live Preview và BroadcastChannel sync đa tab.
 - [x] Task 49: Loại bỏ hoàn toàn 8 agent skills `9router*`, tuân thủ tuyệt đối triết lý Zero-AI Client theo `ADR-003`.
 - [x] Task 50: Kiểm tra toàn diện chất lượng: 98/98 unit tests PASS, `detect.mjs` 0 errors, Vite production build hoàn tất sạch sẽ trong ~340ms.
+
+## Phase 14: Backend API Thật + Judge Thật + Logo CLB (Completed)
+- [x] Task 51: Xây dựng `server/` Node thuần (REST + SSE + JWT + judge JS/Python + hack oracle + Elo + virtual + division gate + Room 25)
+- [x] Task 52: `tests/server_api.test.js` vòng đời đầy đủ (10 tests)
+- [x] Task 53: `public/brand/` + favicon/PWA icons từ logo gốc, gắn Navbar/Login/Landing, `src/lib/apiClient.js` + nối 4 màn hình
+
+## Phase 15: Xóa Clan Wars + Tài Khoản Admin Cấp + Dọn Icon + Sửa Chữ (Completed)
+- [x] Task 54: Xóa Clan Wars (UI/server/engine/tests), user còn cá nhân/đội (`team`, `members`)
+- [x] Task 55: `POST/GET /api/v1/admin/users` + tab Cấp tài khoản, không đăng ký công khai
+- [x] Task 56: Gỡ `lucide-react` + emoji trang trí, SVG ngôn ngữ từ svgl.app, font Space Grotesk (subset Việt), sửa chữ + số liệu thật
+
+## Phase 16: Nối Vòng Lặp Thi Đấu + Security + Judge Sâu + Production (Completed)
+- [x] Task 57: Nối submit/hack/phase/timer/editorial vào backend (lỗi hiện rõ, khóa editorial đến FINISHED)
+- [x] Task 58: Rate-limit + security headers + CORS env + production bắt buộc JWT secret
+- [x] Task 59: Judge Java/C++ tự phát hiện toolchain + endpoint rejudge, rooms/telemetry admin đọc số thật
+- [x] Task 60: `Dockerfile.api/web`, `nginx.conf`, `docker-compose.yml`, `.env.example`; verify 105/105 tests, lint 0, build sạch
+
+## Phase 17: Xóa giao diện vanilla cũ — single-stack React SPA (Completed)
+- [x] Task 61: Xóa `index.html`/`arena.html`/`admin.html`/`css`/`js`/`problems` + script e2e lỗi thời, viết lại `detect.mjs` + `platform_quality.test.js` cho SPA, docs chuyển single-stack.
+
+## Phase 18: CRUD đề thi trên máy chủ + Freeze/ICPC phía server (Completed)
+- [x] Task 62: `POST/PUT/DELETE /api/v1/admin/problems` + Admin Studio publish lên server + 7 tests.
+- [x] Task 63: Module thuần `contestResults` (freeze/ICPC, 11 tests) đấu nối vào `GET standings` (`?frozen=1`, `?format=ICPC`) + nút đóng băng admin đồng bộ Standings + test vòng đời.
+
+## Phase 19: Vá liêm chính hiển thị + luồng dữ liệu thật + mở kỳ thi (Completed)
+- [x] Task 64: Escape HTML MathRenderer (chống stored-XSS), unfreeze demo-only, 401 auto-logout.
+- [x] Task 65: Merge đề server giữ nháp, reset testcase theo bài, hack gate format-only, ContestHub list + đăng ký, standings cột động.
+- [x] Task 66: `POST /api/v1/admin/contests` + form mở kỳ thi, test đầy đủ; verify 126/126 tests, lint 0, build sạch.
+
+## Phase 20: E2E trình duyệt thật + chống treo process (Completed)
+- [x] Task 67: `tests/spa_e2e.test.js` (landing, login JWT, standings live, submit Python chấm thật) + port riêng + kill cây process + proxy theo env; verify 130/130 tests, không mồ côi.
+
+## Phase 21: Soạn đề server-only + worker riêng + ICPC tự động + Postgres (Completed)
+- [x] Task 68: Bỏ persist đề localStorage, Studio 100% qua API, merge giữ nháp phiên.
+- [x] Task 69: `server/queue.js` + `judgeWorker.js` (fork pool, timeout + respawn), test đồng loạt.
+- [x] Task 70: ICPC auto theo `contest_format` + bảng điểm 2 chế độ, test vòng đời ICPC thật.
+- [x] Task 71: Telemetry duyệt + chấm lại bài nộp, reset mật khẩu từng tài khoản, polygon chọn kỳ thi đích.
+- [x] Task 72: Adapter Postgres (`server/pg.js`, service compose) + 4 tests pool giả; verify 136/136 tests, lint 0, build sạch.
 

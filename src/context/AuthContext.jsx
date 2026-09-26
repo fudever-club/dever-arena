@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { api, setToken as saveToken } from '../lib/apiClient';
 
 const AuthContext = createContext(null);
+
+const LOCAL_AVATAR = '/brand/icon-192.png';
 
 export const PRESET_USERS = {
   GUEST: {
@@ -10,7 +13,7 @@ export const PRESET_USERS = {
     rating: 0,
     role: 'GUEST',
     rank: 'Newbie',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=guest'
+    avatar: LOCAL_AVATAR
   },
   PARTICIPANT: {
     id: 'u_dever_hero',
@@ -20,7 +23,7 @@ export const PRESET_USERS = {
     role: 'PARTICIPANT',
     rank: 'Expert',
     clan: 'House of Buggy (K19)',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=dever_hero'
+    avatar: LOCAL_AVATAR
   },
   ADMIN: {
     id: 'u_dever_admin',
@@ -30,7 +33,7 @@ export const PRESET_USERS = {
     role: 'ADMIN',
     rank: 'Grandmaster',
     clan: 'Council Board',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=dever_admin'
+    avatar: LOCAL_AVATAR
   }
 };
 
@@ -53,7 +56,6 @@ export const AuthProvider = ({ children }) => {
         channel = new BroadcastChannel('dever_arena_bus');
         channel.onmessage = (event) => {
           if (event.data?.type === 'AUTH_STATE_CHANGED') {
-            console.log('[BroadcastChannel] Auth state updated from another tab:', event.data.payload);
             setCurrentUser(event.data.payload);
           }
         };
@@ -62,8 +64,19 @@ export const AuthProvider = ({ children }) => {
       console.warn('[BroadcastChannel] Initialization skipped:', err);
     }
 
+    // Token hết hạn/bị thu hồi (apiClient báo 401): về trạng thái khách
+    const onUnauthorized = () => {
+      setCurrentUser(PRESET_USERS.GUEST);
+      try {
+        localStorage.setItem('dever_auth_user', JSON.stringify(PRESET_USERS.GUEST));
+        localStorage.setItem('dever_active_role', 'GUEST');
+      } catch {}
+    };
+    window.addEventListener('dever:unauthorized', onUnauthorized);
+
     return () => {
       if (channel) channel.close();
+      window.removeEventListener('dever:unauthorized', onUnauthorized);
     };
   }, []);
 
@@ -88,25 +101,47 @@ export const AuthProvider = ({ children }) => {
     return user;
   };
 
-  const loginWithCredentials = (username, password) => {
-    // Standard mock credential logic
-    const role = username.toLowerCase().includes('admin') ? 'ADMIN' : 'PARTICIPANT';
-    const newUser = {
-      id: `u_${Date.now()}`,
-      username: username || 'fpt_coder',
-      name: username || 'FPT Coder',
-      rating: 1500,
-      role: role,
-      rank: role === 'ADMIN' ? 'Grandmaster' : 'Specialist',
-      clan: 'FU-DEVER Member',
-      avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${username}`
-    };
-    setCurrentUser(newUser);
-    broadcastAuthChange(newUser);
-    return newUser;
+  const loginWithCredentials = async (username, password) => {
+    // Ưu tiên backend thật (JWT); rớt mạng → fallback mock local để vẫn demo được
+    try {
+      const data = await api.login(username, password);
+      saveToken(data.accessToken || data.token);
+      const u = data.user;
+      const backendUser = {
+        id: u.id,
+        username: u.username,
+        name: u.full_name || u.username,
+        rating: u.rating,
+        role: u.role,
+        rank: u.rank_tier || u.rank || 'Newbie',
+        clan: u.clan_id || '',
+        avatar: LOCAL_AVATAR,
+      };
+      setCurrentUser(backendUser);
+      broadcastAuthChange(backendUser);
+      return backendUser;
+    } catch (e) {
+      if (e?.code !== 'NO_TOKEN') saveToken(null);
+      // Fallback mock local (giữ hành vi cũ khi chưa có backend)
+      const role = username.toLowerCase().includes('admin') ? 'ADMIN' : 'PARTICIPANT';
+      const newUser = {
+        id: `u_${Date.now()}`,
+        username: username || 'fpt_coder',
+        name: username || 'FPT Coder',
+        rating: 1500,
+        role: role,
+        rank: role === 'ADMIN' ? 'Grandmaster' : 'Specialist',
+        clan: 'FU-DEVER Member',
+        avatar: LOCAL_AVATAR
+      };
+      setCurrentUser(newUser);
+      broadcastAuthChange(newUser);
+      return newUser;
+    }
   };
 
   const logout = () => {
+    saveToken(null);
     const guestUser = PRESET_USERS.GUEST;
     setCurrentUser(guestUser);
     broadcastAuthChange(guestUser);

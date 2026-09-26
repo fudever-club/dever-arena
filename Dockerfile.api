@@ -1,0 +1,23 @@
+# DEVER Arena API — production image (Node + judge toolchains).
+# Judge chạy code thật nên image gồm: python3, JDK 17 (javac/java), g++.
+FROM node:20-alpine
+
+RUN apk add --no-cache python3 openjdk17 g++ \
+  && ln -sf python3 /usr/bin/python
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+COPY server/ ./server/
+COPY src/core/ ./src/core/
+COPY src/engine/ ./src/engine/
+COPY src/data/ ./src/data/
+
+ENV NODE_ENV=production \
+    PORT=8787
+
+VOLUME ["/app/server/data"]
+EXPOSE 8787
+
+# DEVER_JWT_SECRET bắt buộc ở production (thiếu → server từ chối khởi động).
+CMD ["node", "server/index.js"]

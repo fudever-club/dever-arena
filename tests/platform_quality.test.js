@@ -1,18 +1,16 @@
 /**
  * DEVER Arena Platform Quality & System Invariants Test Suite
- * Kiểm thử chất lượng toàn diện:
+ * Kiểm thử chất lượng toàn diện (single-stack React SPA):
  * 1. Thuật toán tính toán countdown timer và tỉ lệ % tiến độ kỳ thi
  * 2. Bộ đối soát Output test ví dụ (whitespace & newline normalization)
- * 3. Bộ phân giải Deep Hash Routing (#view-*, #tab-*, #problem-*)
- * 4. Bất biến đồng bộ trạng thái Phase qua LocalStorage/IndexedDB
- * 5. Tính toàn vẹn hợp đồng cấu trúc HTML 3 trang (h1, manifest, footer)
+ * 3. Bất biến đồng bộ trạng thái Phase qua LocalStorage/IndexedDB
+ * 4. Hợp đồng SPA shell: app.html, manifest.json, brand assets, routes (src/App.jsx)
  */
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { CONTEST_PHASES } from '../src/core/contestStateMachine.js';
-import { handleAppHash, renderMathTypography } from '../js/app.js';
 
 describe('DEVER Arena Platform Quality & Ticker Suite', () => {
 
@@ -79,68 +77,6 @@ describe('DEVER Arena Platform Quality & Ticker Suite', () => {
     assert.equal(compareOutputs('-184729104', '11'), false);
   });
 
-  test('Deep Hash Route resolver handles main views, subtabs, and problem IDs', () => {
-    // Mock global window and document objects for test runner environment
-    let lastSwitchedView = null;
-    let lastLoadedProblem = null;
-    let lastToggledTab = null;
-    let clickedSubTab = null;
-
-    globalThis.window = globalThis.window || {};
-    globalThis.window.switchMainView = (v) => { lastSwitchedView = v; };
-    globalThis.window.loadProblemToWorkspace = (p) => { lastLoadedProblem = p; };
-    globalThis.window.toggleProblemTab = (t) => { lastToggledTab = t; };
-
-    globalThis.document = globalThis.document || {};
-    globalThis.document.querySelector = (sel) => {
-      return {
-        click: () => { clickedSubTab = sel; }
-      };
-    };
-
-    // Test 1: Main views
-    handleAppHash('#view-problemset');
-    assert.equal(lastSwitchedView, 'view-problemset');
-
-    handleAppHash('#view-standings');
-    assert.equal(lastSwitchedView, 'view-standings');
-
-    // Test 2: Contest sub-tabs
-    handleAppHash('#tab-workspace');
-    assert.equal(lastSwitchedView, 'view-contests');
-    assert.equal(clickedSubTab, '[data-tab="tab-workspace"]');
-
-    handleAppHash('#tab-hackroom');
-    assert.equal(lastSwitchedView, 'view-contests');
-    assert.equal(clickedSubTab, '[data-tab="tab-hackroom"]');
-
-    // Test 3: Problem deep links
-    handleAppHash('#problem-p101');
-    assert.equal(lastLoadedProblem, 'p101');
-
-    handleAppHash('#p102');
-    assert.equal(lastLoadedProblem, 'p102');
-
-    // Test 4: Problem sub-tabs
-    handleAppHash('#editorial');
-    assert.equal(lastToggledTab, 'editorial');
-
-    // Test 5: Virtual contest direct links
-    let startedVirtualContest = null;
-    globalThis.window.startVirtualContest = (cid) => { startedVirtualContest = cid; };
-    handleAppHash('#virtual-contest_dever_archive');
-    assert.equal(startedVirtualContest, 'contest_dever_archive');
-  });
-
-  test('Math typography formatter converts LaTeX tokens to styled HTML', () => {
-    const container = { innerHTML: 'Cho đồ thị có $N$ đỉnh và độ phức tạp $O(N \\log N)$, giới hạn $1 \\le N \\le 10^5$.' };
-    renderMathTypography(container);
-    assert.ok(container.innerHTML.includes('class="math-formula"'));
-    assert.ok(container.innerHTML.includes('≤'));
-    assert.ok(container.innerHTML.includes('10<sup>5</sup>'));
-    assert.ok(container.innerHTML.includes('log'));
-  });
-
   test('Contest phase enum and storage invariant', () => {
     const validPhases = [
       CONTEST_PHASES.REGISTRATION,
@@ -157,22 +93,48 @@ describe('DEVER Arena Platform Quality & Ticker Suite', () => {
     assert.equal(validPhases.includes('INVALID_PHASE'), false);
   });
 
-  test('Integrity of 3 pages HTML contracts (h1, manifest, footer)', () => {
-    const indexHtml = readFileSync('index.html', 'utf8');
-    const arenaHtml = readFileSync('arena.html', 'utf8');
-    const adminHtml = readFileSync('admin.html', 'utf8');
+  test('SPA shell contract: app.html (root div, lang vi, title, favicon, fonts)', () => {
+    const html = readFileSync('app.html', 'utf8');
 
-    for (const [name, content] of [['index.html', indexHtml], ['arena.html', arenaHtml], ['admin.html', adminHtml]]) {
-      // Mỗi trang có đúng 1 thẻ <h1>
-      const h1Matches = content.match(/<h1[^>]*>/gi) || [];
-      assert.equal(h1Matches.length, 1, `${name} phải có đúng 1 thẻ h1`);
+    // Shell mount point cho React SPA
+    assert.ok(html.includes('<div id="root">'), 'app.html phải có <div id="root">');
 
-      // Mỗi trang đều liên kết manifest.json
-      assert.equal(content.includes('manifest.json'), true, `${name} phải có manifest.json`);
+    // Ngôn ngữ + tiêu đề tiếng Việt
+    assert.ok(html.includes('lang="vi"'), 'app.html phải có lang="vi"');
+    assert.ok(html.includes('<title>') && html.includes('DEVER Arena'), 'app.html phải có <title> DEVER Arena');
 
-      // Mỗi trang đều có skip-link a11y
-      assert.equal(content.includes('skip-link'), true, `${name} phải có skip-link`);
+    // Favicon + fonts Space Grotesk (những gì đang tồn tại — app.html không link manifest)
+    assert.ok(html.includes('favicon'), 'app.html phải link favicon');
+    assert.ok(html.includes('Space Grotesk'), 'app.html phải link fonts Space Grotesk');
+  });
+
+  test('PWA manifest contract: manifest.json valid + icons /brand/', () => {
+    const manifest = JSON.parse(readFileSync('manifest.json', 'utf8'));
+
+    assert.equal(manifest.name, 'DEVER Arena');
+    assert.equal(manifest.short_name, 'DEVER');
+    assert.ok(Array.isArray(manifest.icons) && manifest.icons.length > 0, 'manifest phải có icons');
+    for (const icon of manifest.icons) {
+      assert.ok(icon.src.includes('/brand/'), `${icon.src} phải trỏ /brand/`);
     }
+  });
+
+  test('Brand + language assets exist in public/', () => {
+    for (const f of ['logo-dark.png', 'logo-light.png', 'icon-192.png', 'icon-512.png']) {
+      assert.equal(existsSync(`public/brand/${f}`), true, `public/brand/${f} phải tồn tại`);
+    }
+    for (const f of ['python.svg', 'javascript.svg', 'java.svg', 'nodejs.svg']) {
+      assert.equal(existsSync(`public/icons/${f}`), true, `public/icons/${f} phải tồn tại`);
+    }
+  });
+
+  test('Core routes contract: src/App.jsx has CF loop routes and no /clans', () => {
+    const appJsx = readFileSync('src/App.jsx', 'utf8');
+
+    for (const route of ['path="/"', 'path="/arena"', 'path="/login"', 'path="/problem/:id"', 'path="/standings"', 'path="/hack-room"', 'path="/admin']) {
+      assert.ok(appJsx.includes(route), `src/App.jsx phải có route ${route}`);
+    }
+    assert.ok(!appJsx.includes('ClansPage') && !appJsx.includes('"/clans"') && !appJsx.includes("'/clans'"), 'src/App.jsx không còn route /clans');
   });
 
 });

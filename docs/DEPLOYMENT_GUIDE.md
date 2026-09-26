@@ -1,9 +1,22 @@
 # HƯỚNG DẪN TRIỂN KHAI HẠ TẦNG & PRODUCTION DEPLOYMENT
-> **Kiến trúc:** Microservices phân tán đóng gói qua Docker Compose, sẵn sàng chịu tải 500+ thí sinh nộp bài đồng thời trong kỳ thi toàn trường.
 
 ---
 
-## 1. SƠ ĐỒ KIẾN TRÚC HẠ TẦNG (INFRASTRUCTURE OVERVIEW)
+## 0. TRIỂN KHAI HIỆN TẠI (ĐÃ CÓ FILE, CHẠY ĐƯỢC)
+
+```bash
+cp .env.example .env   # điền DEVER_JWT_SECRET thật rồi mới chạy
+docker compose up --build -d
+# Web: http://localhost  •  API: http://localhost:8787 (nội bộ compose)
+```
+
+* `Dockerfile.api` — image backend Node 20 + toolchains chấm thật (`python3`, JDK 17, `g++`). Thiếu `DEVER_JWT_SECRET` ở production thì server từ chối khởi động.
+* `Dockerfile.web` — build SPA (`npm run build`) rồi phục vụ bằng nginx; copy kèm `manifest.json` (nằm ở root repo).
+* `nginx.conf` — fallback SPA về `app.html`, proxy `/api/` sang `api:8787`, SSE (`/api/v1/stream/`) tắt buffer + timeout đọc 1h, assets hash cache 30 ngày, manifest đúng content-type.
+* Volume `dever-data` giữ `server/data/db.json` qua restart. Sao lưu file này là sao lưu toàn bộ dữ liệu giải.
+* Giới hạn đã biết: judge chạy tuần tự trong process API (`spawnSync` block event-loop) — phù hợp vòng CLB vài chục thí sinh; muốn 500+ concurrent thì tách worker + hàng đợi (mục 1–2 bên dưới là hướng mở rộng).
+
+## 1. SƠ ĐỒ KIẾN TRÚC HẠ TẦNG MỤC TIÊU (MỞ RỘNG TƯƠNG LAI)
 
 ```mermaid
 graph TD
@@ -161,8 +174,8 @@ server {
 
     location / {
         root /usr/share/nginx/html;
-        index index.html;
-        try_files $uri $uri/ /index.html;
+        index app.html;
+        try_files $uri $uri/ /app.html;
     }
 
     location /api/ {
@@ -197,21 +210,21 @@ server {
 
 ## 4. PWA & SEO
 
-> **Trạng thái Vòng 8:** Đã thêm PWA manifest + Open Graph cho 3 trang. Không cần cài đặt bổ sung — chỉ verify trước contest.
+> **Trạng thái Vòng 17:** Single-stack React SPA (`app.html`). PWA manifest + Open Graph gắn trên SPA shell. Không cần cài đặt bổ sung — chỉ verify trước contest.
 
 ### 4.1 `manifest.json` (PWA)
 
-* **Vị trí:** `/manifest.json` (root, cùng cấp `index.html`), được liên kết từ cả 3 trang qua `<link rel="manifest" href="manifest.json">`.
+* **Vị trí:** `/manifest.json` (root, cùng cấp `app.html`).
 * **Nội dung hiện tại (`manifest.json:1`):**
   ```json
   {
     "name": "DEVER Arena",
     "short_name": "DEVER",
     "icons": [
-      { "src": "data:image/png;base64,...", "sizes": "192x192", "type": "image/png" },
-      { "src": "data:image/png;base64,...", "sizes": "512x512", "type": "image/png" }
+      { "src": "/brand/icon-192.png", "sizes": "192x192", "type": "image/png" },
+      { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png" }
     ],
-    "start_url": "index.html",
+    "start_url": "app.html",
     "display": "standalone",
     "theme_color": "#ff6600"
   }
@@ -219,17 +232,15 @@ server {
 * **Ý nghĩa:** Cho phép “Add to Home Screen” (standalone display), splash icon 192/512, theme màu cam `#ff6600` đồng bộ `meta theme-color`.
 * **Nginx:** Serve `manifest.json` với `Content-Type: application/manifest+json`, cache 1h (`expires 1h; add_header Cache-Control "public"`). Không cần service worker ở vòng này.
 
-### 4.2 `og:*` & SEO meta (3 trang)
+### 4.2 `og:*` & SEO meta (SPA shell)
 
-* **Đã thêm trong `<head>` của `index.html:7`, `arena.html:7`, `admin.html:7`:**
+* **Đã thêm trong `<head>` của `app.html`:**
   ```html
-  <meta name="theme-color" content="#ff6600"> <!-- admin.html dùng #ff3366 -->
-  <meta name="color-scheme" content="dark light">
-  <link rel="manifest" href="manifest.json">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta property="og:title" content="DEVER Arena — Thi đấu thuật toán">
-  <meta property="og:description" content="... (mô tả riêng per-page: Landing / Arena / Admin)">
-  <meta property="og:image" content="data:image/png;base64,..."> <!-- placeholder 1x1, thay bằng /og-image.png khi có asset thật -->
+  <meta name="theme-color" content="#ff6600">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <meta property="og:title" content="DEVER Arena — Đấu Trường Thuật Toán CLB FU-DEVER">
+  <meta property="og:description" content="Thi đấu chuẩn Codeforces: Coding 120′, Hack Room 25 người, System Testing, Elo Rating.">
+  <meta property="og:image" content="/brand/og.png">
   <meta name="description" content="...">
   ```
 * **Kiểm tra:** Dùng [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) hoặc `curl -s https://arena.fu-dever.com | grep og:` và DevTools → Application → Manifest. Đảm bảo `og:image` không 404, kích thước khuyến nghị 1200×630 khi thay placeholder.

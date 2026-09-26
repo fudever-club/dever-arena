@@ -105,18 +105,21 @@
 
 ---
 
-## 8. File map
+## 8. File map (single-stack React SPA)
 
-- `css/style.css` — tokens + base + components + responsive + a11y (single file để giữ `npx serve` zero-build, nhưng có comment section rõ)
-- `index.html` — Landing marketing, semantic `<nav><main><section>` + ARIA, 1 h1
-- `arena.html` — Client Arena (contest hero h1 + workspace + hack room), chung `css/style.css` tokens & footer Docs/GitHub/Discord
-- `admin.html` — Admin Command Center (phase control + AST + Polygon + telemetry), guard ADMIN, chung `css/style.css` & footer
-- `manifest.json` — PWA manifest (`name: DEVER Arena`, `short_name: DEVER`, icons 192/512, `start_url: index.html`, `display: standalone`, `theme_color: #ff6600`) — linked via `<link rel="manifest" href="manifest.json">` trong 3 HTML (`index.html:9`, `arena.html:9`, `admin.html:9`)
-- `js/app.js` — tách thành `src/web/modules/*` khi scale (hiện giữ monolith nhưng đã thêm sanitize + XSS guard + `window.__deverAnalytics.track` + `window.__deverPerf` marks)
+- `app.html` — SPA shell duy nhất (`<div id="root">`, favicon, fonts Space Grotesk + JetBrains Mono, KaTeX CDN)
+- `src/index.css` — Tailwind v4 + Cyber Dark theme tokens (single source of truth cho style)
+- `src/App.jsx` — Routes core: `/`, `/arena`, `/login`, `/problem/:id`, `/standings`, `/hack-room`, `/admin` (không còn `/clans`)
+- `manifest.json` — PWA manifest (`name: DEVER Arena`, `short_name: DEVER`, icons 192/512 trỏ `/brand/`, `start_url: app.html`, `display: standalone`, `theme_color: #ff6600`)
+- `public/brand/` — Brand assets chính thức CLB FU-DEVER (single source of truth cho logo web): `logo-dark.png` (nền tối, dùng Navbar/Login/Landing hero), `logo-light.png` (nền sáng), `icon-192.png` / `icon-512.png` (cube mark đã crop + padding, dùng PWA + Navbar thumb), `apple-touch-icon.png`, `og.png` (share preview 1200×630). Nguồn gốc: `docs/assets/*.png`. Vite copy nguyên thư mục `public/` vào `dist/`.
+- `public/icons/` — SVG logo ngôn ngữ duy nhất được phép dùng làm icon (nguồn svgl.app): `python.svg`, `javascript.svg`, `java.svg`, `nodejs.svg`. Mọi icon trang trí khác (lucide, emoji) đã gỡ — UI dùng chữ và số.
+- Typography: UI dùng Space Grotesk (có subset tiếng Việt, đã kiểm chứng), code dùng JetBrains Mono (có subset tiếng Việt).
+- `server/` — Backend API thật (Node thuần, 0 dependency): `index.js` (REST theo API_SPECIFICATION + SSE stream + phase machine + system test + Elo), `db.js` (JSON store `server/data/db.json`, tự seed), `auth.js` (SHA-256 + JWT HS256), `judge.js` (thực thi javascript/python thật qua child_process, cpp/java 422 trung thực), `oracles.js` (lời giải chuẩn chấm hack). Chạy: `npm run server` (port 8787, DB riêng qua `DEVER_DB_PATH`).
+- `src/lib/apiClient.js` — Fetch client + JWT (`dever_jwt`) + SSE; Vite proxy `/api` → `localhost:8787` ở dev.
 - `src/db/api.js` — IndexedDB wrapper + seed cho problems/submissions/hacks (dev) đối ứng `db/schema.sql` (prod)
 - `src/db/index.js` — IndexedDB wrapper (`DB_VERSION=3`, 10 stores incl. `analytics`, fallback localStorage/memory cho Node tests)
 - `tests: 56 tests (db, api, e2e, scoring, rating, contest, astDiff, auth)`
 - `db: 10 stores (users, contests, problems, testcases, submissions, hack_events, discussions, clans, contest_participants, analytics)`
-- `Analytics` — `src/db` analytics store (`analytics` table: `{id, event, props, at}`) + `js/app.js:36 window.__deverAnalytics.track(event, props)` ghi `db.put('analytics', ...)` (console.log fallback), dùng cho `contest_view`, `problems_render`, `standings_render` tracking
+- `Analytics` — `src/db` analytics store (`analytics` table: `{id, event, props, at}`), dùng cho `contest_view`, `problems_render`, `standings_render` tracking
 
 *Tài liệu này là nguồn chân lý cho mọi thay đổi UI tiếp theo.*

@@ -4,17 +4,6 @@
 import { PROBLEMS_DB } from '../data/problems.js';
 
 export async function seedDatabase(db) {
-  // Clans
-  const clans = [
-    { id: 'clan_k19', name: 'House of K19', tag: 'K19', clan_type: 'cohort', total_rating: 18450, leader_id: null },
-    { id: 'clan_k20', name: 'House of K20', tag: 'K20', clan_type: 'cohort', total_rating: 16200, leader_id: null },
-    { id: 'clan_k18', name: 'House of K18', tag: 'K18', clan_type: 'cohort', total_rating: 15900, leader_id: null },
-    { id: 'clan_k21', name: 'House of K21', tag: 'K21', clan_type: 'cohort', total_rating: 12400, leader_id: null },
-    { id: 'clan_ai', name: 'DEVER AI Research Guild', tag: 'AI', clan_type: 'specialty', total_rating: 9800, leader_id: null },
-    { id: 'clan_icpc', name: 'DEVER Competitive Core', tag: 'ICPC', clan_type: 'icpc', total_rating: 19400, leader_id: null },
-  ];
-  for (const c of clans) await db.put('clans', c);
-
   // Contests
   const contests = [
     {
@@ -117,7 +106,7 @@ export async function seedDatabase(db) {
   ];
   for (const tc of testcases) await db.put('testcases', tc);
 
-  // Users (demo) — khớp state.clans/state.contestants trong js/app.js
+  // Users (demo) cho mock layer
   const users = [
     { id: 'user_me', username: 'dever_hero', email: 'dever_hero@fpt.edu.vn', password_hash: 'mock', full_name: 'Dever Hero', clan_id: 'clan_k19', rating: 1540, max_rating: 1540, rank_tier: 'Specialist', role: 'PARTICIPANT', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120', statistics: { solved: 48 } },
     { id: 'c1', username: 'phuc_k19_icpc', email: 'phuc@fpt.edu.vn', password_hash: 'mock', full_name: 'Phuc K19', clan_id: 'clan_k19', rating: 1985, max_rating: 1985, rank_tier: 'Candidate Master', role: 'PARTICIPANT', avatar: '' },
@@ -128,7 +117,7 @@ export async function seedDatabase(db) {
   ];
   for (const u of users) await db.put('users', u);
 
-  // Contest participants + rooms — minh_matrix ở Room #2, an_senior_k18 đã seed để khớp clans
+  // Contest participants + rooms
   const participants = [
     { id: 'cp_contest_dever_round1_user_me', contest_id: contest.id, user_id: 'user_me', room_id: 'Room #1', registered_at: new Date().toISOString() },
     { id: 'cp_contest_dever_round1_c1', contest_id: contest.id, user_id: 'c1', room_id: 'Room #1', registered_at: new Date().toISOString() },
@@ -160,5 +149,5 @@ export async function seedDatabase(db) {
   await db.put('discussions', { id: 'd2', problem_id: 'p102', author_id: 'c2', title: 'Prefix sum', content: 'Có ai giải bài B bằng kỹ thuật nhân hai con trỏ prefix sum giống mình không?', upvotes: 5, created_at: new Date().toISOString() });
   await db.put('discussions', { id: 'd3', problem_id: 'p102', author_id: 'c3', title: 'Thắc mắc', content: 'Mình test trên máy test nhỏ ra đúng mà nộp cứ bị âm điểm là sao nhỉ?', upvotes: 2, created_at: new Date().toISOString() });
 
-  return { contest, clans, users };
+  return { contest, users };
 }

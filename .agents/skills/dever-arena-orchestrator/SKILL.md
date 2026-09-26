@@ -23,11 +23,11 @@ This skill governs the end-to-end development, operations, and feature scaling o
    - Elo rating recalculation with expected seed, geometric mean rank, and anti-inflation zero-sum balancing.
 
 ## Agent Workflows
-* **Before modifying core logic:** Always run `node --test tests/*.test.js` to ensure zero regressions (98 tests across 25 suites).
-* **When authoring new contest features:** 
-  - Update backend calculation engines in `src/core/` and offline runners in `src/engine/`.
-  - Maintain synchronization across both UI implementations:
-    1. Vanilla Web Arena: `index.html`, `arena.html`, `admin.html`, `css/style.css`, and `js/app.js`.
-    2. Enterprise React SPA: `app.html`, `src/App.jsx`, `src/pages/*.jsx`, and `src/components/layout/*.jsx`.
+* **Before modifying core logic:** Always run `node --test tests/*.test.js` to ensure zero regressions (136 tests across 25 suites). Also run `node detect.mjs` (0 errors) and `npm run build` (clean).
+* **Single-stack rule:** React SPA (`app.html`, `src/`) là UI duy nhất được phát triển. Legacy vanilla (`index.html`, `arena.html`, `admin.html`, `js/app.js`) đã freeze — không thêm tính năng, không đồng bộ sang đó.
+* **Backend first:** Mọi tính năng contest (submit, hack, phase, standings, accounts) phải đi qua `server/` (REST + SSE + JWT). UI không được bịa verdict/điểm/số liệu — lỗi phải hiện rõ.
+* **Khi thêm endpoint server:** cập nhật `docs/API_SPECIFICATION.md` + thêm test vào `tests/server_api.test.js`.
+* **Khi xong một đợt:** cập nhật `docs/CHANGELOG.md`, `tasks/todo.md`, số liệu tests trong `README.md`/`PRODUCT.md`/`docs/SPEC.md`.
+* **Cấm:** Clan Wars (đã xóa), icon ngoài SVG svgl.app, emoji trang trí, số liệu demo giả danh số thật.
 * **Zero-AI Guarantee:** Strictly adhere to `docs/decisions/ADR-003-pure-core-engine-and-zero-ai.md`. Do not introduce external AI gateways, LLM APIs, or opaque machine generation into contest environments.
 

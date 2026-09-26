@@ -1,11 +1,7 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { sound } from '../engine/sound.js';
-import { 
-  Trophy, Code, Play, Zap, Shield, Award, Users, 
-  ArrowRight, CheckCircle2, Clock, Terminal, Sparkles 
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { executeCodeInBrowser } from '../engine/runner.js';
+import { api } from '../lib/apiClient';
 
 const DEMO_SNIPPETS = {
   cpp: `#include <iostream>
@@ -40,13 +36,23 @@ console.log("Xác suất dever_hero (1742) thắng:", (prob * 100).toFixed(1) + 
 };
 
 export const LandingPage = () => {
-  const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
-
   const [sandboxLang, setSandboxLang] = useState('cpp');
   const [sandboxCode, setSandboxCode] = useState(DEMO_SNIPPETS.cpp);
   const [sandboxOutput, setSandboxOutput] = useState('');
   const [isExecuting, setIsExecuting] = useState(false);
+  const [stats, setStats] = useState({ contests: null, problems: null });
+
+  // Số liệu thật từ backend; chưa chạy backend thì hiện dấu gạch ngang
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [c, p] = await Promise.all([api.getContests(), api.getProblems()]);
+        if (!cancelled) setStats({ contests: c.contests?.length ?? null, problems: p.problems?.length ?? null });
+      } catch { /* giữ gạch ngang */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleLangChange = (lang) => {
     setSandboxLang(lang);
@@ -54,21 +60,24 @@ export const LandingPage = () => {
     setSandboxOutput('');
   };
 
-  const handleRunSandbox = () => {
+  const handleRunSandbox = async () => {
     setIsExecuting(true);
-    sound.playTick();
+    setSandboxOutput('Đang thực thi...');
 
-    setTimeout(() => {
-      setIsExecuting(false);
-      sound.playAccepted();
-      if (sandboxLang === 'cpp') {
-        setSandboxOutput('DEVER Arena: 3 bài AC! Tổng điểm: 3000đ\n[Execution time: 14ms • Memory: 1.8MB • Status: SUCCESS]');
+    try {
+      if (sandboxLang === 'javascript') {
+        const res = await executeCodeInBrowser('javascript', sandboxCode, '');
+        setSandboxOutput(`${res.stdout || res.status}\n[Time: ${res.executionTimeMs}ms • Status: ${res.status}]`);
       } else if (sandboxLang === 'python') {
-        setSandboxOutput('Grandmaster Rank found at index: 4\n[Execution time: 19ms • Memory: 2.1MB • Status: SUCCESS]');
+        setSandboxOutput('Grandmaster Rank found at index: 4\n[Demo mô phỏng • Time: 19ms • Chạy thật trong Workspace]');
       } else {
-        setSandboxOutput('Xác suất dever_hero (1742) thắng: 69.4%\n[Execution time: 11ms • Memory: 1.2MB • Status: SUCCESS]');
+        setSandboxOutput('DEVER Arena: 3 bài AC! Tổng điểm: 3000đ\n[Demo mô phỏng • Time: 14ms • Chạy thật trong Workspace]');
       }
-    }, 450);
+    } catch (e) {
+      setSandboxOutput(`Runtime Error: ${String(e.message).slice(0, 200)}`);
+    } finally {
+      setIsExecuting(false);
+    }
   };
 
   return (
@@ -80,39 +89,41 @@ export const LandingPage = () => {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-96 bg-gradient-to-b from-orange-500/15 via-cyan-500/10 to-transparent blur-3xl pointer-events-none -z-10"></div>
 
         {/* Live Contest Pill */}
+        <img
+          src="/brand/logo-dark.png"
+          alt="CLB FU-DEVER — Work hard, Play hard"
+          className="h-24 w-24 rounded-3xl object-cover ring-1 ring-white/10 shadow-2xl mx-auto mb-6"
+        />
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-[#ff6600] text-xs font-semibold mb-6 shadow-sm">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span>Vòng thi <b>DEVER Round #1 (Div. 3)</b> đang diễn ra</span>
+          <span>Vòng thi đấu thuật toán của CLB FU-DEVER</span>
         </div>
 
         <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-tight max-w-4xl mx-auto">
-          Đấu Trường Thuật Toán Chuẩn <br className="hidden sm:inline" />
+          Đấu trường thuật toán theo thể thức <br className="hidden sm:inline" />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff6600] via-orange-400 to-[#00f0ff]">
-            Codeforces & LeetCode
+            Codeforces
           </span>
         </h1>
 
         <p className="mt-5 text-sm sm:text-base text-slate-400 max-w-2xl mx-auto leading-relaxed">
-          Nền tảng thi đấu giải thuật tự chủ của CLB FU-DEVER: Coding Phase 120′, Hack Room 25 người bẻ khóa đối thủ, System Testing 45 test ẩn và hệ thống Elo Rating 7 bậc.
+          Nền tảng thi đấu giải thuật của CLB FU-DEVER: làm bài 120 phút, bẻ khóa bài đối thủ cùng phòng, chấm lại toàn bộ test ẩn và xếp hạng Elo.
         </p>
 
         {/* CTAs */}
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link
             to="/arena"
-            className="px-6 py-3 rounded-xl bg-[#ff6600] hover:bg-[#ff771a] text-white font-extrabold text-sm transition flex items-center gap-2 shadow-xl shadow-orange-500/25 group"
+            className="px-6 py-3 rounded-xl bg-[#ff6600] hover:bg-[#ff771a] text-white font-extrabold text-sm transition shadow-xl shadow-orange-500/25"
           >
-            <Trophy className="w-4 h-4" />
             Vào Đấu Trường Arena
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition" />
           </Link>
 
           <Link
             to="/problem/p102"
-            className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white font-bold text-sm transition border border-white/10 flex items-center gap-2"
+            className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white font-bold text-sm transition border border-white/10"
           >
-            <Code className="w-4 h-4 text-[#00f0ff]" />
-            Mở LeetCode Workspace
+            Mở Workspace Làm Bài
           </Link>
         </div>
 
@@ -122,16 +133,9 @@ export const LandingPage = () => {
         <div className="mt-14 max-w-3xl mx-auto rounded-2xl bg-[#090d18] border border-white/10 overflow-hidden shadow-2xl text-left">
           {/* Sandbox Topbar */}
           <div className="h-10 bg-[#0d1222] border-b border-white/10 px-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-500/80"></span>
-                <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></span>
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
-              </div>
-              <span className="ml-2 text-xs font-bold text-slate-300">
-                Interactive Code Sandbox (Dùng Thử Trực Tiếp Không Cần Đăng Nhập)
-              </span>
-            </div>
+            <span className="text-xs font-bold text-slate-300">
+              Chạy thử code ngay, không cần đăng nhập
+            </span>
 
             {/* Language Picker */}
             <div className="flex items-center gap-1 bg-black/40 p-0.5 rounded border border-white/5 text-xs">
@@ -170,16 +174,15 @@ export const LandingPage = () => {
           {/* Sandbox Bottom Execution Bar */}
           <div className="p-3 bg-[#0a0f1e] border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="text-[11px] text-slate-500 font-mono">
-              ⚡ Thực thi Sandbox an toàn cách ly bộ nhớ
+              Chạy thử trực tiếp trên trang, không cách ly như máy chấm thi
             </div>
 
             <button
               onClick={handleRunSandbox}
               disabled={isExecuting}
-              className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-md disabled:opacity-50"
+              className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition shadow-md disabled:opacity-50"
             >
-              <Play className="w-3.5 h-3.5" />
-              {isExecuting ? 'Đang biên dịch...' : '▶ Chạy Thử Code'}
+              {isExecuting ? 'Đang biên dịch...' : 'Chạy Thử Code'}
             </button>
           </div>
 
@@ -197,20 +200,20 @@ export const LandingPage = () => {
       <section className="border-y border-white/10 bg-[#090d18]/50 py-10 px-6">
         <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
           <div>
-            <span className="font-mono text-3xl font-black text-[#ff6600] block">1,240+</span>
-            <span className="text-xs text-slate-400 mt-1 block">Sinh Viên FPTU Thi Đấu</span>
+            <span className="font-mono text-3xl font-black text-[#ff6600] block">{stats.contests ?? '—'}</span>
+            <span className="text-xs text-slate-400 mt-1 block">Kỳ thi trên hệ thống</span>
           </div>
           <div>
-            <span className="font-mono text-3xl font-black text-[#00f0ff] block">48</span>
-            <span className="text-xs text-slate-400 mt-1 block">Contest Đã Tổ Chức</span>
+            <span className="font-mono text-3xl font-black text-[#00f0ff] block">{stats.problems ?? '—'}</span>
+            <span className="text-xs text-slate-400 mt-1 block">Bài tập trong kho đề</span>
           </div>
           <div>
-            <span className="font-mono text-3xl font-black text-emerald-400 block">5</span>
-            <span className="text-xs text-slate-400 mt-1 block">Bài Tập / Round</span>
+            <span className="font-mono text-3xl font-black text-emerald-400 block">JS · Py</span>
+            <span className="text-xs text-slate-400 mt-1 block">Ngôn ngữ chấm thật (local)</span>
           </div>
           <div>
-            <span className="font-mono text-3xl font-black text-purple-400 block">92%</span>
-            <span className="text-xs text-slate-400 mt-1 block">Phát Hiện Gian Lận AST</span>
+            <span className="font-mono text-3xl font-black text-purple-400 block">5</span>
+            <span className="text-xs text-slate-400 mt-1 block">Giai đoạn một vòng thi</span>
           </div>
         </div>
       </section>
@@ -219,47 +222,41 @@ export const LandingPage = () => {
       <section className="py-20 px-6 max-w-6xl mx-auto">
         <div className="text-center mb-12">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Những Trải Nghiệm Độc Quyền Tại DEVER Arena
+            Thể thức thi đấu
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-xl mx-auto">
-            Hội tụ đầy đủ mọi quy chuẩn thi đấu quốc tế được tối ưu hóa cho cộng đồng lập trình FPT University.
+            Luật thi theo vòng: làm bài tính giờ, bẻ khóa bài đối thủ, chấm lại toàn bộ rồi xếp hạng Elo.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="p-6 rounded-2xl bg-[#0e1424] border border-white/10 space-y-3 hover:border-orange-500/40 transition group">
-            <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-[#ff6600]">
-              <Clock className="w-5 h-5" />
-            </div>
+            <div className="font-mono text-xs font-bold text-[#ff6600]">01</div>
             <h3 className="text-base font-bold text-white group-hover:text-[#ff6600] transition">
-              Thi Đấu Thời Gian Thực
+              Thi đấu tính giờ
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Điểm số suy giảm theo từng phút theo công thức chuẩn Codeforces: <code className="text-orange-400">Pmax - Pmax*t/250 - 50*W</code>. Nộp càng nhanh điểm càng cao!
+              Điểm mỗi bài giảm dần theo từng phút: <code className="text-orange-400">Pmax - Pmax*t/250 - 50*W</code>. Nộp càng sớm điểm càng cao.
             </p>
           </div>
 
           <div className="p-6 rounded-2xl bg-[#0e1424] border border-white/10 space-y-3 hover:border-cyan-500/40 transition group">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-[#00f0ff]">
-              <Zap className="w-5 h-5" />
-            </div>
+            <div className="font-mono text-xs font-bold text-[#00f0ff]">02</div>
             <h3 className="text-base font-bold text-white group-hover:text-[#00f0ff] transition">
-              Phòng Thách Đấu Hack Room
+              Phòng thách đấu
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Mở mã nguồn của các đối thủ cùng Room 25 người trong 15 phút Hack Phase. Tung testcase bẻ khóa bẫy tràn số để giành trọn <b className="text-emerald-400">+100 điểm</b>!
+              Sau giờ làm bài, mỗi phòng được xem code của nhau trong 15 phút. Tìm input làm code đối thủ sai để được <b className="text-emerald-400">+100 điểm</b>.
             </p>
           </div>
 
           <div className="p-6 rounded-2xl bg-[#0e1424] border border-white/10 space-y-3 hover:border-red-500/40 transition group">
-            <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400">
-              <Shield className="w-5 h-5" />
-            </div>
+            <div className="font-mono text-xs font-bold text-red-400">03</div>
             <h3 className="text-base font-bold text-white group-hover:text-red-400 transition">
-              AST Anti-Cheat Sentinel
+              Chống gian lận mã nguồn
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Thuật toán Winnowing 3-gram phân tích cây cú pháp trừu tượng, loại bỏ mọi thủ thuật đổi tên biến, thêm khoảng trắng hay comment nhằm bảo vệ tính công bằng 100%.
+              So khớp cây cú pháp để phát hiện bài sao chép dù đã đổi tên biến hay xóa chú thích. Bài vi phạm bị hủy kết quả.
             </p>
           </div>
         </div>
@@ -267,8 +264,8 @@ export const LandingPage = () => {
 
       {/* 4. FOOTER */}
       <footer className="border-t border-white/10 py-8 px-6 text-center text-xs text-slate-500">
-        <p>© 2026 DEVER Arena Enterprise • CLB FU-DEVER • FPT University</p>
-        <p className="mt-1 text-[11px]">Nền tảng thi đấu giải thuật chuẩn Codeforces & ICPC</p>
+        <p>© 2026 DEVER Arena • CLB FU-DEVER • FPT University</p>
+        <p className="mt-1 text-[11px]">Nền tảng thi đấu giải thuật của sinh viên, cho sinh viên</p>
       </footer>
 
     </div>

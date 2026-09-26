@@ -15,7 +15,7 @@
 [![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8.2-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4.3-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Tests](https://img.shields.io/badge/Tests-98%2F98%20Passed%20(100%25)-success?logo=checkmarx&logoColor=white)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-136%2F136%20Passed%20(100%25)-success?logo=checkmarx&logoColor=white)](tests/)
 [![Website](https://img.shields.io/badge/Website-fudever.com-FF6600?logo=google-chrome&logoColor=white)](https://fu-dever-landingpage-v2.vercel.app/)
 [![GitHub Org](https://img.shields.io/badge/GitHub-fudever--club-181717?logo=github&logoColor=white)](https://github.com/fudever-club)
 
@@ -31,10 +31,10 @@
 **DEVER Arena** (mật danh: *DEVER-Forces*) là nền tảng thi đấu thuật toán và luyện tập Competitive Programming chuyên sâu được nghiên cứu và phát triển bởi **CLB Lập trình FU-DEVER (Trường Đại học FPT Đà Nẵng)**.
 
 Hệ thống được thiết kế nhằm mục đích:
-1. **Mô phỏng 100% chân thực vòng đời kỳ thi Codeforces**: Phân phòng (Hack Room 25 người theo rank), chấm sơ bộ (Pretests), vòng phản biện đối thủ (Instant Hacking Phase) và kiểm thử hệ thống ngầm (System Testing).
-2. **Liêm chính học thuật tuyệt đối**: Trang bị engine AST Winnowing phát hiện đạo văn mã nguồn tự động, triệt tiêu việc ngụy trang bằng cách đổi tên biến hay xóa chú thích, đồng thời cam kết **Zero-AI Client** (ADR-003, loại bỏ hoàn toàn AI sinh code trong các round Rated).
-3. **Sư phạm qua phản biện**: Tính năng Hack Room 25 người tạo cơ hội để sinh viên đọc hiểu mã nguồn của bạn học, phát hiện các trường hợp biên (edge cases), tràn số (`integer overflow`) hay độ phức tạp thuật toán vượt ngưỡng (`TLE`).
-4. **Vinh danh tập thể (Clan Wars)**: Hệ thống xếp hạng bang hội House of Buggy (K18, K19, K20, K21...) theo thuật toán Harmonic Mean Top-5.
+1. **Vòng đời thi đấu theo thể thức Codeforces**: phân phòng 25 người, chấm pretest, phase bẻ khóa bài đối thủ (hack +100/−50) và chấm lại toàn bộ (system test) trước khi chốt Elo.
+2. **Liêm chính học thuật**: quét tương đồng mã nguồn AST sau contest, cấm AI sinh code trong các round tính điểm (ADR-003).
+3. **Học qua phản biện**: đọc code bạn cùng phòng, tìm ca biên, tràn số và lỗi độ phức tạp trong Hack Phase.
+4. **Tổ chức linh hoạt**: tài khoản cá nhân hoặc đội thi do admin cấp trước giờ contest, không đăng ký công khai.
 
 ---
 
@@ -70,30 +70,22 @@ Hệ thống được thiết kế nhằm mục đích:
 ---
 
 <a id="kien-truc-he-thong"></a>
-## 🏛️ Kiến Trúc Hệ Thống (Dual-Stack Architecture)
+## 🏛️ Kiến Trúc Hệ Thống (Single-Stack React SPA)
 
-DEVER Arena được thiết kế theo kiến trúc kép để đảm bảo tính linh hoạt tối đa:
+DEVER Arena là single-stack React SPA duy nhất:
 
 ```
-DEVER Arena
-├── 1. Zero-Build Baseline (Static Web)
-│   ├── index.html       # Landing page giới thiệu & điều lệ
-│   ├── arena.html       # Giao diện thi đấu thuần Vanilla JS
-│   ├── admin.html       # Bảng điều khiển dành cho Giám khảo / Problemsetter
-│   └── css/ & js/       # Vanilla CSS3 Cyber Dark + ES Modules
-│
-└── 2. Enterprise SPA (React 19 + Vite)
-    ├── app.html         # Single Page Application Shell
-    ├── src/             # Toàn bộ mã nguồn React 19 & Tailwind CSS v4
-    │   ├── components/  # Monaco Workspace, Resizable Splitters, KaTeX Math
-    │   ├── core/        # Pure Engine: Scoring, Rating, State Machine, Freeze
-    │   ├── engine/      # AST Winnowing, Isolate Sandbox, Testlib Validator
-    │   └── pages/       # Arena, Problemset, Standings, Admin, Virtual
-    └── tests/           # 25 test suites native (100% PASS)
+DEVER Arena (React 19 + Vite)
+├── app.html         # Single Page Application Shell
+├── src/             # Toàn bộ mã nguồn React 19 & Tailwind CSS v4
+│   ├── components/  # Monaco Workspace, Resizable Splitters, KaTeX Math
+│   ├── core/        # Pure Engine: Scoring, Rating, State Machine, Freeze
+│   ├── engine/      # AST Winnowing, Isolate Sandbox, Testlib Validator
+│   └── pages/       # Landing, ContestHub, Workspace, Standings, HackRoom, Admin
+└── tests/           # Test suites native (xem mục Kiểm Thử)
 ```
 
-1. **Lightweight Zero-Build Baseline**: Chạy độc lập trên Nginx hoặc bất kỳ static web host nào, không yêu cầu Node.js runtime khi triển khai bản nhẹ.
-2. **Modern Enterprise SPA**: Xây dựng trên nền **React 19**, **Vite 8**, **Tailwind CSS v4**, tích hợp **Monaco Editor Pro** (bộ gõ chuẩn VS Code), hỗ trợ **Resizable Splitters (20-80%)**, **Zen Mode**, **KaTeX Math Typography** và đồng bộ đa tab qua **BroadcastChannel**.
+1. **Single-stack React SPA**: Xây dựng trên nền **React 19**, **Vite 8**, **Tailwind CSS v4**, tích hợp **Monaco Editor Pro** (bộ gõ chuẩn VS Code), hỗ trợ **Resizable Splitters (20-80%)**, **Zen Mode**, **KaTeX Math Typography** và đồng bộ đa tab qua **BroadcastChannel**.
 
 ---
 
@@ -144,7 +136,7 @@ Mọi quyết định thiết kế quan trọng của hệ thống đều đư�
 |---|---|---|---|
 | [**ADR-001**](docs/decisions/ADR-001-three-page-architecture.md) | Kiến trúc 3 trang HTML độc lập | **Accepted** | Tối ưu SEO (1 H1/trang), FCP < 360ms, cô lập ranh giới an ninh Thí sinh và Giám khảo. |
 | [**ADR-002**](docs/decisions/ADR-002-isolate-sandbox-execution.md) | Cơ chế Isolate Sandbox & Dừng sớm | **Accepted** | Chặn 18 API trình duyệt độc hại, TLE 1.0s, MLE 256MB, Fail-Fast khi WA test đầu. |
-| [**ADR-003**](docs/decisions/ADR-003-pure-core-engine-and-zero-ai.md) | Core Engine hàm thuần & Zero-AI Client | **Accepted** | Tách biệt 100% logic nghiệp vụ khỏi DOM, 98/98 test pass, giữ vững liêm chính thi đấu. |
+| [**ADR-003**](docs/decisions/ADR-003-pure-core-engine-and-zero-ai.md) | Core Engine hàm thuần & Zero-AI Client | **Accepted** | Tách biệt logic nghiệp vụ khỏi DOM, 136/136 test pass, giữ vững liêm chính thi đấu. |
 | [**ADR-004**](docs/decisions/ADR-004-ast-winnowing-anti-cheat.md) | AST Tokenizer & Thuật toán Winnowing 3-Gram | **Accepted** | Khử đổi tên biến và comment rác, tính khoảng cách Jaccard phát hiện gian lận tự động. |
 
 ---
@@ -168,18 +160,28 @@ npm install
 
 ### 2. Chạy môi trường phát triển (Development)
 ```bash
-# Khởi chạy Vite Dev Server (React 19 SPA)
+# Terminal 1 — Backend API + máy chấm (port 8787, DB tự seed)
+npm run server
+
+# Terminal 2 — Web React SPA (proxy /api sẵn về backend)
 npm run dev
 # Mở trình duyệt tại: http://localhost:5173/app.html
 ```
+Tài khoản seed: `dever_hero/hero123` (thí sinh), `dever_admin/admin123` (giám khảo).
+Tài khoản thi đấu do admin cấp trong tab “Cấp tài khoản”, không có đăng ký công khai.
 
-Nếu muốn chạy giao diện **Zero-Build Static Web**:
-```bash
+# Phục vụ bản build production:
 npm run serve
-# Mở trình duyệt tại: http://localhost:3000/index.html
-```
 
-### 3. Đóng gói triển khai (Production Build)
+### 3. Triển khai production (Docker)
+```bash
+cp .env.example .env   # điền DEVER_JWT_SECRET thật
+docker compose up --build -d
+# Web: http://localhost  •  API: http://localhost:8787
+```
+Chi tiết: `Dockerfile.api`, `Dockerfile.web`, `nginx.conf`, `docs/DEPLOYMENT_GUIDE.md`.
+
+### 4. Đóng gói frontend (Production Build)
 ```bash
 npm run build
 ```
@@ -193,7 +195,7 @@ Bản build tối ưu hóa sẽ được tạo tại thư mục `dist/`.
 Dự án áp dụng quy chuẩn kiểm thử nghiêm ngặt với bộ Test Runner tích hợp sẵn trong Node.js (Zero external test runner bloatware):
 
 ```bash
-# Chạy toàn bộ 25 Test Suites (98 tests)
+# Chạy toàn bộ Test Suites (136 tests)
 npm run test
 
 # Chạy chế độ theo dõi (Watch mode)
@@ -208,17 +210,12 @@ npm run lint
 
 ### Kết quả kiểm thử tự động mẫu:
 ```
-✔ DEVER-Forces Rating Engine Tests (1.89ms)
-✔ DEVER-Forces Scoring Engine Tests (1.75ms)
-✔ DEVER Polygon Testlib Input Validator Tests (2.18ms)
-✔ DEVER Polygon Custom Checker Engine Tests (1.48ms)
-✔ DEVER Virtual Contest Simulator Engine Tests (2.65ms)
-✔ DEVER Judge Worker Queue & Priority Engine Tests (2.93ms)
-✔ DEVER Isolate Sandbox Runner Tests (0.59ms)
+✔ DEVER-Forces Rating Engine Tests
+✔ DEVER Server API Lifecycle Tests (judge thật, hack oracle, Elo, SSE)
 ...
-ℹ tests 98
+ℹ tests 136
 ℹ suites 25
-ℹ pass 98
+ℹ pass 136
 ℹ fail 0
 ```
 
@@ -244,20 +241,27 @@ dever-arena/
 │   └── JUDGE_ARCHITECTURE.md   # Thiết kế hệ thống máy chấm Isolate Sandbox
 ├── db/
 │   └── schema.sql              # Cấu trúc bảng SQL chuẩn cho production
-├── problems/                   # Thư viện đề mẫu chuẩn Polygon
-│   ├── prob_A_cyber_sum/
-│   └── prob_B_modulo_matrix/
 ├── src/                        # Mã nguồn chính của ứng dụng
 │   ├── components/             # React components (Workspace, Splitters, Math)
 │   ├── core/                   # Scoring, rating, contest state machine
 │   ├── engine/                 # AST diff, runner, sound, testlib validator
 │   ├── pages/                  # Các trang SPA (Arena, Problemset, Admin, Standings)
 │   └── index.css               # Thiết lập Tailwind v4 & Cyber Dark theme
-├── tests/                      # Bộ 25 test suites kiểm thử tự động
-├── admin.html                  # Giao diện quản trị viên & problemsetter
-├── arena.html                  # Giao diện thi đấu Zero-Build
-├── app.html                    # Giao diện ứng dụng SPA
-├── index.html                  # Trang chủ giới thiệu
+├── server/                     # Backend API thật (REST + SSE + judge JS/Python/Java/C++)
+│   ├── index.js                # Router, phase machine, system test, Elo, rate-limit
+│   ├── judge.js                # Thực thi code thật (tự phát hiện toolchain)
+│   ├── oracles.js              # Lời giải chuẩn chấm hack
+│   ├── auth.js                 # SHA-256 + JWT HS256
+│   └── db.js                   # JSON store (server/data, tự seed)
+├── public/brand/               # Logo CLB (nguồn thật duy nhất cho web)
+├── public/icons/               # SVG ngôn ngữ từ svgl.app (python/java/js/node)
+├── Dockerfile.api              # Image backend + toolchains chấm
+├── Dockerfile.web              # Image nginx phục vụ SPA
+├── nginx.conf                  # SPA fallback + proxy /api + SSE
+├── docker-compose.yml          # Production: web + api
+├── .env.example                # Mẫu biến môi trường production
+├── tests/                      # Bộ test suites kiểm thử tự động (124 tests)
+├── app.html                    # Giao diện ứng dụng SPA (duy nhất)
 ├── detect.mjs                  # Bộ kiểm tra ràng buộc kiến trúc bất biến
 ├── package.json
 └── README.md

@@ -6,21 +6,21 @@ Xây dựng nền tảng thi đấu giải thuật độc lập cho CLB FU-DEVER
 - Cơ chế tính điểm suy giảm theo thời gian (Dynamic Point Decay) và thể thức ICPC penalty / IOI subtasks.
 - Cơ chế Hack/Challenge trong Room (mở mã nguồn đối thủ để tìm testcase phản ví dụ).
 - Hệ thống System Testing sau contest để tái kiểm tra toàn bộ bài nộp bằng test suite đầy đủ.
-- Giao diện 3 trang chuyên biệt (Landing `index.html`, Client Arena `arena.html`, Admin Command Center `admin.html`), phong cách Cyber Dark & FPT Orange Pro, tích hợp bộ chạy test ví dụ 1-Click và điều hướng Deep Hash Router.
+- Giao diện single-stack React SPA (`app.html` + `src/App.jsx`: Landing `/`, Arena `/arena`, Workspace `/problem/:id`, Standings `/standings`, Hack Room `/hack-room`, Admin `/admin`), phong cách Cyber Dark & FPT Orange Pro.
 - Hệ thống Virtual Contest Simulator (thi lại contest quá khứ với cơ chế Ghost Submissions Replay theo từng phút thực tế).
 
 ## 2. Tech Stack & Environment
 - **Core Algorithms & Logic:** JavaScript (ESM / Node.js standard) for deterministic testable engines.
-- **Testing:** Node.js built-in `node:test` and `node:assert` for zero-overhead, ultra-fast test execution (78 tests across 20 suites in ~123ms).
-- **Design System & Linter:** Single-file CSS tokens (`css/style.css`), automated architectural linter `detect.mjs` (0 errors required).
-- **Frontend Web Arena:** Vanilla HTML5 / CSS3 / ES Modules — Zero build step, load time < 50ms, WCAG AA accessible, PWA installable with `manifest.json`.
+- **Testing:** Node.js built-in `node:test` and `node:assert` for zero-overhead, ultra-fast test execution (136 tests across 25 suites).
+- **Design System & Linter:** Design tokens trong `src/index.css` (Tailwind v4), automated architectural linter `detect.mjs` (0 errors required).
+- **Frontend Web Arena:** React 19 SPA (`app.html` shell + `<div id="root">`), build bằng Vite, PWA installable with `manifest.json`.
 - **Client Storage & Offline:** IndexedDB with 11 object stores (`users`, `contests`, `problems`, `testcases`, `submissions`, `hack_events`, `discussions`, `clans`, `contest_participants`, `analytics`, `virtual_sessions`) and local in-memory fallback for headless Node.js tests.
 - **Documentation:** Markdown với sơ đồ Mermaid, công thức LaTeX và hệ thống 14 tài liệu chi tiết trong `docs/`.
 
 ## 3. Commands
 - Chạy toàn bộ test suites kiểm tra thuật toán & nền tảng: `node --test tests/*.test.js`
 - Chạy linter kiểm tra tính toàn vẹn kiến trúc & CSS: `node detect.mjs`
-- Khởi chạy Web Arena Server: `npx serve -l 5173 .` hoặc mở trực tiếp các file HTML trong trình duyệt.
+- Phục vụ bản build SPA: `npm run build && npm run serve` (phục vụ `dist/` tại port 3000).
 
 ## 4. Project Structure
 ```
@@ -40,22 +40,25 @@ DEVER Arena/
 │   ├── AGENT_SYSTEM_PLAYBOOK.md   # Multi-agent orchestrator roles
 │   ├── AI_SLOP_REPORT.md          # Quality audit & anti-slop score (2.8/10)
 │   └── CHANGELOG.md               # Version history & iteration audit trail
-├── css/style.css                  # Unified Design System (tokens + responsive + a11y)
-├── js/app.js                      # Master controller (router, ticker, sync, workspace, a11y)
+├── app.html                     # React SPA shell duy nhất (<div id="root">)
 ├── detect.mjs                     # Automated architectural & design system linter
 ├── manifest.json                  # PWA Web App Manifest (standalone, theme #ff6600)
-├── index.html                     # Landing Marketing Portal (hero, stats, upcoming)
-├── arena.html                     # Client Arena (workspace, standings, hack room)
-├── admin.html                     # Admin Command Center (phase control, telemetry, radar)
+├── server/                         # Backend API thật (Node thuần, 0 dependency)
+│   ├── index.js                    # REST + SSE + phase machine + system test + Elo + rate-limit
+│   ├── judge.js                    # Thực thi JS/Python/Java/C++ thật (tự phát hiện toolchain)
+│   ├── oracles.js                  # Lời giải chuẩn chấm hack
+│   ├── auth.js                     # SHA-256 + JWT HS256
+│   └── db.js                       # JSON store + seed
+├── public/brand/                   # Logo CLB (nguồn thật duy nhất)
+├── public/icons/                   # SVG ngôn ngữ từ svgl.app
 ├── src/
-│   ├── core/                      # rating.js, scoring.js, contestStateMachine.js, auth.js, virtualContest.js, clanRating.js, scoreboardFreeze.js
-│   ├── engine/                    # runner.js, astDiff.js, sound.js, workerQueue.js, isolateRunner.js, testlibValidator.js
+│   ├── core/                      # rating.js, scoring.js, contestStateMachine.js, auth.js, virtualContest.js, scoreboardFreeze.js
+│   ├── engine/                    # runner.js, astDiff.js, workerQueue.js, isolateRunner.js, testlibValidator.js
 │   ├── db/                        # index.js (11 stores), seed.js, api.js (mock REST)
 │   ├── components/                # React layouts (MemberLayout, AdminLayout) and MathRenderer
 │   ├── pages/                     # ProblemWorkspace (LeetCode 3-pane), Landing, Standings, etc.
 │   └── data/problems.js           # Built-in problems database & editorials
-├── problems/                      # Standard Polygon problem packages (A, B)
-├── tests/                         # 98 tests across 25 test suites (Node.js test runner)
+├── tests/                         # 124 tests across 25 test suites (Node.js test runner)
 │   ├── scoring.test.js            # Codeforces dynamic decay tests
 │   ├── rating.test.js             # Elo rating engine tests
 │   ├── contest.test.js            # Contest state machine transitions
@@ -84,7 +87,7 @@ DEVER Arena/
 - **Security & Sandbox:** Kiểm tra `runner.js` chặn 18 API nguy hiểm (`Worker`, `WebSocket`, `indexedDB`, `eval`, v.v.).
 - **Judge Worker Queue & Isolate:** Kiểm tra xử lý hàng đợi ưu tiên 3 cấp và fail-fast sandbox.
 - **Scoreboard Freeze:** Xác thực trạng thái `?` và thuật toán sinh bước unfreeze từ đáy bảng.
-- **Platform Quality & Integrity:** Kiểm tra đồng hồ đếm ngược, chuẩn hóa khoảng trắng đối soát output, phân giải hash URL, và tính toàn vẹn 3 trang web.
+- **Platform Quality & Integrity:** Kiểm tra đồng hồ đếm ngược, chuẩn hóa khoảng trắng đối soát output, phase enum, và hợp đồng SPA shell (`app.html`, `manifest.json`, brand assets, routes).
 
 ## 6. Completed Strategic Capabilities (Phases 8–13)
 1. **Offline Judge Sandbox Engine & 3-Tier Priority Worker Queue (Phase 8):** Quản lý điều phối máy chấm ngoại tuyến với 3 cấp độ ưu tiên (Hack > Pretest > System Test) và cgroups v2 resource capping.

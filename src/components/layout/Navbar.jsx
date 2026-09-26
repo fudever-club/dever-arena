@@ -1,27 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useContest } from '../../context/ContestContext';
-import { sound } from '../../engine/sound.js';
-import { 
-  Trophy, BookOpen, Shield, Code, User, LogOut, LogIn, 
-  Volume2, VolumeX, Clock, Zap, Swords, BarChart3, Home 
-} from 'lucide-react';
 
 export const Navbar = () => {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const { phase, formattedTime } = useContest();
   const navigate = useNavigate();
   const location = useLocation();
-
-  const [soundEnabled, setSoundEnabled] = useState(true);
-
-  const toggleSound = () => {
-    const next = !soundEnabled;
-    setSoundEnabled(next);
-    sound.enabled = next;
-    if (next) sound.playTick();
-  };
 
   const getRankBadgeColor = (role, rating) => {
     if (role === 'ADMIN') return 'text-red-400 bg-red-500/10 border-red-500/30';
@@ -44,13 +30,13 @@ export const Navbar = () => {
         <div className="h-7 bg-amber-500/15 border-b border-amber-500/30 px-4 flex items-center justify-between text-xs text-amber-300">
           <div className="flex items-center gap-1.5 font-medium text-[11px]">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-            <span>Bạn đang ở chế độ xem của <b>Ban Giám Khảo (Contestant Preview Mode)</b>.</span>
+            <span>Bạn đang xem với quyền giám khảo.</span>
           </div>
           <Link
             to="/admin"
             className="font-bold text-[11px] text-amber-400 hover:text-amber-200 flex items-center gap-1 underline transition"
           >
-            Quay lại Admin Command Center →
+            Quay lại trang quản trị →
           </Link>
         </div>
       )}
@@ -60,6 +46,11 @@ export const Navbar = () => {
         {/* Brand & Nav items */}
         <div className="flex items-center gap-5">
           <Link to="/" className="flex items-center gap-2 group">
+            <img
+              src="/brand/icon-192.png"
+              alt="CLB FU-DEVER"
+              className="h-7 w-7 rounded-md object-cover ring-1 ring-white/10"
+            />
             <div className="font-extrabold text-base tracking-tight flex items-center">
               <span className="text-white">DEVER</span>
               <span className="text-[#ff6600]">FORCES</span>
@@ -72,74 +63,57 @@ export const Navbar = () => {
           <nav className="hidden lg:flex items-center gap-1">
             <Link
               to="/"
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
                 isCurrent('/')
                   ? 'bg-white/10 text-white'
                   : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              <Home className="w-3.5 h-3.5 text-slate-400" />
               Trang Chủ
             </Link>
 
             <Link
               to="/arena"
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
                 isCurrent('/arena')
                   ? 'bg-white/10 text-white'
                   : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              <Trophy className="w-3.5 h-3.5 text-[#ff6600]" />
               Kỳ Thi
             </Link>
 
             <Link
               to="/problem/p102"
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
                 location.pathname.startsWith('/problem')
                   ? 'bg-white/10 text-white'
                   : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              <Code className="w-3.5 h-3.5 text-[#00f0ff]" />
-              Workspace (LeetCode)
+              Workspace
             </Link>
 
             <Link
               to="/standings"
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
                 isCurrent('/standings')
                   ? 'bg-white/10 text-white'
                   : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
               Standings
             </Link>
 
             <Link
               to="/hack-room"
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
                 isCurrent('/hack-room')
                   ? 'bg-white/10 text-white'
                   : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              <Zap className="w-3.5 h-3.5 text-red-400" />
               Hack Room
-            </Link>
-
-            <Link
-              to="/clans"
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition flex items-center gap-1.5 ${
-                isCurrent('/clans')
-                  ? 'bg-white/10 text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <Swords className="w-3.5 h-3.5 text-purple-400" />
-              Clan Wars
             </Link>
           </nav>
         </div>
@@ -149,26 +123,11 @@ export const Navbar = () => {
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           <span className="text-slate-400 font-medium">{phase}</span>
           <span className="text-slate-600">|</span>
-          <Clock className="w-3.5 h-3.5 text-[#ff6600]" />
           <span className="font-mono font-semibold text-orange-400">{formattedTime}</span>
         </div>
 
-        {/* Right Section: Sound Toggle & User Profile */}
+        {/* Right Section: User Profile */}
         <div className="flex items-center gap-3">
-          {/* Sound Toggle Button */}
-          <button
-            onClick={toggleSound}
-            className={`px-2.5 py-1 rounded-lg border text-xs font-semibold transition flex items-center gap-1.5 ${
-              soundEnabled
-                ? 'bg-white/5 border-white/10 text-slate-300 hover:text-white'
-                : 'bg-red-500/10 border-red-500/20 text-red-400'
-            }`}
-            title={soundEnabled ? 'Tắt âm thanh Web Audio' : 'Bật âm thanh Web Audio'}
-          >
-            {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline text-[11px]">{soundEnabled ? 'ON' : 'OFF'}</span>
-          </button>
-
           {/* Member Profile Badge */}
           {isAuthenticated ? (
             <div className="flex items-center gap-2.5 pl-2 border-l border-white/10">
@@ -188,17 +147,16 @@ export const Navbar = () => {
               <button
                 onClick={() => { logout(); navigate('/login'); }}
                 title="Đăng xuất"
-                className="p-1 rounded text-slate-400 hover:text-red-400 hover:bg-white/5 transition ml-1"
+                className="px-2 py-1 rounded text-xs text-slate-400 hover:text-red-400 hover:bg-white/5 transition ml-1"
               >
-                <LogOut className="w-3.5 h-3.5" />
+                Đăng xuất
               </button>
             </div>
           ) : (
             <Link
               to="/login"
-              className="flex items-center gap-1.5 px-3 py-1 rounded bg-[#ff6600] hover:bg-[#ff771a] text-white font-semibold text-xs transition shadow-sm"
+              className="px-3 py-1 rounded bg-[#ff6600] hover:bg-[#ff771a] text-white font-semibold text-xs transition shadow-sm"
             >
-              <LogIn className="w-3.5 h-3.5" />
               Đăng Nhập
             </Link>
           )}

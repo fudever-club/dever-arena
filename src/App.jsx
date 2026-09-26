@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ContestProvider } from './context/ContestContext';
@@ -7,10 +7,17 @@ import { AdminLayout } from './components/layout/AdminLayout';
 import { LoginPage } from './pages/LoginPage';
 import { LandingPage } from './pages/LandingPage';
 import { ContestHub } from './pages/ContestHub';
-import { ProblemWorkspace } from './pages/ProblemWorkspace';
-import { StandingsPage } from './pages/StandingsPage';
-import { HackRoomPage } from './pages/HackRoomPage';
-import { ClansPage } from './pages/ClansPage';
+
+// Code-split nặng: Monaco workspace + Standings/Hack/Admin/Clans (frozen) tải lazy để giảm bundle đầu
+const ProblemWorkspace = lazy(() => import('./pages/ProblemWorkspace.jsx').then(m => ({ default: m.ProblemWorkspace })));
+const StandingsPage = lazy(() => import('./pages/StandingsPage.jsx').then(m => ({ default: m.StandingsPage })));
+const HackRoomPage = lazy(() => import('./pages/HackRoomPage.jsx').then(m => ({ default: m.HackRoomPage })));
+
+const PageFallback = () => (
+  <div className="min-h-[50vh] flex items-center justify-center text-slate-400 text-sm">
+    Đang tải đấu trường...
+  </div>
+);
 
 // Member Portal Layout (clean CP Navbar, contestant workspace)
 const MemberLayout = () => {
@@ -34,15 +41,14 @@ export function App() {
             <Route path="/admin/*" element={<AdminLayout />} />
             <Route path="/admin" element={<AdminLayout />} />
 
-            {/* DEDICATED MEMBER & CONTESTANT PORTAL ROUTES */}
+            {/* DEDICATED MEMBER & CONTESTANT PORTAL ROUTES — Core CF loop */}
             <Route element={<MemberLayout />}>
               <Route path="/" element={<LandingPage />} />
               <Route path="/arena" element={<ContestHub />} />
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/problem/:id" element={<ProblemWorkspace />} />
-              <Route path="/standings" element={<StandingsPage />} />
-              <Route path="/hack-room" element={<HackRoomPage />} />
-              <Route path="/clans" element={<ClansPage />} />
+              <Route path="/problem/:id" element={<Suspense fallback={<PageFallback />}><ProblemWorkspace /></Suspense>} />
+              <Route path="/standings" element={<Suspense fallback={<PageFallback />}><StandingsPage /></Suspense>} />
+              <Route path="/hack-room" element={<Suspense fallback={<PageFallback />}><HackRoomPage /></Suspense>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

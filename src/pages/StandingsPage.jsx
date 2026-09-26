@@ -1,11 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useContest } from '../context/ContestContext';
-import { sound } from '../engine/sound.js';
-import { 
-  Trophy, Search, Filter, Play, SkipForward, RotateCcw, 
-  Sparkles, Award, ArrowUp, ArrowDown, HelpCircle, Check, X 
-} from 'lucide-react';
+import { api, getToken } from '../lib/apiClient';
 
 const INITIAL_STANDINGS = [
   {
@@ -13,7 +9,7 @@ const INITIAL_STANDINGS = [
     rank: 1,
     username: 'dever_hero',
     name: 'Nguyễn Anh Tuấn',
-    clan: 'House of Buggy (K19)',
+    team: null,
     rating: 1742,
     role: 'PARTICIPANT',
     hackScore: 100,
@@ -30,7 +26,7 @@ const INITIAL_STANDINGS = [
     rank: 2,
     username: 'hacker_pro',
     name: 'Lê Hoàng Nam',
-    clan: 'Cyber Warriors (K20)',
+    team: null,
     rating: 1680,
     role: 'PARTICIPANT',
     hackScore: -50,
@@ -47,7 +43,7 @@ const INITIAL_STANDINGS = [
     rank: 3,
     username: 'alice_ninja',
     name: 'Trần Thị Mai',
-    clan: 'AI & Data Lab (K21)',
+    team: null,
     rating: 1540,
     role: 'PARTICIPANT',
     hackScore: 0,
@@ -64,7 +60,7 @@ const INITIAL_STANDINGS = [
     rank: 4,
     username: 'buggy_coder',
     name: 'Phạm Quốc Bảo',
-    clan: 'House of Buggy (K19)',
+    team: null,
     rating: 1490,
     role: 'PARTICIPANT',
     hackScore: 100,
@@ -81,7 +77,7 @@ const INITIAL_STANDINGS = [
     rank: 5,
     username: 'newbie_fpt',
     name: 'Đặng Minh Khôi',
-    clan: 'AI & Data Lab (K21)',
+    team: null,
     rating: 1180,
     role: 'PARTICIPANT',
     hackScore: 0,
@@ -97,15 +93,55 @@ const INITIAL_STANDINGS = [
 
 export const StandingsPage = () => {
   const { user } = useAuth();
-  const { phase } = useContest();
+  const { frozen } = useContest();
 
   const [standings, setStandings] = useState(INITIAL_STANDINGS);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedClan, setSelectedClan] = useState('ALL');
-  const [isFrozenMode, setIsFrozenMode] = useState(true);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const [unfreezeMessage, setUnfreezeMessage] = useState('');
+  const [dataSource, setDataSource] = useState('demo'); // demo | live
   const autoPlayTimerRef = useRef(null);
+
+  const mapBackendRow = (r) => ({
+    id: r.user_id,
+    rank: r.rank,
+    username: r.username,
+    name: r.username,
+    team: r.team || null,
+    rating: r.rating,
+    role: 'PARTICIPANT',
+    hackScore: r.hackDelta || 0,
+    problems: r.problems || {},
+    solved: r.solved ?? null,
+    penalty: r.penalty ?? null,
+  });
+
+  // Backend thật: standings + SSE live; rớt mạng → giữ demo local.
+  // Khi admin bật đóng băng, tải bản frozen từ máy chủ.
+  const [boardFormat, setBoardFormat] = useState('CODEFORCES');
+  useEffect(() => {
+    let es = null;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.getStandings('dever-round-1-div3', frozen ? { frozen: 1 } : {});
+        if (cancelled || !data?.standings?.length) return;
+        setStandings(data.standings.map(mapBackendRow));
+        setBoardFormat(data.format || 'CODEFORCES');
+        setDataSource(getToken() ? 'live' : 'backend');
+        if (getToken() && typeof EventSource !== 'undefined' && !frozen) {
+          es = api.streamContest(data.contest_id, (ev, payload) => {
+            if (ev === 'EVENT_STANDINGS_UPDATE' && payload?.standings) {
+              setStandings(payload.standings.map(mapBackendRow));
+              setDataSource('live');
+            }
+          });
+          es.onerror = () => { try { es.close(); } catch {} };
+        }
+      } catch { /* giữ demo */ }
+    })();
+    return () => { cancelled = true; try { es?.close(); } catch {} };
+  }, [frozen]);
 
   // Helper to compute total points
   const calculateTotal = (participant) => {
@@ -142,10 +178,9 @@ export const StandingsPage = () => {
     }
 
     if (!targetCoder) {
-      setUnfreezeMessage('🎉 Đã giải mã thành công 100% bảng điểm! Vòng thi kết thúc.');
+      setUnfreezeMessage('Đã giải mã thành công 100% bảng điểm! Vòng thi kết thúc.');
       setIsAutoPlaying(false);
       clearInterval(autoPlayTimerRef.current);
-      sound.playAccepted();
       return;
     }
 
@@ -153,9 +188,6 @@ export const StandingsPage = () => {
     const isAC = Math.random() > 0.3;
     const earnedPoints = isAC ? 1250 : 0;
     const newStatus = isAC ? 'AC' : 'WA';
-
-    // Play unfreeze sound effect
-    sound.playUnfreezeStep();
 
     const updated = standings.map((coder) => {
       if (coder.id === targetCoder.id) {
@@ -181,7 +213,7 @@ export const StandingsPage = () => {
 
     setStandings(reRanked);
     const resultText = isAC ? `ACCEPTED (+${earnedPoints}đ)` : 'WRONG ANSWER';
-    setUnfreezeMessage(`🔍 Giải mã Bài ${targetProbKey} của [${targetCoder.username}]: ${resultText}!`);
+    setUnfreezeMessage(`Giải mã Bài ${targetProbKey} của [${targetCoder.username}]: ${resultText}!`);
   };
 
   // Handle Auto-Play
@@ -208,13 +240,17 @@ export const StandingsPage = () => {
     setUnfreezeMessage('');
   };
 
+  // Cột bài thi suy ra từ dữ liệu (mặc định A–E cho demo)
+  const problemCodes = [...new Set(standings.flatMap((r) => Object.keys(r.problems || {})))].sort();
+  if (problemCodes.length === 0) problemCodes.push('A', 'B', 'C', 'D', 'E');
+
   const filteredStandings = standings.filter((coder) => {
     const matchesName = coder.username.toLowerCase().includes(searchTerm.toLowerCase()) || coder.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesClan = selectedClan === 'ALL' || coder.clan === selectedClan;
-    return matchesName && matchesClan;
+    return matchesName;
   });
 
   const getProblemBadge = (prob) => {
+    if (!prob) return <span className="text-slate-600 font-mono">-</span>;
     if (prob.status === 'AC') {
       return (
         <span className="px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono font-bold">
@@ -224,8 +260,8 @@ export const StandingsPage = () => {
     }
     if (prob.status === 'FROZEN') {
       return (
-        <span className="px-2 py-0.5 rounded bg-yellow-500/20 border border-yellow-500/40 text-yellow-300 font-mono font-bold animate-pulse inline-flex items-center gap-1">
-          <HelpCircle className="w-3 h-3" /> ? ({prob.attempts})
+        <span className="px-2 py-0.5 rounded bg-yellow-500/20 border border-yellow-500/40 text-yellow-300 font-mono font-bold animate-pulse">
+          ? ({prob.attempts})
         </span>
       );
     }
@@ -257,79 +293,70 @@ export const StandingsPage = () => {
               Live Standings
             </span>
             <span className="text-xs text-slate-400">DEVER Round #1 (Div. 3)</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${dataSource === 'demo' ? 'bg-white/5 text-slate-400 border-white/10' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'}`}>
+              {dataSource === 'demo' ? 'Demo local' : dataSource === 'live' ? '● LIVE API' : 'Backend API'}
+            </span>
+            {frozen && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+                Đang đóng băng
+              </span>
+            )}
           </div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
-            <Trophy className="w-6 h-6 text-[#ff6600]" />
+          <h1 className="text-2xl font-extrabold text-white tracking-tight">
             Bảng Xếp Hạng Kỳ Thi
           </h1>
         </div>
 
-        {/* ICPC Dramatic Unfreeze Controls */}
+        {/* Mô phỏng lật bảng (chỉ demo local — dữ liệu thật không bao giờ bịa verdict) */}
+        {dataSource === 'demo' && (
         <div className="flex flex-wrap items-center gap-2 bg-[#0c101d] p-2 rounded-xl border border-white/10">
           <button
             onClick={handleToggleAutoPlay}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
               isAutoPlaying
                 ? 'bg-amber-600 text-white animate-pulse'
                 : 'bg-emerald-600 hover:bg-emerald-500 text-white'
             }`}
           >
-            <Play className="w-3.5 h-3.5" />
-            {isAutoPlaying ? 'Tạm Dừng' : '▶ Chạy Giải Mã Tự Động'}
+            {isAutoPlaying ? 'Tạm Dừng' : 'Chạy Giải Mã Tự Động'}
           </button>
 
           <button
             onClick={stepUnfreeze}
             disabled={isAutoPlaying}
-            className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 text-xs font-semibold border border-white/10 transition flex items-center gap-1.5 disabled:opacity-40"
+            className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 text-xs font-semibold border border-white/10 transition disabled:opacity-40"
           >
-            <SkipForward className="w-3.5 h-3.5 text-[#00f0ff]" />
             Lật Từng Bước
           </button>
 
           <button
             onClick={handleReset}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition"
+            className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition text-xs"
             title="Đặt lại bảng ban đầu"
           >
-            <RotateCcw className="w-4 h-4" />
+            Đặt lại
           </button>
         </div>
+        )}
       </div>
 
       {/* Unfreeze Live Ticker Alert */}
       {unfreezeMessage && (
-        <div className="p-3.5 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-300 text-xs font-semibold flex items-center gap-2 animate-fadeIn">
-          <Sparkles className="w-4 h-4 text-[#ff6600] shrink-0" />
+        <div className="p-3.5 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-300 text-xs font-semibold animate-fadeIn">
           <span>{unfreezeMessage}</span>
         </div>
       )}
 
-      {/* 2. Filter & Search Bar */}
+      {/* 2. Search Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-        <div className="relative w-full sm:w-72">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        <div className="w-full sm:w-72">
           <input
             type="text"
             placeholder="Tìm theo tên hoặc handle..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:border-[#ff6600] outline-none"
+            className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:border-[#ff6600] outline-none"
           />
-        </div>
-
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Filter className="w-3.5 h-3.5 text-slate-400" />
-          <select
-            value={selectedClan}
-            onChange={(e) => setSelectedClan(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-slate-300 outline-none focus:border-[#ff6600]"
-          >
-            <option value="ALL">Tất cả Bang Hội (Clans)</option>
-            <option value="House of Buggy (K19)">House of Buggy (K19)</option>
-            <option value="Cyber Warriors (K20)">Cyber Warriors (K20)</option>
-            <option value="AI & Data Lab (K21)">AI & Data Lab (K21)</option>
-          </select>
         </div>
       </div>
 
@@ -339,14 +366,21 @@ export const StandingsPage = () => {
           <thead className="bg-[#0c101c] border-b border-white/10 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
             <tr>
               <th className="py-3 px-3 w-12 text-center">#</th>
-              <th className="py-3 px-4">Thí Sinh</th>
-              <th className="py-3 px-3 w-28 text-right">Tổng Điểm</th>
-              <th className="py-3 px-3 w-20 text-center">Hack</th>
-              <th className="py-3 px-3 text-center">Bài A</th>
-              <th className="py-3 px-3 text-center">Bài B</th>
-              <th className="py-3 px-3 text-center">Bài C</th>
-              <th className="py-3 px-3 text-center">Bài D</th>
-              <th className="py-3 px-3 text-center">Bài E</th>
+              <th className="py-3 px-4">Thí sinh</th>
+              {boardFormat === 'ICPC' && dataSource !== 'demo' ? (
+                <>
+                  <th className="py-3 px-3 w-28 text-center">Giải được</th>
+                  <th className="py-3 px-3 w-28 text-right">Penalty (phút)</th>
+                </>
+              ) : (
+                <>
+                  <th className="py-3 px-3 w-28 text-right">Tổng điểm</th>
+                  <th className="py-3 px-3 w-20 text-center">Hack</th>
+                  {problemCodes.map((code) => (
+                    <th key={code} className="py-3 px-3 text-center">Bài {code}</th>
+                  ))}
+                </>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
@@ -359,7 +393,7 @@ export const StandingsPage = () => {
                   className={`transition ${isCurrentUser ? 'bg-orange-500/10 hover:bg-orange-500/15' : 'hover:bg-white/5'}`}
                 >
                   <td className="py-3.5 px-3 text-center font-bold font-mono text-sm">
-                    {coder.rank === 1 ? '🥇 1' : coder.rank === 2 ? '🥈 2' : coder.rank === 3 ? '🥉 3' : coder.rank}
+                    {coder.rank}
                   </td>
                   <td className="py-3.5 px-4">
                     <div className="flex items-center gap-2">
@@ -372,8 +406,19 @@ export const StandingsPage = () => {
                         </span>
                       )}
                     </div>
-                    <span className="text-[11px] text-slate-500 block">{coder.clan}</span>
+                    <span className="text-[11px] text-slate-500 block">{coder.team ? `Đội ${coder.team}` : coder.name}</span>
                   </td>
+                  {boardFormat === 'ICPC' && dataSource !== 'demo' ? (
+                    <>
+                      <td className="py-3.5 px-3 text-center font-mono font-extrabold text-sm text-emerald-400">
+                        {coder.solved ?? 0}
+                      </td>
+                      <td className="py-3.5 px-3 text-right font-mono text-sm text-slate-300">
+                        {coder.penalty ?? 0}
+                      </td>
+                    </>
+                  ) : (
+                    <>
                   <td className="py-3.5 px-3 text-right font-mono font-extrabold text-sm text-orange-400">
                     {total}đ
                   </td>
@@ -386,11 +431,11 @@ export const StandingsPage = () => {
                       <span className="text-slate-600">0</span>
                     )}
                   </td>
-                  <td className="py-3.5 px-3 text-center">{getProblemBadge(coder.problems.A)}</td>
-                  <td className="py-3.5 px-3 text-center">{getProblemBadge(coder.problems.B)}</td>
-                  <td className="py-3.5 px-3 text-center">{getProblemBadge(coder.problems.C)}</td>
-                  <td className="py-3.5 px-3 text-center">{getProblemBadge(coder.problems.D)}</td>
-                  <td className="py-3.5 px-3 text-center">{getProblemBadge(coder.problems.E)}</td>
+                  {problemCodes.map((code) => (
+                    <td key={code} className="py-3.5 px-3 text-center">{getProblemBadge(coder.problems[code])}</td>
+                  ))}
+                    </>
+                  )}
                 </tr>
               );
             })}

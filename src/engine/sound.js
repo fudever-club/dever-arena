@@ -1,4 +1,7 @@
 /**
+ * @deprecated FROZEN 2026-09 — SFX removed from core CF loop.
+ * Giữ file để legacy vanilla (js/app.js) không gãy import.
+ * React SPA mới KHÔNG dùng module này (xóa khỏi Navbar/Landing/Standings/Hack).
  * DEVER-Forces Sound Synthesizer (Web Audio API)
  * Tạo âm thanh thi đấu eSports trực tiếp bằng thuật toán dao động sóng âm.
  */

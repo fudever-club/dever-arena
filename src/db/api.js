@@ -9,7 +9,6 @@
 import { db } from './index.js';
 import { calculateProblemScore, calculateHackScore } from '../core/scoring.js';
 import { createVirtualSession, getVirtualElapsedMinutes, calculateVirtualStandings } from '../core/virtualContest.js';
-import { generateClanLeaderboard } from '../core/clanRating.js';
 
 // helper uuid
 function uuid() {
@@ -509,14 +508,12 @@ export const api = {
       standings[i].new_rank = rank;
     }
 
-    // filters — Crew-T: hỗ trợ alias mới (room, clan, page, pageSize) + legacy (room_id, clan_id, limit)
+    // filters — hỗ trợ alias mới (room, page, pageSize) + legacy (room_id, limit)
     let filtered = standings;
     const roomFilter = opts.room ?? opts.room_id ?? opts.roomId ?? null;
     if (roomFilter) {
       filtered = filtered.filter(s => s.room_id === roomFilter);
     }
-    const clanFilter = opts.clan ?? opts.clan_id ?? opts.clanId ?? null;
-    if (clanFilter) filtered = filtered.filter(s => s.clan_id === clanFilter);
 
     // pagination — hỗ trợ page/pageSize (mới) + page/limit (legacy), mặc định pageSize 20
     const hasPage = opts.page !== undefined && opts.page !== null && opts.page !== '';
@@ -597,18 +594,6 @@ export const api = {
       standings
     };
   },
-
-  /**
-   * Lấy bảng xếp hạng Clan Wars — mock cho `GET /api/v1/clans/standings`
-   * @endpoint GET /api/v1/clans/standings
-   * @param {string} [method='top5_harmonic']
-   * @returns {Promise<object[]>}
-   */
-  async getClanStandings(method = 'top5_harmonic') {
-    const clans = await db.getAll('clans');
-    const users = await db.getAll('users');
-    return generateClanLeaderboard(clans, users, method);
-  }
 };
 
 // small helper to normalize userId param name collisions

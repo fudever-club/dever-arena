@@ -1,16 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import { PROBLEMS_DB } from '../data/problems.js';
 import { useAuth } from '../context/AuthContext';
 import { useContest } from '../context/ContestContext';
 import { MathRenderer } from '../components/common/MathRenderer';
-import { 
-  Play, Send, RotateCcw, Copy, Check, ChevronLeft, ChevronRight, 
-  Terminal, CheckCircle, XCircle, Clock, AlertTriangle, Maximize2, 
-  Minimize2, FileText, Lightbulb, History, MessageSquare, Sparkles,
-  GripVertical, GripHorizontal, Columns, Layout, X, Eye, EyeOff
-} from 'lucide-react';
+import { executeCodeInBrowser } from '../engine/runner.js';
+import { compareOutputs } from '../engine/isolateRunner.js';
+import { api, getToken } from '../lib/apiClient';
 
 const STARTER_CODE = {
   cpp: `#include <bits/stdc++.h>
@@ -68,7 +65,20 @@ export const ProblemWorkspace = () => {
   const { id = 'p102' } = useParams();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
-  const { getDynamicScore, formattedTime, phase, problems = [] } = useContest();
+  const { getDynamicScore, formattedTime, problems = [], contestId, contestSlug } = useContest();
+  const [editorialOpen, setEditorialOpen] = useState(false);
+
+  // Lời giải chỉ mở khi vòng thi đã kết thúc (mặc định khóa để chống lộ đề)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.getContest(contestSlug);
+        if (!cancelled && data?.contest?.status === 'FINISHED') setEditorialOpen(true);
+      } catch { /* giữ khóa */ }
+    })();
+    return () => { cancelled = true; };
+  }, [contestSlug]);
 
   // Find problem or fallback to p102
   const currentProblem = problems.find((p) => p.id === id) || problems[0] || PROBLEMS_DB[1];
@@ -113,6 +123,7 @@ export const ProblemWorkspace = () => {
   const [zenMode, setZenMode] = useState('none'); // 'none' | 'split' | 'editor'
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showZenMenu, setShowZenMenu] = useState(false);
+  const [confirmResetCode, setConfirmResetCode] = useState(false);
 
   const workspaceRef = useRef(null);
   const rightPaneRef = useRef(null);
@@ -132,10 +143,20 @@ export const ProblemWorkspace = () => {
       const saved = localStorage.getItem(`dever_code_${currentProblem.id}_${language}`);
       if (saved) {
         setCode(saved);
-        return;
+      } else {
+        setCode(STARTER_CODE[language] || STARTER_CODE.cpp);
       }
-    } catch (e) {}
-    setCode(STARTER_CODE[language] || STARTER_CODE.cpp);
+    } catch (e) {
+      setCode(STARTER_CODE[language] || STARTER_CODE.cpp);
+    }
+    // Reset console theo bài mới (không giữ testcase/verdict bài cũ)
+    setTestCases([
+      { id: 1, name: 'Case 1', input: currentProblem.sampleInput || '', expected: currentProblem.sampleOutput || '' },
+    ]);
+    setActiveCaseIndex(0);
+    setRunResult(null);
+    setSubmissionVerdict(null);
+    setActiveTab('statement');
   }, [currentProblem.id, language]);
 
   // Auto-Save effect
@@ -270,11 +291,15 @@ export const ProblemWorkspace = () => {
   };
 
   const handleResetCode = () => {
-    if (window.confirm('Bạn có chắc muốn đặt lại mã nguồn về mẫu khởi tạo ban đầu?')) {
+    if (confirmResetCode) {
       const initial = STARTER_CODE[language] || STARTER_CODE.cpp;
       setCode(initial);
       localStorage.setItem(`dever_code_${currentProblem.id}_${language}`, initial);
       setAutoSaveStatus('Đã đặt lại');
+      setConfirmResetCode(false);
+    } else {
+      setConfirmResetCode(true);
+      setTimeout(() => setConfirmResetCode(false), 4000);
     }
   };
 
@@ -290,30 +315,34 @@ export const ProblemWorkspace = () => {
     setActiveCaseIndex(testCases.length);
   };
 
-  // Run Code (Custom Testcase simulation with auto-open console)
-  const handleRunCode = () => {
+  // Run Code: thực thi thật qua runner local (JS chạy thật, các ngôn ngữ khác mô phỏng)
+  const handleRunCode = async () => {
     setIsRunning(true);
     setIsConsoleOpen(true);
     if (consoleHeight < 160) setConsoleHeight(220);
     setRunResult(null);
 
-    setTimeout(() => {
-      setIsRunning(false);
+    try {
       const activeCase = testCases[activeCaseIndex];
-      const isPassed = !code.includes('throw') && code.length > 50;
+      const res = await executeCodeInBrowser(language, code, activeCase.input || '');
+      const matched = res.status === 'OK' && compareOutputs(res.stdout, activeCase.expected || '');
       setRunResult({
-        status: isPassed ? 'ACCEPTED' : 'WRONG_ANSWER',
-        actual: isPassed ? activeCase.expected : '0\n[Output mismatch]',
+        status: matched ? 'ACCEPTED' : 'WRONG_ANSWER',
+        actual: res.stdout || res.status,
         expected: activeCase.expected,
-        executionTime: Math.floor(Math.random() * 25) + 12,
-        memory: (Math.random() * 1.5 + 2.1).toFixed(1),
+        executionTime: res.executionTimeMs,
+        memory: res.memoryKb ? (res.memoryKb / 1024).toFixed(1) : '—',
         input: activeCase.input
       });
-    }, 600);
+    } catch (e) {
+      setRunResult({ status: 'WRONG_ANSWER', actual: String(e.message || e), expected: testCases[activeCaseIndex]?.expected || '', executionTime: 0, memory: '—', input: '' });
+    } finally {
+      setIsRunning(false);
+    }
   };
 
-  // Submit Code (Pretests simulation with Codeforces scoring)
-  const handleSubmit = () => {
+  // Submit Code: chấm thật trên máy chủ (pretest). Rớt mạng → báo rõ, không bịa điểm.
+  const handleSubmit = async () => {
     if (!isAuthenticated) {
       navigate('/login?redirect=' + encodeURIComponent(window.location.pathname));
       return;
@@ -324,19 +353,31 @@ export const ProblemWorkspace = () => {
     if (consoleHeight < 160) setConsoleHeight(220);
     setSubmissionVerdict(null);
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      const earned = getDynamicScore(currentProblem.rating || 1000);
+    try {
+      if (!getToken()) throw Object.assign(new Error('Phiên đăng nhập local, chưa có token máy chủ. Hãy đăng nhập lại.'), { code: 'NO_TOKEN' });
+      const data = await api.createSubmission({
+        contest_id: contestId, problem_id: currentProblem.id, language, source_code: code,
+      });
+      const s = data.submission;
+      const passed = data.pretests_passed;
       setSubmissionVerdict({
-        status: 'PASSED',
-        verdict: 'Accepted (Passed Pretests)',
-        points: earned,
-        passedTests: '12 / 12 pretests',
-        time: '34ms',
-        memory: '3.2MB'
+        ok: passed,
+        verdict: passed ? `Qua pretest (+${s.points_awarded}đ)` : `Chưa qua: ${s.verdict}`,
+        detail: passed ? `Thời gian ${s.time_ms ?? '—'}ms` : (s.detail || s.verdict),
+        points: passed ? s.points_awarded : 0,
       });
       setActiveTab('submissions');
-    }, 1200);
+    } catch (err) {
+      setSubmissionVerdict({
+        ok: false,
+        verdict: 'Nộp bài thất bại',
+        detail: err?.message || 'Không kết nối được máy chấm. Kiểm tra npm run server.',
+        points: 0,
+      });
+      setActiveTab('submissions');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const isZenActive = zenMode !== 'none';
@@ -362,16 +403,16 @@ export const ProblemWorkspace = () => {
         <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/90 border border-[#00f0ff]/40 text-xs shadow-2xl backdrop-blur-md animate-fade-in">
           <span className="w-2 h-2 rounded-full bg-[#00f0ff] animate-pulse"></span>
           <span className="text-slate-200 font-semibold">
-            {isZenEditorOnly ? 'Zen Mode: Editor Only' : 'Zen Mode: Split View'}
+            {isZenEditorOnly ? 'Chế độ tập trung: chỉ khung code' : 'Chế độ tập trung: chia đôi'}
           </span>
           <span className="text-slate-500">|</span>
           <span className="text-[11px] text-slate-400">Nhấn <kbd className="px-1 py-0.5 rounded bg-white/10 text-white font-mono text-[10px]">Esc</kbd> để thoát</span>
           <button
             onClick={() => setZenMode('none')}
-            className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition ml-1"
-            title="Thoát Zen Mode"
+            className="px-2 py-0.5 rounded hover:bg-white/10 text-slate-400 hover:text-white transition ml-1 text-[11px]"
+            title="Thoát chế độ tập trung"
           >
-            <X className="w-3.5 h-3.5" />
+            Thoát
           </button>
         </div>
       )}
@@ -387,18 +428,18 @@ export const ProblemWorkspace = () => {
             <button
               onClick={() => prevProblem && navigate(`/problem/${prevProblem.id}`)}
               disabled={!prevProblem}
-              className="p-1 rounded hover:bg-white/10 text-slate-400 disabled:opacity-30 disabled:hover:bg-transparent transition"
+              className="px-1.5 py-1 rounded hover:bg-white/10 text-slate-400 disabled:opacity-30 disabled:hover:bg-transparent transition font-mono"
               title="Bài trước"
             >
-              <ChevronLeft className="w-4 h-4" />
+              ‹
             </button>
             <button
               onClick={() => nextProblem && navigate(`/problem/${nextProblem.id}`)}
               disabled={!nextProblem}
-              className="p-1 rounded hover:bg-white/10 text-slate-400 disabled:opacity-30 disabled:hover:bg-transparent transition"
+              className="px-1.5 py-1 rounded hover:bg-white/10 text-slate-400 disabled:opacity-30 disabled:hover:bg-transparent transition font-mono"
               title="Bài tiếp theo"
             >
-              <ChevronRight className="w-4 h-4" />
+              ›
             </button>
           </div>
 
@@ -417,9 +458,8 @@ export const ProblemWorkspace = () => {
 
         {/* Center: Dynamic Decay Points Ticker */}
         <div className="hidden md:flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400">
-          <Sparkles className="w-3 h-3 text-[#ff6600]" />
           <span className="font-bold">+{getDynamicScore(currentProblem.rating || 1000)}đ</span>
-          <span className="text-[10px] text-orange-300/70">(Giảm theo phút)</span>
+          <span className="text-[10px] text-orange-300/70">(giảm theo phút)</span>
         </div>
 
         {/* Right: ERGONOMIC LAYOUT CONTROLS & ZEN MODE */}
@@ -466,15 +506,15 @@ export const ProblemWorkspace = () => {
           <div className="relative">
             <button
               onClick={() => setShowZenMenu(!showZenMenu)}
-              className={`px-2 py-1 rounded-lg border text-[11px] font-semibold flex items-center gap-1.5 transition ${
+              className={`px-2 py-1 rounded-lg border text-[11px] font-semibold transition ${
                 isZenActive
                   ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
                   : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white'
               }`}
-              title="Chế độ tập trung Zen Mode"
+              title="Chế độ tập trung"
             >
-              <Layout className="w-3.5 h-3.5 text-[#00f0ff]" />
-              <span className="hidden sm:inline">Zen Mode</span>
+              <span className="hidden sm:inline">Tập trung</span>
+              <span className="sm:hidden">TT</span>
             </button>
 
             {/* Zen Mode Dropdown Menu */}
@@ -482,24 +522,22 @@ export const ProblemWorkspace = () => {
               <div className="absolute right-0 mt-1.5 w-48 rounded-xl bg-[#0c101d] border border-white/15 shadow-2xl p-1 z-50 text-xs space-y-0.5">
                 <button
                   onClick={() => { setZenMode('split'); setShowZenMenu(false); }}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-slate-200 flex items-center justify-between transition"
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-slate-200 transition"
                 >
-                  <span>🧘 Zen Split (Ẩn Navbar)</span>
-                  {zenMode === 'split' && <Check className="w-3.5 h-3.5 text-cyan-400" />}
+                  Chia đôi (ẩn navbar){zenMode === 'split' && ' — đang bật'}
                 </button>
                 <button
                   onClick={() => { setZenMode('editor'); setShowZenMenu(false); }}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-slate-200 flex items-center justify-between transition"
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-slate-200 transition"
                 >
-                  <span>🎯 Zen Editor (Chỉ Code)</span>
-                  {zenMode === 'editor' && <Check className="w-3.5 h-3.5 text-cyan-400" />}
+                  Chỉ khung code{zenMode === 'editor' && ' — đang bật'}
                 </button>
                 {isZenActive && (
                   <button
                     onClick={() => { setZenMode('none'); setShowZenMenu(false); }}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-500/10 text-red-400 flex items-center justify-between transition border-t border-white/5"
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-500/10 text-red-400 transition border-t border-white/5"
                   >
-                    <span>✕ Thoát Zen Mode</span>
+                    Thoát chế độ tập trung
                   </button>
                 )}
               </div>
@@ -509,15 +547,14 @@ export const ProblemWorkspace = () => {
           {/* Fullscreen Toggle */}
           <button
             onClick={() => setIsFullscreen(!isFullscreen)}
-            className="p-1.5 rounded hover:bg-white/10 text-slate-400 hover:text-white transition"
+            className="px-2 py-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition text-[11px]"
             title={isFullscreen ? 'Thoát toàn màn hình (Esc)' : 'Toàn màn hình'}
           >
-            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            {isFullscreen ? 'Thu nhỏ' : 'Phóng to'}
           </button>
 
           {/* Contest Clock */}
           <div className="hidden sm:flex items-center gap-1.5 text-slate-400 pl-2 border-l border-white/10">
-            <Clock className="w-3.5 h-3.5 text-orange-400" />
             <span className="font-mono text-slate-200 font-medium">{formattedTime}</span>
           </div>
 
@@ -544,46 +581,42 @@ export const ProblemWorkspace = () => {
             <div className="h-9 bg-[#0c101c] border-b border-white/10 flex items-center px-2 gap-1 shrink-0 select-none">
               <button
                 onClick={() => setActiveTab('statement')}
-                className={`px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
+                className={`px-3 py-1.5 rounded text-xs font-semibold transition ${
                   activeTab === 'statement'
                     ? 'bg-white/10 text-white border-b-2 border-[#ff6600]'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
                 }`}
               >
-                <FileText className="w-3.5 h-3.5 text-[#ff6600]" />
                 Đề Bài
               </button>
               <button
                 onClick={() => setActiveTab('editorial')}
-                className={`px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
+                className={`px-3 py-1.5 rounded text-xs font-semibold transition ${
                   activeTab === 'editorial'
                     ? 'bg-white/10 text-white border-b-2 border-emerald-400'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
                 }`}
               >
-                <Lightbulb className="w-3.5 h-3.5 text-emerald-400" />
                 Hướng Dẫn
               </button>
               <button
                 onClick={() => setActiveTab('submissions')}
-                className={`px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
+                className={`px-3 py-1.5 rounded text-xs font-semibold transition ${
                   activeTab === 'submissions'
                     ? 'bg-white/10 text-white border-b-2 border-blue-400'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
                 }`}
               >
-                <History className="w-3.5 h-3.5 text-blue-400" />
                 Lịch Sử Nộp
               </button>
               <button
                 onClick={() => setActiveTab('discussion')}
-                className={`px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
+                className={`px-3 py-1.5 rounded text-xs font-semibold transition ${
                   activeTab === 'discussion'
                     ? 'bg-white/10 text-white border-b-2 border-purple-400'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
                 }`}
               >
-                <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
                 Thảo Luận
               </button>
             </div>
@@ -597,8 +630,8 @@ export const ProblemWorkspace = () => {
                       {currentProblem.code}. {currentProblem.title}
                     </h2>
                     <div className="flex items-center gap-4 text-xs text-slate-500 font-mono mt-1">
-                      <span>⏱️ Giới hạn thời gian: <b className="text-slate-300">{currentProblem.timeLimit || '1.0s'}</b></span>
-                      <span>💾 Giới hạn bộ nhớ: <b className="text-slate-300">{currentProblem.memoryLimit || '256 MB'}</b></span>
+                      <span>Thời gian: <b className="text-slate-300">{currentProblem.timeLimit || '1.0s'}</b></span>
+                      <span>Bộ nhớ: <b className="text-slate-300">{currentProblem.memoryLimit || '256 MB'}</b></span>
                     </div>
                   </div>
 
@@ -617,13 +650,12 @@ export const ProblemWorkspace = () => {
                   {/* Example 1 */}
                   <div className="mt-4 p-4 rounded-xl bg-[#111827] border border-white/10 space-y-3">
                     <div className="flex items-center justify-between text-xs font-bold text-slate-200">
-                      <span>Ví Dụ 1 (Sample Testcase)</span>
+                      <span>Ví dụ mẫu</span>
                       <button
                         onClick={handleCopyInput}
-                        className="flex items-center gap-1 px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition text-[11px]"
+                        className="px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition text-[11px]"
                       >
-                        {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                        {copied ? 'Đã sao chép' : 'Sao chép Input'}
+                        {copied ? 'Đã sao chép' : 'Sao chép input'}
                       </button>
                     </div>
 
@@ -646,11 +678,10 @@ export const ProblemWorkspace = () => {
 
               {activeTab === 'editorial' && (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-                    <Lightbulb className="w-4 h-4 shrink-0" />
-                    Hướng dẫn giải chi tiết và phân tích độ phức tạp chuẩn thi đấu.
+                  <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
+                    Hướng dẫn giải và phân tích độ phức tạp.
                   </div>
-                  <MathRenderer content={currentProblem.editorial || 'Lời giải bài này sẽ được mở tự động sau khi kỳ thi kết thúc.'} />
+                  <MathRenderer content={editorialOpen ? (currentProblem.editorial || 'Chưa có lời giải cho bài này.') : 'Lời giải sẽ mở sau khi vòng thi kết thúc.'} />
                 </div>
               )}
 
@@ -659,19 +690,22 @@ export const ProblemWorkspace = () => {
                 <div className="space-y-3">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Lịch Sử Nộp Bài Của Bạn</h3>
                   {submissionVerdict ? (
-                    <div className="p-3.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <CheckCircle className="w-5 h-5 text-emerald-400" />
-                        <div>
-                          <span className="text-xs font-bold text-emerald-300 block">{submissionVerdict.verdict}</span>
-                          <span className="text-[11px] text-emerald-400/80">{submissionVerdict.passedTests} • {submissionVerdict.time}</span>
-                        </div>
+                    <div className={`p-3.5 rounded-lg border flex items-center justify-between ${
+                      submissionVerdict.ok
+                        ? 'bg-emerald-500/10 border-emerald-500/20'
+                        : 'bg-red-500/10 border-red-500/30'
+                    }`}>
+                      <div>
+                        <span className={`text-xs font-bold block ${submissionVerdict.ok ? 'text-emerald-300' : 'text-red-300'}`}>{submissionVerdict.verdict}</span>
+                        <span className="text-[11px] opacity-80">{submissionVerdict.detail}</span>
                       </div>
-                      <span className="text-sm font-extrabold text-emerald-400">+{submissionVerdict.points}đ</span>
+                      {submissionVerdict.ok && (
+                        <span className="text-sm font-extrabold text-emerald-400">+{submissionVerdict.points}đ</span>
+                      )}
                     </div>
                   ) : (
                     <div className="p-6 rounded-lg bg-white/5 border border-white/5 text-center text-xs text-slate-500">
-                      Chưa có bài nộp nào cho bài toán này. Hãy nhấn Submit để chấm Pretests!
+                      Chưa có bài nộp nào. Nhấn Nộp bài để chấm pretest.
                     </div>
                   )}
                 </div>
@@ -679,9 +713,8 @@ export const ProblemWorkspace = () => {
 
               {activeTab === 'discussion' && (
                 <div className="p-6 rounded-lg bg-white/5 border border-white/5 text-center text-xs text-slate-500 space-y-2">
-                  <MessageSquare className="w-8 h-8 mx-auto text-slate-600 mb-2" />
                   <p>Kênh trao đổi ý tưởng thuật toán giữa các thành viên CLB FU-DEVER.</p>
-                  <p className="text-[11px] text-slate-600">Vui lòng không chia sẻ toàn bộ code AC trong suốt thời gian diễn ra Contest Rated!</p>
+                  <p className="text-[11px] text-slate-600">Không chia sẻ code lời giải trong thời gian contest tính điểm.</p>
                 </div>
               )}
             </div>
@@ -727,16 +760,28 @@ export const ProblemWorkspace = () => {
           <div className="h-10 bg-[#0e1424] border-b border-white/10 px-3 flex items-center justify-between shrink-0 select-none">
             {/* Language dropdown & Controls */}
             <div className="flex items-center gap-2">
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                className="px-2 py-1 rounded bg-[#1f2937] border border-white/10 text-xs text-slate-200 font-mono outline-none focus:border-[#ff6600]"
-              >
-                <option value="cpp">C++ 20 (GCC 13)</option>
-                <option value="python">Python 3.11</option>
-                <option value="java">Java 17 (OpenJDK)</option>
-                <option value="javascript">JavaScript (Node.js 20)</option>
-              </select>
+              <div className="flex items-center gap-1" role="group" aria-label="Chọn ngôn ngữ">
+                {[
+                  { id: 'cpp', label: 'C++', title: 'C++20' },
+                  { id: 'python', label: 'Python', logo: '/icons/python.svg', title: 'Python 3' },
+                  { id: 'java', label: 'Java', logo: '/icons/java.svg', title: 'Java 17' },
+                  { id: 'javascript', label: 'JS', logo: '/icons/javascript.svg', title: 'JavaScript (Node.js)' },
+                ].map((l) => (
+                  <button
+                    key={l.id}
+                    onClick={() => setLanguage(l.id)}
+                    title={l.title}
+                    className={`px-2 py-1 rounded text-[11px] font-mono font-semibold transition flex items-center gap-1 ${
+                      language === l.id
+                        ? 'bg-[#ff6600] text-white'
+                        : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    {l.logo && <img src={l.logo} alt="" className="h-3.5 w-3.5" />}
+                    {l.label}
+                  </button>
+                ))}
+              </div>
 
               <div className="hidden sm:flex items-center gap-1 ml-2 text-xs">
                 <button
@@ -758,10 +803,10 @@ export const ProblemWorkspace = () => {
 
               <button
                 onClick={handleResetCode}
-                className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/10 ml-2 transition"
+                className="px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-white/10 ml-2 transition text-[11px]"
                 title="Khôi phục mã nguồn ban đầu"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                {confirmResetCode ? 'Nhấn lại để xác nhận' : 'Đặt lại'}
               </button>
             </div>
 
@@ -829,10 +874,9 @@ export const ProblemWorkspace = () => {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setIsConsoleOpen(!isConsoleOpen)}
-                  className="flex items-center gap-1.5 text-xs font-bold text-slate-300 hover:text-white transition"
+                  className="text-xs font-bold text-slate-300 hover:text-white transition"
                 >
-                  <Terminal className="w-3.5 h-3.5 text-[#ff6600]" />
-                  Console & Testcases {isConsoleOpen ? '▲' : '▼'}
+                  Console và testcase {isConsoleOpen ? '(thu gọn)' : '(mở rộng)'}
                 </button>
 
                 {isConsoleOpen && (
@@ -889,26 +933,26 @@ export const ProblemWorkspace = () => {
                   />
                 </div>
 
-                {/* Diff View Result */}
-                <div className="flex flex-col h-full">
-                  <div className="flex items-center justify-between mb-1 shrink-0">
-                    <span className="text-slate-400 font-semibold text-[11px]">Kết quả thực thi (Execution Diff):</span>
-                    {runResult && (
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                        runResult.status === 'ACCEPTED'
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                      }`}>
-                        {runResult.status === 'ACCEPTED' ? '✓ KHỚP KẾT QUẢ' : '✗ OUTPUT SAI KHÁC'}
-                      </span>
-                    )}
-                  </div>
+                  {/* Diff View Result */}
+                  <div className="flex flex-col h-full">
+                    <div className="flex items-center justify-between mb-1 shrink-0">
+                      <span className="text-slate-400 font-semibold text-[11px]">Kết quả chạy thử:</span>
+                      {runResult && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          runResult.status === 'ACCEPTED'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                        }`}>
+                          {runResult.status === 'ACCEPTED' ? 'Khớp kết quả' : 'Output sai khác'}
+                        </span>
+                      )}
+                    </div>
 
                   {runResult ? (
                     <div className="flex-1 p-2.5 rounded-lg bg-[#050811] border border-white/10 font-mono text-xs space-y-1.5 overflow-y-auto">
                       <div className="flex items-center justify-between text-[11px] text-slate-500 border-b border-white/5 pb-1">
                         <span>Thời gian: <b className="text-slate-300">{runResult.executionTime}ms</b></span>
-                        <span>Bộ nhớ: <b className="text-slate-300">{runResult.memory}MB</b></span>
+                        <span>Bộ nhớ: <b className="text-slate-300">{runResult.memory === '—' ? '—' : `${runResult.memory}MB`}</b></span>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-500 block">Actual Output:</span>
@@ -925,8 +969,7 @@ export const ProblemWorkspace = () => {
                     </div>
                   ) : (
                     <div className="flex-1 rounded-lg bg-[#050811] border border-white/10 flex flex-col items-center justify-center text-slate-500 text-xs">
-                      <Terminal className="w-5 h-5 mb-1 opacity-40" />
-                      <span>Nhấn "Chạy Thử" để kiểm tra kết quả</span>
+                      <span>Nhấn “Chạy thử” để kiểm tra kết quả</span>
                     </div>
                   )}
                 </div>
@@ -937,7 +980,7 @@ export const ProblemWorkspace = () => {
             <div className="h-11 bg-[#0c101c] border-t border-white/10 px-4 flex items-center justify-between shrink-0 select-none">
               <div className="flex items-center gap-2 text-xs text-slate-400">
                 <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                <span>Pretests Mode: Chấm 12 testcases ban đầu</span>
+                <span>Chế độ pretest: chấm trên bộ test mẫu</span>
               </div>
 
               <div className="flex items-center gap-2">
@@ -945,20 +988,18 @@ export const ProblemWorkspace = () => {
                   type="button"
                   onClick={handleRunCode}
                   disabled={isRunning || isSubmitting}
-                  className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition flex items-center gap-1.5 border border-white/10 disabled:opacity-50"
+                  className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition border border-white/10 disabled:opacity-50"
                 >
-                  <Play className="w-3.5 h-3.5 text-emerald-400" />
-                  {isRunning ? 'Đang chạy...' : 'Chạy Thử'}
+                  {isRunning ? 'Đang chạy...' : 'Chạy thử'}
                 </button>
 
                 <button
                   type="button"
                   onClick={handleSubmit}
                   disabled={isRunning || isSubmitting}
-                  className="px-5 py-1.5 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-bold text-xs transition flex items-center gap-1.5 shadow-md shadow-orange-500/20 disabled:opacity-50"
+                  className="px-5 py-1.5 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-bold text-xs transition shadow-md shadow-orange-500/20 disabled:opacity-50"
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  {isSubmitting ? 'Đang chấm...' : 'NỘP BÀI'}
+                  {isSubmitting ? 'Đang chấm...' : 'Nộp bài'}
                 </button>
               </div>
             </div>

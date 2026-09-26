@@ -1,0 +1,44 @@
+# DEVER Arena — production compose: web (nginx + SPA) + api (REST + judge) + db (Postgres).
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dever
+      POSTGRES_PASSWORD: ${DEVER_DB_PASSWORD:-deverlocal}
+      POSTGRES_DB: dever_arena
+    volumes:
+      - dever-pgdata:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DEVER_DATABASE_URL: postgres://dever:${DEVER_DB_PASSWORD:-deverlocal}@db:5432/dever_arena
+    volumes:
+      - dever-data:/app/server/data
+    expose:
+      - "8787"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  dever-data:
+  dever-pgdata:

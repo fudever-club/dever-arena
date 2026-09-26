@@ -1,14 +1,63 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import { useContest } from '../context/ContestContext';
-import { Trophy, Clock, Code, Award, ChevronRight, Zap, CheckCircle2 } from 'lucide-react';
+import { api, getToken } from '../lib/apiClient';
 
 export const ContestHub = () => {
-  const { user } = useAuth();
   const { phase, formattedTime, getDynamicScore, problems = [] } = useContest();
   const navigate = useNavigate();
 
+  const [virtual, setVirtual] = useState(null); // { session_id, elapsedMinutes, standings }
+  const [virtualSupported, setVirtualSupported] = useState(false);
+  const [virtualLoading, setVirtualLoading] = useState(false);
+  const [contests, setContests] = useState(null);
+  const [regMsg, setRegMsg] = useState('');
+
+  // Danh sách kỳ thi thật từ backend
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.getContests();
+        if (!cancelled && Array.isArray(data?.contests)) setContests(data.contests);
+      } catch { /* backend chưa chạy → ẩn danh sách */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Virtual Contest: chỉ hiện khi backend reachable
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        await api.getContest('dever-round-0-archive');
+        if (!cancelled) setVirtualSupported(true);
+      } catch { /* backend chưa chạy → ẩn thẻ ảo */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const startVirtual = async () => {
+    if (!getToken()) { navigate('/login?redirect=/arena'); return; }
+    setVirtualLoading(true);
+    try {
+      const s = await api.createVirtual('dever-round-0-archive');
+      const v = await api.getVirtual('dever-round-0-archive', s.session_id);
+      setVirtual(v);
+    } catch { /* im lặng, giữ thẻ */ }
+    finally { setVirtualLoading(false); }
+  };
+
+  const handleRegister = async (slug) => {
+    if (!getToken()) { navigate('/login?redirect=/arena'); return; }
+    setRegMsg('');
+    try {
+      const data = await api.register(slug);
+      setRegMsg(`Đã đăng ký thành công, xếp vào ${data.participant.room_id}.`);
+    } catch (err) {
+      setRegMsg(err?.message || 'Đăng ký thất bại.');
+    }
+  };
   const getDifficultyColor = (rating) => {
     if (rating <= 800) return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
     if (rating <= 1200) return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
@@ -36,7 +85,7 @@ export const ContestHub = () => {
             </div>
 
             <h1 className="text-2xl lg:text-3xl font-extrabold text-white tracking-tight">
-              DEVER Round #1 (Div. 3) — Đấu Trường Thuật Toán
+              DEVER Round #1 (Div. 3) — đấu trường thuật toán
             </h1>
 
             <p className="text-slate-400 text-xs sm:text-sm mt-1.5 max-w-xl">
@@ -54,21 +103,57 @@ export const ContestHub = () => {
             <div className="h-8 border-r border-white/10"></div>
             <Link
               to="/problem/p102"
-              className="px-4 py-2 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] font-bold text-xs text-white transition flex items-center gap-1.5 shadow-md shadow-orange-500/20"
+              className="px-4 py-2 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] font-bold text-xs text-white transition shadow-md shadow-orange-500/20"
             >
-              Vào Workspace
-              <ChevronRight className="w-4 h-4" />
+              Vào Workspace →
             </Link>
           </div>
         </div>
       </div>
 
+      {/* Contests Roster (từ máy chủ) */}
+      {contests && contests.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-bold text-white tracking-tight">Các kỳ thi</h2>
+          {regMsg && (
+            <div className="p-3 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-300" role="status">
+              {regMsg}
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {contests.map((c) => (
+              <div key={c.id} className="p-5 rounded-2xl bg-[#0e1424] border border-white/10 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold text-white text-sm">{c.title}</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-white/5 text-slate-300 border-white/10">
+                    {c.status}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-500 font-mono">
+                  {c.contest_format} • {c.duration_minutes} phút
+                  {c.min_rating != null && ` • từ ${c.min_rating} Elo`}
+                  {c.max_rating != null && ` • đến ${c.max_rating} Elo`}
+                </div>
+                {['REGISTRATION', 'CODING'].includes(c.status) && (
+                  <button
+                    onClick={() => handleRegister(c.slug)}
+                    className="px-3 py-1.5 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-bold text-xs transition"
+                  >
+                    Đăng ký thi
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Problems Table */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-white tracking-tight">Danh Sách Bài Tập Của Vòng Thi</h2>
-            <p className="text-xs text-slate-400">Nhấn vào bài bất kỳ để mở không gian làm bài LeetCode 3 phân vùng</p>
+            <h2 className="text-lg font-bold text-white tracking-tight">Danh sách bài tập của vòng thi</h2>
+            <p className="text-xs text-slate-400">Chọn một bài để mở không gian làm bài</p>
           </div>
           <span className="text-xs font-mono text-slate-400 bg-white/5 px-2.5 py-1 rounded border border-white/10">
             {problems.length} Bài Tập • Tổng {problems.reduce((sum, p) => sum + (p.rating || 1000), 0)}đ
@@ -80,12 +165,12 @@ export const ContestHub = () => {
             <thead className="bg-[#0c101c] border-b border-white/10 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
               <tr>
                 <th className="py-3 px-4 w-16">Mã</th>
-                <th className="py-3 px-4">Tên Bài Toán</th>
-                <th className="py-3 px-4 w-28">Độ Khó</th>
-                <th className="py-3 px-4 w-32">Điểm Tối Đa</th>
-                <th className="py-3 px-4 w-32">Điểm Hiện Tại</th>
-                <th className="py-3 px-4 w-28 text-center">Đã Giải</th>
-                <th className="py-3 px-4 w-28 text-right">Thao Tác</th>
+                <th className="py-3 px-4">Tên bài toán</th>
+                <th className="py-3 px-4 w-28">Độ khó</th>
+                <th className="py-3 px-4 w-32">Điểm tối đa</th>
+                <th className="py-3 px-4 w-32">Điểm hiện tại</th>
+                <th className="py-3 px-4 w-28 text-center">Đã giải</th>
+                <th className="py-3 px-4 w-28 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -144,6 +229,30 @@ export const ContestHub = () => {
           </table>
         </div>
       </div>
+
+      {/* Virtual Contest (Archive) */}
+      {virtualSupported && (
+        <div className="p-6 rounded-2xl bg-[#0e1424] border border-cyan-500/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-sm font-bold text-white">DEVER Round #0 (Archive) — Thi đấu ảo</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">Ghost Replay</span>
+            </div>
+            <p className="text-xs text-slate-400">
+              {virtual
+                ? `Phiên ${virtual.session_id} • đã trôi qua ${virtual.elapsedMinutes}′ • ${virtual.standings?.length || 0} ghost trên bảng. Mở bài bất kỳ để làm song song.`
+                : 'Thi lại contest đã kết thúc với đồng hồ cá nhân, ghost submissions hiện đúng timeline lịch sử.'}
+            </p>
+          </div>
+          <button
+            onClick={startVirtual}
+            disabled={virtualLoading}
+            className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition shrink-0 disabled:opacity-50"
+          >
+            {virtualLoading ? 'Đang tạo phiên...' : virtual ? 'Tạo phiên mới' : 'Bắt đầu thi ảo'}
+          </button>
+        </div>
+      )}
 
     </div>
   );

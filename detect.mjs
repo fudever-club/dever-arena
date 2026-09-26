@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 let errors = 0;
 function check(cond, msg) {
@@ -6,60 +7,56 @@ function check(cond, msg) {
   else console.log('PASS:', msg);
 }
 
-const css = readFileSync('css/style.css','utf8');
-const index = readFileSync('index.html','utf8');
-const arena = readFileSync('arena.html','utf8');
-const admin = readFileSync('admin.html','utf8');
-const ds = readFileSync('docs/DESIGN_SYSTEM.md','utf8');
+// 1. app.html shell
+const appExists = existsSync('app.html');
+check(appExists, 'app.html exists');
+const app = appExists ? readFileSync('app.html', 'utf8') : '';
+if (appExists) {
+  check(app.includes('<div id="root">'), 'app.html has <div id="root">');
+  check(app.includes('favicon'), 'app.html links favicon');
+  check(app.includes('Space Grotesk'), 'app.html links fonts Space Grotesk');
+}
 
-// 1. radius-lg 12px
-check(css.includes('--radius-lg: 12px'), '--radius-lg 12px');
+// 2. manifest.json
+const mfExists = existsSync('manifest.json');
+check(mfExists, 'manifest.json exists');
+if (mfExists) {
+  let mf = null;
+  try { mf = JSON.parse(readFileSync('manifest.json', 'utf8')); } catch { mf = null; }
+  check(mf !== null, 'manifest.json is valid JSON');
+  const icons = (mf && Array.isArray(mf.icons)) ? mf.icons : [];
+  check(icons.length > 0 && icons.every(i => typeof i.src === 'string' && i.src.includes('/brand/')), 'manifest.json icons point to /brand/');
+}
 
-// 2. card, clan-card, room-card, feature-card radius 12px
-for (const sel of ['.card','.clan-card','.room-card','.feature-card']) {
-  const re = new RegExp(sel.replace('.','\\.') + '\\s*\\{[^}]+\\}', 'g');
-  let ok = false;
-  for (const m of css.matchAll(re)) {
-    const block = m[0];
-    if (block.includes('border-radius') && (block.includes('12px') || block.includes('var(--radius-lg)'))) { ok = true; break; }
+// 3. public/brand/ assets
+for (const f of ['logo-dark', 'logo-light', 'icon-192', 'icon-512']) {
+  const hit = existsSync(join('public', 'brand', `${f}.png`));
+  check(hit, `public/brand/${f}.png exists`);
+}
+
+// 4. public/icons/ language SVGs
+for (const f of ['python', 'javascript', 'java', 'nodejs']) {
+  const hit = existsSync(join('public', 'icons', `${f}.svg`));
+  check(hit, `public/icons/${f}.svg exists`);
+}
+
+// 5. no lucide-react imports in src/
+function walk(dir, out = []) {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) walk(p, out);
+    else if (/\.(jsx?|tsx?|css)$/.test(e.name)) out.push(p);
   }
-  // feature-card may be combined but check presence
-  if (sel === '.feature-card' && css.includes('.feature-card') && css.includes('border-radius: var(--radius-lg)')) ok = true;
-  check(ok, `${sel} border-radius 12px / var(--radius-lg)`);
+  return out;
 }
-
-// 3. no stray 10px border-radius
-check(!css.includes('border-radius: 10px') && !css.includes('border-radius:10px'), 'no border-radius:10px stray in css/style.css');
-check(!index.includes('border-radius:10px') && !index.includes('border-radius: 10px'), 'no border-radius:10px stray in index.html');
-
-// 4. will-change for .card:hover
-check(css.includes('.card:hover') && css.includes('will-change: transform'), '.card:hover will-change: transform');
-
-// 5. box-shadow for card double
-const cardMatch = css.match(/\.card\s*\{[^}]+\}/);
-const cardBlock = cardMatch ? cardMatch[0] : '';
-check(cardBlock.includes('0 8px 24px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.25)'), 'card box-shadow double layer');
-check(css.includes('--shadow-card: 0 8px 24px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.25)'), '--shadow-card double layer');
-
-// 6. footer identical Docs/GitHub/Discord + copyright
-for (const [name, html] of [['index.html',index],['arena.html',arena],['admin.html',admin]]) {
-  check(html.includes('<footer'), `${name} has footer`);
-  check(html.includes('docs/DESIGN_SYSTEM.md'), `${name} footer Docs`);
-  check(html.includes('https://github.com/dever-forces'), `${name} footer GitHub`);
-  check(html.includes('https://discord.gg/dever'), `${name} footer Discord`);
-  check(html.includes('© 2026 DEVER Arena Enterprise'), `${name} footer copyright`);
-  const h1s = (html.match(/<h1[^>]*>/gi)||[]).length;
-  check(h1s===1, `${name} h1 count ==1 (found ${h1s})`);
-}
-// footers identical core
-const extract = (html) => { const m = html.match(/<footer[^>]*>[\s\S]*?<\/footer>/i); return m ? m[0].replace(/\s+/g,' ').trim() : ''; };
-const f1 = extract(index), f2 = extract(arena), f3 = extract(admin);
-check(f1===f2 && f1===f3, 'footers identical across 3 pages');
-
-// 7. DESIGN_SYSTEM file map
-check(ds.includes('arena.html'), 'DESIGN_SYSTEM has arena.html');
-check(ds.includes('admin.html'), 'DESIGN_SYSTEM has admin.html');
-check(ds.includes('src/db/api.js'), 'DESIGN_SYSTEM has src/db/api.js');
+let lucideFound = [];
+try {
+  for (const f of walk('src')) {
+    const content = readFileSync(f, 'utf8');
+    if (content.includes('lucide-react')) lucideFound.push(f);
+  }
+} catch { /* src missing counts as failure below */ }
+check(lucideFound.length === 0, `no lucide-react imports in src/${lucideFound.length ? ' (found in: ' + lucideFound.join(', ') + ')' : ''}`);
 
 console.log(`\n=== detect.mjs result: ${errors} error(s) ===`);
-process.exit(errors);
+process.exit(errors ? 1 : 0);

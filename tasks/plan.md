@@ -109,5 +109,29 @@ Xây dựng nền tảng thi đấu giải thuật nội bộ của CLB FU-DEVER
 - [x] Task 49: Loại bỏ hoàn toàn 8 agent skills `9router*`, tuân thủ tuyệt đối triết lý Zero-AI Client theo `ADR-003`.
 - [x] Task 50: Kiểm tra toàn diện chất lượng: 98/98 unit tests PASS, `detect.mjs` 0 errors, Vite production build hoàn tất sạch sẽ trong ~340ms.
 
+### Phase 14: Backend API Thật + Judge Thật + Logo CLB (Completed)
+- [x] Task 51-53: `server/` Node thuần (REST + SSE + JWT + judge thật + hack oracle + Elo + virtual + division gate), 10 tests vòng đời, logo CLB + PWA icons thật, nối 4 màn hình qua `src/lib/apiClient.js`.
+
+### Phase 15: Xóa Clan Wars + Tài Khoản Admin Cấp + Dọn Icon + Sửa Chữ (Completed)
+- [x] Task 54-56: Xóa Clan Wars toàn diện, tài khoản cá nhân/đội do admin cấp, gỡ lucide/emoji (SVG svgl), font Space Grotesk, sửa chữ + số liệu thật.
+
+### Phase 16: Nối Vòng Lặp Thi Đấu + Security + Judge Sâu + Production (Completed)
+- [x] Task 57-60: Nối submit/hack/phase/timer/editorial, rate-limit + headers + CORS, judge Java/C++ + rejudge, rooms/telemetry thật, Docker + nginx + compose, 105/105 tests PASS.
+
+### Phase 17: Xóa giao diện vanilla cũ — single-stack React SPA (Completed)
+- [x] Task 61: Xóa legacy + viết lại detect/platform_quality + docs single-stack, 124 tests PASS.
+
+### Phase 18: CRUD đề thi trên máy chủ + Freeze/ICPC phía server (Completed)
+- [x] Task 62-63: Problem CRUD API + publish, module contestResults + đấu nối standings + nút freeze đồng bộ, 125 tests PASS.
+
+### Phase 19: Vá liêm chính hiển thị + luồng dữ liệu thật + mở kỳ thi (Completed)
+- [x] Task 64-66: Vá XSS/unfreeze/401, merge đề + contest list + standings động, API tạo contest + form admin, 126 tests PASS.
+
+### Phase 20: E2E trình duyệt thật + chống treo process (Completed)
+- [x] Task 67: Playwright Chromium có sẵn, port riêng, kill cây process, sửa pass ảo, proxy theo env, 130 tests PASS.
+
+### Phase 21: Soạn đề server-only + worker riêng + ICPC tự động + Postgres (Completed)
+- [x] Task 68-72: Bỏ dual-source đề, worker chấm riêng, ICPC auto, duyệt + rejudge + reset pass, polygon đa kỳ thi, adapter PG, 136 tests PASS.
+
 
 

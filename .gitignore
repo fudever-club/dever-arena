@@ -35,6 +35,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Local backend runtime data (seed tự tạo khi chạy npm run server)
+server/data/
+
 # Editor & OS files
 .DS_Store
 Thumbs.db

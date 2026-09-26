@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { useAuth, PRESET_USERS } from '../context/AuthContext';
-import { Shield, Trophy, Code, Zap, CheckCircle, ArrowRight, UserCheck, Key } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export const LoginPage = () => {
   const { loginWithPreset, loginWithCredentials } = useAuth();
@@ -22,13 +21,14 @@ export const LoginPage = () => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!username.trim()) {
       setError('Vui lòng nhập Tên đăng nhập hoặc Email FPT!');
       return;
     }
-    const loggedUser = loginWithCredentials(username, password);
+    setError('');
+    const loggedUser = await loginWithCredentials(username, password);
     if (loggedUser.role === 'ADMIN') {
       navigate('/admin');
     } else {
@@ -45,41 +45,43 @@ export const LoginPage = () => {
         <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
         <div className="relative z-10">
+          <img
+            src="/brand/logo-dark.png"
+            alt="CLB FU-DEVER — Work hard, Play hard"
+            className="h-20 w-20 rounded-2xl object-cover ring-1 ring-white/10 shadow-xl mb-6"
+          />
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-[#ff6600] text-xs font-semibold mb-6">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             Hệ Thống Đấu Trường Giải Thuật CLB FU-DEVER
           </div>
 
           <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight text-white mb-4 leading-tight">
-            Chinh phục chuẩn mực thi đấu <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff6600] to-orange-400">Codeforces & LeetCode</span>
+            Thi đấu theo thể thức <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff6600] to-orange-400">Codeforces</span>
           </h1>
 
           <p className="text-slate-400 text-sm leading-relaxed max-w-lg mb-8">
-            Nền tảng thi đấu thời gian thực tự chủ của CLB FU-DEVER: Coding Phase 120 phút, Room Hack đối kháng, System Testing 45 test ẩn, và hệ thống xếp hạng Elo 7 bậc danh giá.
+            Nền tảng thi đấu của CLB FU-DEVER: làm bài 120 phút, bẻ khóa bài đối thủ cùng phòng, chấm lại toàn bộ rồi xếp hạng Elo.
           </p>
 
           <div className="space-y-3.5 max-w-md">
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-white/5 border border-white/10">
-              <Code className="w-5 h-5 text-[#00f0ff] mt-0.5 shrink-0" />
+            <div className="p-3 rounded-lg bg-white/5 border border-white/10">
               <div>
-                <h4 className="text-xs font-bold text-slate-200">Không Gian Làm Bài Pro (LeetCode Workspace)</h4>
-                <p className="text-[11px] text-slate-400 mt-0.5">Monaco Code Editor chuẩn VS Code, bảng Testcase Diff Console và cơ chế Auto-Save chống mất code.</p>
+                <h4 className="text-xs font-bold text-slate-200">Không gian làm bài</h4>
+                <p className="text-[11px] text-slate-400 mt-0.5">Soạn code, chạy thử testcase và nộp bài chấm điểm ngay trên trình duyệt.</p>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-white/5 border border-white/10">
-              <Zap className="w-5 h-5 text-[#ff6600] mt-0.5 shrink-0" />
+            <div className="p-3 rounded-lg bg-white/5 border border-white/10">
               <div>
-                <h4 className="text-xs font-bold text-slate-200">Phòng Thách Đấu Hack Room</h4>
-                <p className="text-[11px] text-slate-400 mt-0.5">Mở mã nguồn của đối thủ cùng Room 25 người, bắt lỗi tràn số 32-bit và giành trọn +100 điểm thưởng.</p>
+                <h4 className="text-xs font-bold text-slate-200">Phòng thách đấu</h4>
+                <p className="text-[11px] text-slate-400 mt-0.5">Đọc code đối thủ cùng phòng, tìm input làm code sai để được cộng điểm.</p>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-white/5 border border-white/10">
-              <Shield className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" />
+            <div className="p-3 rounded-lg bg-white/5 border border-white/10">
               <div>
-                <h4 className="text-xs font-bold text-slate-200">Bảo Vệ Tính Toàn Vẹn AST Anti-Cheat</h4>
-                <p className="text-[11px] text-slate-400 mt-0.5">Thuật toán Winnowing 3-gram khử đổi tên biến và chống gian lận mã nguồn tuyệt đối.</p>
+                <h4 className="text-xs font-bold text-slate-200">Chống gian lận mã nguồn</h4>
+                <p className="text-[11px] text-slate-400 mt-0.5">So khớp cây cú pháp để phát hiện bài sao chép. Cấm dùng AI sinh code trong giờ thi tính điểm.</p>
               </div>
             </div>
           </div>
@@ -102,10 +104,9 @@ export const LoginPage = () => {
 
           {/* 1-Click Fast Switch Panel */}
           <div className="mb-6 p-4 rounded-xl bg-slate-900 border border-orange-500/20 shadow-lg relative overflow-hidden">
-            <div className="flex items-center gap-2 mb-3">
-              <UserCheck className="w-4 h-4 text-[#ff6600]" />
+            <div className="mb-3">
               <span className="text-xs font-bold text-orange-400 tracking-wide uppercase">
-                1-Click Fast Switch (Dành Cho Kiểm Thử & Ban Tổ Chức)
+                Đăng nhập nhanh
               </span>
             </div>
 
@@ -115,8 +116,8 @@ export const LoginPage = () => {
                 onClick={() => handleFastSwitch('GUEST')}
                 className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition group text-center"
               >
-                <span className="text-xs font-semibold text-slate-300 group-hover:text-white">👤 Khách</span>
-                <span className="text-[10px] text-slate-500 mt-0.5">Chế độ xem</span>
+                <span className="text-xs font-semibold text-slate-300 group-hover:text-white">Khách</span>
+                <span className="text-[10px] text-slate-500 mt-0.5">Chỉ xem, không thi</span>
               </button>
 
               <button
@@ -124,8 +125,8 @@ export const LoginPage = () => {
                 onClick={() => handleFastSwitch('PARTICIPANT')}
                 className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 hover:border-orange-500/50 transition group text-center"
               >
-                <span className="text-xs font-bold text-orange-400 group-hover:text-orange-300">⚡ dever_hero</span>
-                <span className="text-[10px] text-orange-400/70 mt-0.5">Thí Sinh (1742)</span>
+                <span className="text-xs font-bold text-orange-400 group-hover:text-orange-300">dever_hero</span>
+                <span className="text-[10px] text-orange-400/70 mt-0.5">Thí sinh — làm bài</span>
               </button>
 
               <button
@@ -133,8 +134,8 @@ export const LoginPage = () => {
                 onClick={() => handleFastSwitch('ADMIN')}
                 className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 transition group text-center"
               >
-                <span className="text-xs font-bold text-red-400 group-hover:text-red-300">👑 dever_admin</span>
-                <span className="text-[10px] text-red-400/70 mt-0.5">Admin (2450)</span>
+                <span className="text-xs font-bold text-red-400 group-hover:text-red-300">dever_admin</span>
+                <span className="text-[10px] text-red-400/70 mt-0.5">Giám khảo — quản trị</span>
               </button>
             </div>
           </div>
@@ -172,9 +173,6 @@ export const LoginPage = () => {
                 <label className="block text-xs font-medium text-slate-300">
                   Mật khẩu
                 </label>
-                <span className="text-[11px] text-[#ff6600] hover:underline cursor-pointer">
-                  Quên mật khẩu?
-                </span>
               </div>
               <input
                 type="password"
@@ -187,22 +185,15 @@ export const LoginPage = () => {
 
             <button
               type="submit"
-              className="w-full py-2.5 px-4 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] font-bold text-sm text-white transition flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20"
+              className="w-full py-2.5 px-4 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] font-bold text-sm text-white transition shadow-lg shadow-orange-500/20"
             >
               Đăng Nhập Vào Arena
-              <ArrowRight className="w-4 h-4" />
             </button>
           </form>
 
           <div className="mt-6 text-center">
             <p className="text-xs text-slate-500">
-              Chưa có tài khoản?{' '}
-              <span 
-                onClick={() => handleFastSwitch('PARTICIPANT')} 
-                className="text-[#00f0ff] hover:underline font-semibold cursor-pointer"
-              >
-                Kích hoạt tài khoản thành viên ngay
-              </span>
+              Chưa có tài khoản? Liên hệ ban tổ chức CLB để được cấp tài khoản thi đấu.
             </p>
           </div>
         </div>

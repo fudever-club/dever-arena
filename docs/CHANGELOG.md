@@ -266,9 +266,35 @@
 
 ---
 
+## Vòng 14: Backend API Thật + Judge Chạy Code Thật + Logo CLB
+
+**Mục tiêu:** Thay mock IndexedDB bằng máy chủ thật, chấm code thật, gắn logo chính thức.
+
+- `server/{index,db,auth,judge,oracles}.js` (Node thuần, 0 dependency): REST theo API_SPECIFICATION + SSE, JWT HS256, judge thực thi JS/Python qua child_process có timeout, hack chấm bằng oracle chạy cùng payload, system test chấm lại thật, chốt Elo thật, virtual ghost replay, division gate, xếp Room ≤25.
+- `tests/server_api.test.js`: 10 tests vòng đời (login, gate, judge AC/WA, standings, phase machine, hack +100/−50, Elo, virtual, SSE).
+- `public/brand/` (logo CLB nguồn thật duy nhất) + favicon/PWA icons sinh từ logo gốc; `manifest.json` hết placeholder; `app.html` + Navbar/Login/Landing gắn logo.
+- `src/lib/apiClient.js`: fetch client + JWT + SSE; Standings/Clans/ContestHub-ảo/Login nối backend có fallback demo.
+
+## Vòng 15: Xóa Clan Wars + Tài Khoản Do Admin Cấp + Dọn Icon + Sửa Chữ
+
+- Xóa Clan Wars khỏi UI/server/engine/tests (`ClansPage`, `clanRating`, `clan_wars.test`, endpoint `/clans`); user còn lại là cá nhân hoặc đội (`team`, `members`).
+- `POST/GET /api/v1/admin/users`: admin cấp tài khoản (validate username/password/role), tab “Cấp tài khoản” trong Admin; không có đăng ký công khai.
+- Gỡ toàn bộ `lucide-react` và emoji trang trí; icon còn lại duy nhất là SVG ngôn ngữ từ svgl.app (`public/icons/`); medal/huy hiệu → chữ và số.
+- Font UI đổi Outfit → Space Grotesk (có subset tiếng Việt, đã kiểm chứng METADATA Google Fonts); JetBrains Mono giữ (đã có subset Việt).
+- Sửa chữ: bỏ số liệu bịa (1.240+ sinh viên, 48 contest, 92%), bỏ tuyệt đối hóa (“100%”, “tuyệt đối”), stats Landing lấy từ API, telemetry/rooms/admin báo rõ khi chưa nối backend.
+
+## Vòng 16: Nối Vòng Lặp Thi Đấu Vào Backend + Security + Judge Sâu + Production
+
+- Workspace nộp bài chấm thật qua API (lỗi hiện rõ, không bịa AC); chạy thử local thật; editorial khóa đến khi FINISHED; đồng hồ + phase đồng bộ từ server.
+- Hack Room đọc phòng thật + bẻ khóa thật qua oracle; nút phase admin gọi API có báo lỗi; telemetry/rooms admin đọc số thật.
+- Security: rate-limit login/submit/hack, security headers, CORS theo env, production bắt buộc `DEVER_JWT_SECRET`.
+- Judge: thêm Java (javac/java) và C++ (g++) tự phát hiện toolchain, thiếu tool trả 422 trung thực; endpoint admin rejudge.
+- Production: `Dockerfile.api` (Node + python3 + JDK17 + g++), `Dockerfile.web` (nginx), `nginx.conf` (SPA + proxy API/SSE), `docker-compose.yml`, `.env.example`; `server/data/` gitignore.
+- Nâng tổng số kiểm thử lên **105/105 PASS** (24 suites).
+
 ## Tổng kết file chạm
 
-| Vòng | File chính | Dòng thay đổi |
+| Vòng | File chính | Thay đổi |
 |------|------------|---------------|
 | 1–4 | `index.html`, `arena.html`, `admin.html`, `css/style.css`, `js/app.js`, `src/db/index.js`, `src/db/seed.js`, `db/schema.sql`, `docs/DESIGN_SYSTEM.md`, `docs/AI_SLOP_REPORT.md` | Tách SPA → 3 trang, thêm DB layer, XSS guard, responsive |
 | 5–7 | `src/db/api.js`, `src/db/index.js`, `js/app.js`, `tests/e2e.test.js`, `tests/api.test.js` | API contract + E2E + perf marks + form hardening |
@@ -278,8 +304,50 @@
 | 11 | `src/engine/workerQueue.js`, `src/engine/isolateRunner.js`, `src/core/scoreboardFreeze.js`, `src/engine/testlibValidator.js`, `tests/worker_queue.test.js`, `tests/freeze_scoreboard.test.js`, `tests/testlib.test.js`, `docs/DATABASE_SCHEMA.md`, `docs/API_SPECIFICATION.md`, `docs/SPEC.md`, `docs/CAPABILITY_MAP.md`, `PRODUCT.md`, `tasks/plan.md`, `tasks/todo.md` | 3-Tier Judge Queue, Isolate Sandbox Runner, Scoreboard Freeze & ICPC Unfreeze, Polygon Testlib Validator, 98 tests PASS |
 | 12 | `css/style.css`, `index.html`, `arena.html`, `admin.html`, `js/app.js`, `favicon.ico`, `tests/e2e_playwright.mjs`, `tests/devtools_audit.mjs`, `docs/decisions/*`, `docs/DEPLOYMENT_GUIDE.md`, `docs/CHANGELOG.md` | UI/UX Redesign Cyber Dark, Playwright E2E (47/47 PASS), DevTools CDP Audit (Clean Console), Nginx Hardening, ADR-001 tới ADR-004 |
 | 13 | `src/App.jsx`, `src/pages/*.jsx`, `src/components/layout/*.jsx`, `src/components/common/MathRenderer.jsx`, `src/context/ContestContext.jsx`, `.agents/skills/*`, `docs/CAPABILITY_MAP.md`, `docs/CHANGELOG.md` | React 18 SPA Portal Separation, LeetCode Workspace Splitters & Zen Mode, KaTeX Math, Polygon Studio, 9Router De-integration |
+| 14 | `server/*`, `tests/server_api.test.js`, `public/brand/*`, `src/lib/apiClient.js`, `manifest.json`, `app.html` | Backend REST+SSE+judge thật, logo CLB, PWA icons thật, nối Standings/Clans/Virtual/Login |
+| 15 | `src/pages/*`, `src/components/layout/*`, `server/index.js`, `package.json`, `app.html`, `src/index.css` | Xóa Clan Wars + SFX, tài khoản admin cấp, gỡ lucide/emoji (SVG svgl), font Space Grotesk, sửa chữ + số liệu thật |
+| 16 | `src/pages/ProblemWorkspace.jsx`, `src/pages/HackRoomPage.jsx`, `src/context/ContestContext.jsx`, `server/{index,judge}.js`, `tests/server_api.test.js`, `Dockerfile.*`, `nginx.conf`, `docker-compose.yml` | Nối submit/hack/phase/timer/editorial, rate-limit + headers, judge Java/C++ + rejudge, rooms/telemetry thật, production Docker, 105 tests PASS |
+| 17 | Xóa `index.html`/`arena.html`/`admin.html`/`css`/`js`/`problems` + 5 script e2e lỗi thời; `detect.mjs` + `platform_quality.test.js` viết lại cho SPA | Single-stack React, 124 tests PASS |
+| 18 | `server/index.js` (problems CRUD), `src/core/contestResults.js`, `GET standings` (?frozen/?format), BroadcastChannel FREEZE | CRUD đề thi, freeze/ICPC phía server, 125 tests PASS |
+| 19 | `MathRenderer.jsx` (escape XSS), `ContestContext` (merge đề), `ContestHub` (list kỳ thi), `server` (hack gate, tạo contest), `AdminLayout` (form mở kỳ thi) | Vá hiển thị + luồng dữ liệu thật + mở kỳ thi, 126 tests PASS |
 
-> **Lệnh verify sau mỗi vòng:** `node --test tests/*.test.js` (98 pass, 0 fail), `node detect.mjs` (0 error), `npm run build` (~340ms, clean bundle).
+> **Lệnh verify sau mỗi vòng:** `node --test tests/*.test.js` (105 pass, 0 fail), `node detect.mjs` (0 error), `npm run build` (~250ms, clean bundle).
+
+## Vòng 17: Xóa giao diện vanilla cũ — single-stack React SPA duy nhất
+
+- **Xóa:** `index.html`, `arena.html`, `admin.html`, `css/`, `js/`, `problems/` (không code/test nào import), 5 file `tests/*.mjs` lỗi thời (`audit_buttons`, `devtools_audit`, `e2e_playwright`, `playwright_audit`, `test_all_buttons_and_forbidden`); gỡ script `test:e2e` treo.
+- **Viết lại:** `detect.mjs` (check `app.html` shell + `manifest.json` + `public/brand/` + `public/icons/` + cấm `lucide-react` trong `src/`), `tests/platform_quality.test.js` (hợp đồng SPA: shell/manifest/assets/routes core, giữ countdown/comparator/phase-enum), `package.json` serve → `npx serve dist -l 3000`.
+- **Docs:** `README.md`, `docs/SPEC.md`, `docs/DESIGN_SYSTEM.md`, `docs/DEPLOYMENT_GUIDE.md` chuyển dual-stack/3-trang → single-stack SPA.
+- **Verify:** `npm run test` **124 pass / 0 fail** (25 suites: platform_quality 7→8 test SPA + 19 test ngoài phạm vi vòng này), `node detect.mjs` 16 PASS / 0 error, `npm run build` sạch (~249ms).
+
+## Vòng 18: CRUD đề thi trên máy chủ + Freeze/ICPC phía server
+
+- **Ra đề lên máy chủ:** `POST/PUT/DELETE /api/v1/admin/problems` (validate 422, trùng mã 409, đã có submission 409, non-admin 403); Admin Studio tự tải đề từ server, lưu báo rõ máy chủ/local; `loadProblemsFromServer()` trong ContestContext; 7 tests server mới.
+- **Freeze + ICPC phía server:** module thuần `src/core/contestResults.js` (`applyFreeze`, `computeIcpcStandings`, 11 unit tests) đấu nối vào `GET standings` qua `?frozen=1&freeze_minute=N` và `?format=ICPC`; nút đóng băng admin đồng bộ qua BroadcastChannel tới Standings; test server vòng đời freeze/ICPC.
+- **Verify:** `npm run test` **125 pass / 0 fail**, `node detect.mjs` 0 error, `npm run build` sạch.
+
+## Vòng 19: Vá liêm chính hiển thị + luồng dữ liệu thật + mở kỳ thi
+
+- **Liêm chính hiển thị:** escape HTML trong MathRenderer (chống stored-XSS từ đề/editorial); bộ mô phỏng lật bảng chỉ chạy ở demo local, dữ liệu thật không bao giờ bịa verdict; 401 tự về trạng thái khách.
+- **Luồng dữ liệu:** merge đề server giữ nháp local; workspace reset testcase/verdict theo bài; validator hack chuyển gate format-only (tránh loại oan); ContestHub liệt kê kỳ thi + đăng ký thật; cột bảng điểm render động theo đề.
+- **Mở kỳ thi:** `POST /api/v1/admin/contests` + form admin (tên, thể thức, giờ bắt đầu, thời lượng, chặn rating); test tạo/trùng/sai/non-admin.
+- **Verify:** `npm run test` **126 pass / 0 fail**, `node detect.mjs` 0 error, `npm run build` sạch.
+
+## Vòng 20: E2E trình duyệt thật + chống treo process
+
+- **E2E thật:** `tests/spa_e2e.test.js` (Playwright Chromium có sẵn, không download) dựng API riêng port 18787 + Vite riêng port 5174: landing, login JWT qua UI, standings live, workspace nộp Python chấm thật hiện điểm.
+- **Chống treo/mồ côi:** phát hiện vite mồ côi do spawn `shell:true` (kill không tới process con) → spawn trực tiếp bằng node + `taskkill /T /F` dọn cây process; E2E dùng port riêng nên không đụng máy dev của người dùng (hết lỗi EADDRINUSE); sửa test login chờ token JWT thay vì chờ text (nút fast-switch đã chứa tên user gây pass ảo).
+- **Vite:** proxy `/api` đọc `DEVER_API_PORT` (mặc định 8787).
+- **Verify:** `npm run test` **136 pass / 0 fail**, `node detect.mjs` 0 error, `npm run build` sạch, không process mồ côi sau test.
+
+## Vòng 21: Soạn đề server-only + worker chấm riêng + ICPC tự động + Postgres
+
+- **Soạn đề server-only:** bỏ persist localStorage đề thi (dual-source), Admin Studio lưu/xóa/tải lại 100% qua API, merge giữ nháp trong phiên.
+- **Worker chấm riêng:** `server/queue.js` + `server/judgeWorker.js` (fork pool, FIFO, timeout 60s + respawn, `unref` + shutdown tường minh); API không chạy code thí sinh trên event-loop; test 3 bài đồng loạt.
+- **ICPC tự động:** standings theo `contest_format` khi không ép `?format=`; bảng điểm render cột Giải được/Penalty; test vòng đời ICPC thật (tạo contest → ra đề → đăng ký → chấm → solved=1).
+- **Admin sâu:** telemetry duyệt bài nộp + chấm lại, reset mật khẩu từng tài khoản (test đổi pass cũ/mới), polygon chọn kỳ thi đích.
+- **Postgres:** adapter `server/pg.js` (1 bảng KV + meta, migrate tự động, write-through + flush) + service `db` trong compose + `.env`; logic verify bằng pool giả (4 tests) — chạy thật cần server Postgres.
+- **Verify:** `npm run test` **136 pass / 0 fail**, `node detect.mjs` 0 error, `npm run build` sạch.
 
 
 
