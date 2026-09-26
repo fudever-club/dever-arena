@@ -18,7 +18,34 @@ import { createVirtualSession, getVirtualElapsedMinutes } from '../src/core/virt
 import { applyFreeze, computeIcpcStandings } from '../src/core/contestResults.js';
 import { compareOutputs } from '../src/engine/isolateRunner.js';
 import { generateSuite } from '../src/engine/testGenerator.js';
-import { checkOutput } from '../src/engine/testlibValidator.js';
+import { checkOutput, validateInput } from '../src/engine/testlibValidator.js';
+
+// Validator bounds theo từng đề (hợp đồng UI đã chốt, frontend gửi/đọc các field này).
+// Defaults: minN=1 / maxN=200000 / minVal=-1e9 / maxVal=1e9. Luật: minN>=1, maxN<=1e6.
+const DEFAULT_BOUNDS = { minN: 1, maxN: 200000, minVal: -1000000000, maxVal: 1000000000 };
+function boundsOf(problem) {
+  return { ...DEFAULT_BOUNDS, ...(problem?.bounds || {}) };
+}
+function parseBounds(raw, base = DEFAULT_BOUNDS) {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { error: 'bounds phải là object {minN,maxN,minVal,maxVal}.' };
+  }
+  const merged = { ...base };
+  for (const key of ['minN', 'maxN', 'minVal', 'maxVal']) {
+    if (raw[key] === undefined) continue;
+    const v = Number(raw[key]);
+    if (!Number.isFinite(v)) return { error: `bounds.${key} phải là số hợp lệ.` };
+    merged[key] = v;
+  }
+  if (!Number.isInteger(merged.minN) || !Number.isInteger(merged.maxN)) {
+    return { error: 'bounds.minN/maxN phải là số nguyên.' };
+  }
+  if (merged.minN < 1) return { error: 'bounds.minN phải >= 1.' };
+  if (merged.maxN > 1000000) return { error: 'bounds.maxN phải <= 1000000.' };
+  if (merged.minN > merged.maxN) return { error: 'bounds.minN phải <= bounds.maxN.' };
+  if (merged.minVal > merged.maxVal) return { error: 'bounds.minVal phải <= bounds.maxVal.' };
+  return { bounds: merged };
+}
 
 const PORT = Number(process.env.PORT || 8787);
 // Store: DEVER_DATABASE_URL → Postgres (đa máy), không thì JSON file (mặc định server/data/db.json).
@@ -518,7 +545,13 @@ route('POST', '^/api/v1/hacks/execute$', async (req, res, url, m, user) => {
   if (!me || !victim || me.room_id !== victim.room_id) { send(res, 403, { error: 'DIFFERENT_ROOM', message: 'Chỉ hack đối thủ cùng Room.' }); return; }
   const payload = String(test_payload || '');
   if (!payload || payload.length > 50 * 1024) { send(res, 422, { error: 'BAD_PAYLOAD', message: 'Payload rỗng hoặc vượt 50KB.' }); return; }
-  // Gate format-only (không áp ràng buộc số học mặc định của từng đề để tránh loại oan payload đúng):
+  // Luật Polygon: chặn hack input bẩn bằng bounds CỦA ĐỀ của target submission.
+  const prob = db.find('problems', (p) => p.id === target.problem_id);
+  const hackCheck = validateInput(payload, boundsOf(prob));
+  if (!hackCheck.isValid) {
+    send(res, 422, { error: 'HACK_VALIDATOR_REJECT', message: hackCheck.error }); return;
+  }
+  // Gate format-only (giữ như lưới an toàn sau validator):
   // đúng 1 ký tự xuống dòng ở cuối, không dư khoảng trắng cuối dòng.
   if (!payload.endsWith('\n') || payload.endsWith('\n\n')) {
     send(res, 422, { error: 'HACK_VALIDATOR_REJECT', message: 'Payload phải kết thúc bằng đúng một ký tự xuống dòng.' }); return;
@@ -527,7 +560,6 @@ route('POST', '^/api/v1/hacks/execute$', async (req, res, url, m, user) => {
   if (badLine >= 0) {
     send(res, 422, { error: 'HACK_VALIDATOR_REJECT', message: `Dư khoảng trắng cuối dòng ${badLine + 1}.` }); return;
   }
-  const prob = db.find('problems', (p) => p.id === target.problem_id);
   const timeLimitMs = parseFloat(prob?.timeLimit) * 1000 || 1000;
   const victimRun = await judgeQueue.executeOne({ language: target.language, source: target.source_code, stdin: payload, timeLimitMs });
   const oracleSrc = ORACLES[target.problem_id];
@@ -690,6 +722,12 @@ route('POST', '^/api/v1/admin/problems$', async (req, res) => {
   if (db.find('problems', (p) => p.contest_id === contest_id && p.code === code)) { send(res, 409, { error: 'CODE_TAKEN', message: `Mã ${code} đã tồn tại trong contest.` }); return; }
   const ratingVal = Number(body.rating ?? body.base_points ?? 1000) || 1000;
   const tags = Array.isArray(body.tags) ? body.tags.map((t) => String(t)) : String(body.tags || '').split(',').map((s) => s.trim()).filter(Boolean);
+  let bounds = { ...DEFAULT_BOUNDS };
+  if (body.bounds !== undefined) {
+    const parsed = parseBounds(body.bounds, DEFAULT_BOUNDS);
+    if (parsed.error) { send(res, 422, { error: 'BAD_BOUNDS', message: parsed.error }); return; }
+    bounds = parsed.bounds;
+  }
   const problem = db.insert('problems', {
     id: db.nextId('p'),
     contest_id,
@@ -698,6 +736,7 @@ route('POST', '^/api/v1/admin/problems$', async (req, res) => {
     rating: ratingVal,
     base_points: ratingVal,
     tags,
+    bounds,
     timeLimit: body.timeLimit || '1.0s',
     memoryLimit: body.memoryLimit || '256 MB',
     statement: body.statement,
@@ -738,6 +777,11 @@ route('PUT', '^/api/v1/admin/problems/([^/]+)$', async (req, res, url, m) => {
   if (body.sampleInput !== undefined) patch.sampleInput = body.sampleInput;
   if (body.sampleOutput !== undefined) patch.sampleOutput = body.sampleOutput;
   if (body.editorial !== undefined) patch.editorial = body.editorial;
+  if (body.bounds !== undefined) {
+    const parsed = parseBounds(body.bounds, boundsOf(p));
+    if (parsed.error) { send(res, 422, { error: 'BAD_BOUNDS', message: parsed.error }); return; }
+    patch.bounds = parsed.bounds;
+  }
   db.update('problems', (x) => x.id === p.id, patch);
   const updated = db.find('problems', (x) => x.id === p.id);
   const samples = db.filter('testcases', (t) => t.problem_id === p.id && t.is_sample);
@@ -827,6 +871,9 @@ route('POST', '^/api/v1/admin/testcases$', async (req, res) => {
   if (!p) { send(res, 404, { error: 'PROBLEM_NOT_FOUND', message: 'Không tìm thấy đề.' }); return; }
   const stdin = String(body.stdin ?? '');
   if (!stdin) { send(res, 422, { error: 'MISSING_FIELD', message: 'Thiếu stdin.' }); return; }
+  // Validate stdin bằng bounds CỦA ĐỀ (không dùng defaults cứng của validator).
+  const v = validateInput(stdin, boundsOf(p));
+  if (!v.isValid) { send(res, 422, { error: 'VALIDATOR_REJECT', message: v.error }); return; }
   const existing = db.filter('testcases', (t) => t.problem_id === p.id);
   const order_index = existing.reduce((mx, t) => Math.max(mx, Number(t.order_index) || 0), 0) + 1;
   const tc = db.insert('testcases', {
