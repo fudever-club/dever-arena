@@ -184,6 +184,11 @@ export const ProblemWorkspace = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [runResult, setRunResult] = useState(null);
   const [submissionVerdict, setSubmissionVerdict] = useState(null);
+  const [copiedOut, setCopiedOut] = useState(false);
+  const [runAll, setRunAll] = useState(null); // { [index]: { ok, ms } }
+  const [runAllBusy, setRunAllBusy] = useState(false);
+  const [mobilePane, setMobilePane] = useState('code'); // 'problem' | 'code' (mobile <lg)
+  const [history, setHistory] = useState(null); // lịch sử nộp bài từ API
 
   // =====================================================================
   // SPLITTER DRAG HANDLERS WITH SMOOTH MOUSE CAPTURE
@@ -290,6 +295,26 @@ export const ProblemWorkspace = () => {
     }
   };
 
+  const handleCopyOutput = () => {
+    if (currentProblem.sampleOutput) {
+      navigator.clipboard.writeText(currentProblem.sampleOutput);
+      setCopiedOut(true);
+      setTimeout(() => setCopiedOut(false), 2000);
+    }
+  };
+
+  // Phân loại verdict chạy thử theo chuẩn CF từ runner engine
+  const classifyRun = (res, matched) => {
+    const st = String(res.status || '');
+    if (st === 'OK' && matched) return { code: 'AC', label: 'Accepted — khớp kết quả' };
+    if (st.startsWith('Time Limit')) return { code: 'TLE', label: st };
+    if (st.startsWith('Compilation Error')) return { code: 'CE', label: st };
+    if (st.startsWith('Security Error')) return { code: 'BLOCKED', label: st };
+    if (st.startsWith('Wrong Answer')) return { code: 'WA', label: st };
+    if (st === 'OK') return { code: 'WA', label: 'Wrong Answer — output sai khác' };
+    return { code: 'RE', label: st || 'Runtime Error' };
+  };
+
   const handleResetCode = () => {
     if (confirmResetCode) {
       const initial = STARTER_CODE[language] || STARTER_CODE.cpp;
@@ -326,8 +351,10 @@ export const ProblemWorkspace = () => {
       const activeCase = testCases[activeCaseIndex];
       const res = await executeCodeInBrowser(language, code, activeCase.input || '');
       const matched = res.status === 'OK' && compareOutputs(res.stdout, activeCase.expected || '');
+      const v = classifyRun(res, matched);
       setRunResult({
-        status: matched ? 'ACCEPTED' : 'WRONG_ANSWER',
+        status: v.code,
+        label: v.label,
         actual: res.stdout || res.status,
         expected: activeCase.expected,
         executionTime: res.executionTimeMs,
@@ -335,11 +362,45 @@ export const ProblemWorkspace = () => {
         input: activeCase.input
       });
     } catch (e) {
-      setRunResult({ status: 'WRONG_ANSWER', actual: String(e.message || e), expected: testCases[activeCaseIndex]?.expected || '', executionTime: 0, memory: '—', input: '' });
+      setRunResult({ status: 'RE', label: String(e.message || e), actual: String(e.message || e), expected: testCases[activeCaseIndex]?.expected || '', executionTime: 0, memory: '—', input: '' });
     } finally {
       setIsRunning(false);
     }
   };
+
+  // Run All: chấm hết testcase, báo pass/fail + time từng case
+  const handleRunAll = async () => {
+    if (runAllBusy) return;
+    setRunAllBusy(true);
+    setIsConsoleOpen(true);
+    const acc = {};
+    for (let i = 0; i < testCases.length; i++) {
+      try {
+        const tc = testCases[i];
+        const res = await executeCodeInBrowser(language, code, tc.input || '');
+        const matched = res.status === 'OK' && compareOutputs(res.stdout, tc.expected || '');
+        acc[i] = { ...classifyRun(res, matched), ms: res.executionTimeMs };
+      } catch (e) {
+        acc[i] = { code: 'RE', label: String(e.message || e), ms: 0 };
+      }
+    }
+    setRunAll(acc);
+    setRunAllBusy(false);
+  };
+
+  // Lịch sử nộp bài thật từ API (lọc theo đề đang mở)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!getToken() || !contestId) { if (!cancelled) setHistory([]); return; }
+        const data = await api.listSubmissions(contestId);
+        const rows = (data.submissions || []).filter((s) => s.problem_id === currentProblem.id);
+        if (!cancelled) setHistory(rows);
+      } catch { if (!cancelled) setHistory([]); }
+    })();
+    return () => { cancelled = true; };
+  }, [currentProblem.id, contestId, submissionVerdict]);
 
   // Submit Code: chấm thật trên máy chủ (pretest). Rớt mạng → báo rõ, không bịa điểm.
   const handleSubmit = async () => {
@@ -466,7 +527,7 @@ export const ProblemWorkspace = () => {
         <div className="flex items-center gap-2 sm:gap-3 text-xs">
           
           {/* Preset Buttons (50:50, 40:60, 60:40) */}
-          <div className="hidden lg:flex items-center gap-1 bg-[#090d18] p-0.5 rounded-lg border border-white/10">
+          <div className="hidden lg:flex items-center gap-1 bg-[#010102] p-0.5 rounded-lg border border-white/10">
             <button
               onClick={() => applyPreset(50)}
               className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold transition ${
@@ -564,21 +625,35 @@ export const ProblemWorkspace = () => {
       {/* ======================================================== */}
       {/* 2. RESIZABLE MULTI-PANE WORKSPACE CONTAINER             */}
       {/* ======================================================== */}
-      <div 
-        ref={workspaceRef}
-        className="flex-1 flex flex-col lg:flex-row overflow-hidden relative"
-      >
+        {/* Mobile pane tabs (Đề bài / Code) — desktop dùng split-pane */}
+        <div className="lg:hidden flex items-center gap-1 px-3 py-2 border-b border-[#23252a] bg-[#010102] shrink-0">
+          {[{ id: 'problem', label: 'Đề bài' }, { id: 'code', label: 'Code & Console' }].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setMobilePane(t.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                mobilePane === t.id ? 'bg-[#ff6600] text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div
+          ref={workspaceRef}
+          className="flex-1 flex flex-col lg:flex-row overflow-hidden relative"
+        >
         
         {/* ======================================================== */}
         {/* PANE 1: Problem Statement & Tabs (Left)                  */}
         {/* ======================================================== */}
         {!isZenEditorOnly && (
-          <div 
-            style={{ width: `${splitRatio}%` }}
-            className="hidden lg:flex flex-col bg-[#010102] border-r border-[#23252a] overflow-hidden shrink-0"
+          <div
+            style={mobilePane === 'problem' ? { width: '100%' } : { width: `${splitRatio}%` }}
+            className={`${mobilePane === 'problem' ? 'flex' : 'hidden'} lg:flex ws-pane flex-col bg-[#010102] border-r border-[#23252a] overflow-hidden shrink-0 max-lg:flex-1`}
           >
             {/* Tabs Header */}
-            <div className="h-9 bg-[#0c101c] border-b border-white/10 flex items-center px-2 gap-1 shrink-0 select-none">
+            <div className="h-9 bg-[#141516] border-b border-[#23252a] flex items-center px-2 gap-1 shrink-0 select-none">
               <button
                 onClick={() => setActiveTab('statement')}
                 className={`px-3 py-1.5 rounded text-xs font-semibold transition ${
@@ -626,12 +701,14 @@ export const ProblemWorkspace = () => {
               {activeTab === 'statement' && (
                 <>
                   <div>
-                    <h2 className="text-xl font-extrabold text-white mb-1">
+                    <h2 className="text-xl font-semibold text-white mb-2">
                       {currentProblem.code}. {currentProblem.title}
                     </h2>
-                    <div className="flex items-center gap-4 text-xs text-slate-500 font-mono mt-1">
-                      <span>Thời gian: <b className="text-slate-300">{currentProblem.timeLimit || '1.0s'}</b></span>
-                      <span>Bộ nhớ: <b className="text-slate-300">{currentProblem.memoryLimit || '256 MB'}</b></span>
+                    {/* Limits kiểu Codeforces: box hairline, mono bold */}
+                    <div className="inline-flex items-center gap-4 px-3 py-1.5 rounded-lg bg-[#0f1011] border border-[#23252a] text-xs font-mono">
+                      <span className="text-slate-500">time limit <b className="text-slate-200">{currentProblem.timeLimit || '1.0s'}</b></span>
+                      <span className="w-px h-3 bg-[#23252a]" />
+                      <span className="text-slate-500">memory limit <b className="text-slate-200">{currentProblem.memoryLimit || '256 MB'}</b></span>
                     </div>
                   </div>
 
@@ -648,27 +725,35 @@ export const ProblemWorkspace = () => {
                   </div>
 
                   {/* Example 1 */}
-                  <div className="mt-4 p-4 rounded-xl bg-[#111827] border border-white/10 space-y-3">
+                  <div className="mt-4 p-4 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-3">
                     <div className="flex items-center justify-between text-xs font-bold text-slate-200">
                       <span>Ví dụ mẫu</span>
-                      <button
-                        onClick={handleCopyInput}
-                        className="px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition text-[11px]"
-                      >
-                        {copied ? 'Đã sao chép' : 'Sao chép input'}
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={handleCopyInput}
+                          className="px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition text-[11px]"
+                        >
+                          {copied ? 'Đã sao chép input' : 'Sao chép input'}
+                        </button>
+                        <button
+                          onClick={handleCopyOutput}
+                          className="px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition text-[11px]"
+                        >
+                          {copiedOut ? 'Đã sao chép output' : 'Sao chép output'}
+                        </button>
+                      </div>
                     </div>
 
                     <div>
                       <span className="text-[11px] font-semibold text-slate-400 block mb-1">Input mẫu:</span>
-                      <pre className="p-2.5 rounded-lg bg-[#080b13] border border-white/5 font-mono text-xs text-emerald-400 overflow-x-auto">
+                      <pre className="p-2.5 rounded-lg bg-[#010102] border border-[#23252a] font-mono text-xs text-slate-200 overflow-x-auto">
                         {currentProblem.sampleInput || '3\n1 2 3'}
                       </pre>
                     </div>
 
                     <div>
                       <span className="text-[11px] font-semibold text-slate-400 block mb-1">Output mẫu:</span>
-                      <pre className="p-2.5 rounded-lg bg-[#080b13] border border-white/5 font-mono text-xs text-orange-400 overflow-x-auto">
+                      <pre className="p-2.5 rounded-lg bg-[#010102] border border-[#23252a] font-mono text-xs text-slate-200 overflow-x-auto">
                         {currentProblem.sampleOutput || '11'}
                       </pre>
                     </div>
@@ -706,6 +791,30 @@ export const ProblemWorkspace = () => {
                   ) : (
                     <div className="p-6 rounded-lg bg-white/5 border border-white/5 text-center text-xs text-slate-500">
                       Chưa có bài nộp nào. Nhấn Nộp bài để chấm pretest.
+                    </div>
+                  )}
+                  {history && history.length > 0 && (
+                    <div className="rounded-lg border border-[#23252a] overflow-hidden">
+                      <table className="w-full text-left text-[11px]">
+                        <thead className="bg-[#141516] text-slate-400 uppercase tracking-wider">
+                          <tr>
+                            <th className="py-2 px-3">Giờ nộp</th>
+                            <th className="py-2 px-3">Ngôn ngữ</th>
+                            <th className="py-2 px-3">Verdict</th>
+                            <th className="py-2 px-3 text-right">Điểm</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#23252a] font-mono">
+                          {history.slice(0, 10).map((s) => (
+                            <tr key={s.id}>
+                              <td className="py-2 px-3 text-slate-400">{new Date(s.submitted_at).toLocaleTimeString('vi-VN')}</td>
+                              <td className="py-2 px-3 text-slate-300">{s.language}</td>
+                              <td className={`py-2 px-3 font-bold ${s.verdict === 'AC' ? 'text-emerald-400' : 'text-red-400'}`}>{s.verdict}</td>
+                              <td className="py-2 px-3 text-right text-slate-200">+{s.points_awarded || 0}đ</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   )}
                 </div>
@@ -749,14 +858,14 @@ export const ProblemWorkspace = () => {
         {/* ======================================================== */}
         {/* PANE 2 & 3: Monaco Code Editor + Testcase Drawer (Right) */}
         {/* ======================================================== */}
-        <div 
+        <div
           ref={rightPaneRef}
           style={{ width: isZenEditorOnly ? '100%' : `${100 - splitRatio}%` }}
-          className="flex-1 flex flex-col bg-[#0d1220] overflow-hidden"
+          className={`${mobilePane === 'code' ? 'flex' : 'hidden'} lg:flex ws-pane flex-1 flex-col bg-[#010102] overflow-hidden`}
         >
-          
+
           {/* Editor Toolbar */}
-          <div className="h-10 bg-[#0e1424] border-b border-white/10 px-3 flex items-center justify-between shrink-0 select-none">
+          <div className="h-10 bg-[#141516] border-b border-[#23252a] px-3 flex items-center justify-between shrink-0 select-none">
             {/* Language dropdown & Controls */}
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1" role="group" aria-label="Chọn ngôn ngữ">
@@ -817,7 +926,7 @@ export const ProblemWorkspace = () => {
           </div>
 
           {/* Monaco Editor Container */}
-          <div className="flex-1 relative overflow-hidden bg-[#080b13]">
+          <div className="flex-1 relative overflow-hidden bg-[#010102]">
             <Editor
               height="100%"
               language={language === 'cpp' ? 'cpp' : language === 'python' ? 'python' : language === 'java' ? 'java' : 'javascript'}
@@ -849,16 +958,16 @@ export const ProblemWorkspace = () => {
               setIsDraggingVertical(true);
             }}
             onDoubleClick={handleResetVerticalSplit}
-            className={`h-1.5 bg-[#0a0e1a] hover:bg-[#ff6600]/50 cursor-row-resize transition-colors flex items-center justify-center relative group z-20 ${
-              isDraggingVertical ? 'bg-[#ff6600] shadow-lg shadow-[#ff6600]/50' : 'border-t border-white/10'
+            className={`h-1.5 bg-[#010102] hover:bg-[#34343a] cursor-row-resize transition-colors flex items-center justify-center relative group z-20 ${
+              isDraggingVertical ? 'bg-[#ff6600]' : 'border-t border-[#23252a]'
             }`}
             title="Kéo lên/xuống để điều chỉnh độ cao Console (Nhấp đúp chuột để về 220px)"
           >
-            <div className="w-8 h-1 rounded-full bg-slate-600 group-hover:bg-[#ff6600] transition" />
-            
+            <div className="w-8 h-1 rounded-full bg-slate-600 group-hover:bg-[#8a8f98] transition" />
+
             {/* Height tooltip while dragging */}
             {isDraggingVertical && (
-              <div className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded bg-black/90 border border-[#ff6600] text-[10px] font-mono font-bold text-[#ff6600] whitespace-nowrap shadow-xl z-50">
+              <div className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded bg-black/90 border border-[#34343a] text-[10px] font-mono font-bold text-[#d0d6e0] whitespace-nowrap z-50">
                 Cao: {consoleHeight}px
               </div>
             )}
@@ -867,9 +976,9 @@ export const ProblemWorkspace = () => {
           {/* ======================================================== */}
           {/* PANE 3: Testcase & Diff Console Drawer                   */}
           {/* ======================================================== */}
-          <div className="bg-[#0a0e1a] shrink-0 flex flex-col transition-all duration-150">
+          <div className="bg-[#010102] shrink-0 flex flex-col transition-all duration-150">
             {/* Drawer Toggle Header */}
-            <div className="h-8 bg-[#0d1222] border-b border-white/10 px-3 flex items-center justify-between text-xs select-none">
+            <div className="h-8 bg-[#141516] border-b border-[#23252a] px-3 flex items-center justify-between text-xs select-none">
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setIsConsoleOpen(!isConsoleOpen)}
@@ -884,13 +993,18 @@ export const ProblemWorkspace = () => {
                       <button
                         key={tc.id}
                         onClick={() => setActiveCaseIndex(idx)}
-                        className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
+                        className={`px-2 py-0.5 rounded text-[11px] font-semibold transition border ${
                           activeCaseIndex === idx
-                            ? 'bg-[#ff6600] text-white'
-                            : 'bg-white/5 text-slate-400 hover:text-slate-200'
+                            ? 'bg-[#ff6600] text-white border-[#ff6600]'
+                            : runAll?.[idx]
+                              ? runAll[idx].code === 'AC'
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                : 'bg-red-500/10 text-red-400 border-red-500/30'
+                              : 'bg-white/5 text-slate-400 hover:text-slate-200 border-transparent'
                         }`}
+                        title={runAll?.[idx] ? `${runAll[idx].code} • ${runAll[idx].ms}ms` : tc.name}
                       >
-                        {tc.name}
+                        {tc.name}{runAll?.[idx] ? ` ${runAll[idx].ms}ms` : ''}
                       </button>
                     ))}
                     <button
@@ -899,6 +1013,14 @@ export const ProblemWorkspace = () => {
                       title="Thêm testcase tùy biến"
                     >
                       + Thêm Case
+                    </button>
+                    <button
+                      onClick={handleRunAll}
+                      disabled={runAllBusy || isRunning}
+                      className="px-2 py-0.5 rounded text-[11px] bg-[#141516] hover:bg-[#18191a] border border-[#34343a] text-slate-200 transition disabled:opacity-50"
+                      title="Chạy hết testcase"
+                    >
+                      {runAllBusy ? 'Đang chạy...' : 'Chạy hết'}
                     </button>
                   </div>
                 )}
@@ -913,23 +1035,37 @@ export const ProblemWorkspace = () => {
             {isConsoleOpen && (
               <div 
                 style={{ height: `${consoleHeight}px` }}
-                className="p-3 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-[#090d18]"
+                className="p-3 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-[#010102]"
               >
-                {/* Testcase Input */}
-                <div className="flex flex-col h-full">
-                  <div className="flex items-center justify-between mb-1 shrink-0">
-                    <span className="text-slate-400 font-semibold text-[11px]">Đầu vào (Custom Input):</span>
+                {/* Testcase Input + Expected */}
+                <div className="flex flex-col h-full gap-2">
+                  <div className="flex-1 flex flex-col min-h-0">
+                    <span className="text-slate-400 font-semibold text-[11px] mb-1 shrink-0">Đầu vào (Custom Input):</span>
+                    <textarea
+                      value={testCases[activeCaseIndex]?.input || ''}
+                      onChange={(e) => {
+                        const updated = [...testCases];
+                        updated[activeCaseIndex].input = e.target.value;
+                        setTestCases(updated);
+                      }}
+                      className="w-full flex-1 p-2 rounded-lg bg-[#010102] border border-[#23252a] text-slate-200 font-mono text-xs focus:border-[#ff6600] outline-none resize-none"
+                      placeholder="Nhập testcase đầu vào..."
+                    />
                   </div>
-                  <textarea
-                    value={testCases[activeCaseIndex]?.input || ''}
-                    onChange={(e) => {
-                      const updated = [...testCases];
-                      updated[activeCaseIndex].input = e.target.value;
-                      setTestCases(updated);
-                    }}
-                    className="w-full flex-1 p-2 rounded-lg bg-[#050811] border border-white/10 text-emerald-400 font-mono text-xs focus:border-[#ff6600] outline-none resize-none"
-                    placeholder="Nhập testcase đầu vào..."
-                  />
+                  <div className="shrink-0">
+                    <span className="text-slate-400 font-semibold text-[11px] mb-1 block">Kết quả mong đợi (Expected):</span>
+                    <textarea
+                      value={testCases[activeCaseIndex]?.expected || ''}
+                      rows={2}
+                      onChange={(e) => {
+                        const updated = [...testCases];
+                        updated[activeCaseIndex].expected = e.target.value;
+                        setTestCases(updated);
+                      }}
+                      className="w-full p-2 rounded-lg bg-[#010102] border border-[#23252a] text-slate-200 font-mono text-xs focus:border-[#ff6600] outline-none resize-none"
+                      placeholder="Output đúng để đối soát..."
+                    />
+                  </div>
                 </div>
 
                   {/* Diff View Result */}
@@ -937,25 +1073,27 @@ export const ProblemWorkspace = () => {
                     <div className="flex items-center justify-between mb-1 shrink-0">
                       <span className="text-slate-400 font-semibold text-[11px]">Kết quả chạy thử:</span>
                       {runResult && (
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                          runResult.status === 'ACCEPTED'
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                          runResult.status === 'AC'
+                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                            : runResult.status === 'TLE'
+                              ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                              : 'bg-red-500/20 text-red-400 border-red-500/30'
                         }`}>
-                          {runResult.status === 'ACCEPTED' ? 'Khớp kết quả' : 'Output sai khác'}
+                          {runResult.status} — {runResult.status === 'AC' ? 'khớp kết quả' : runResult.label}
                         </span>
                       )}
                     </div>
 
                   {runResult ? (
-                    <div className="flex-1 p-2.5 rounded-lg bg-[#050811] border border-white/10 font-mono text-xs space-y-1.5 overflow-y-auto">
+                    <div className="flex-1 p-2.5 rounded-lg bg-[#010102] border border-[#23252a] font-mono text-xs space-y-1.5 overflow-y-auto">
                       <div className="flex items-center justify-between text-[11px] text-slate-500 border-b border-white/5 pb-1">
                         <span>Thời gian: <b className="text-slate-300">{runResult.executionTime}ms</b></span>
                         <span>Bộ nhớ: <b className="text-slate-300">{runResult.memory === '—' ? '—' : `${runResult.memory}MB`}</b></span>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-500 block">Actual Output:</span>
-                        <pre className={runResult.status === 'ACCEPTED' ? 'text-emerald-400' : 'text-red-400'}>
+                        <pre className={runResult.status === 'AC' ? 'text-emerald-400' : runResult.status === 'TLE' ? 'text-yellow-400' : 'text-red-400'}>
                           {runResult.actual}
                         </pre>
                       </div>
@@ -967,7 +1105,7 @@ export const ProblemWorkspace = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex-1 rounded-lg bg-[#050811] border border-white/10 flex flex-col items-center justify-center text-slate-500 text-xs">
+                    <div className="flex-1 rounded-lg bg-[#010102] border border-[#23252a] flex flex-col items-center justify-center text-slate-500 text-xs">
                       <span>Nhấn “Chạy thử” để kiểm tra kết quả</span>
                     </div>
                   )}
@@ -976,7 +1114,7 @@ export const ProblemWorkspace = () => {
             )}
 
             {/* Pinned Action Bar (Run & Submit) */}
-            <div className="h-11 bg-[#0c101c] border-t border-white/10 px-4 flex items-center justify-between shrink-0 select-none">
+            <div className="h-11 bg-[#141516] border-t border-[#23252a] px-4 flex items-center justify-between shrink-0 select-none">
               <div className="flex items-center gap-2 text-xs text-slate-400">
                 <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                 <span>Chế độ pretest: chấm trên bộ test mẫu</span>
