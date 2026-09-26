@@ -145,3 +145,97 @@ test('workflow: gửi kiểm duyệt → queue blind (ẩn editorial) → báo c
   const again = await call(`/api/v1/admin/problems/${problemId}/review`, 'POST', { decision: 'APPROVED' }, adminToken);
   assert.equal(again.status, 409);
 });
+
+test('bounds: tạo đề với bounds custom + validate POST/PUT', async () => {
+  // POST thiếu bounds → defaults 1/200000/-1e9/1e9 (hợp đồng UI đã chốt)
+  const def = await call('/api/v1/admin/problems', 'POST', {
+    contest_id: 'contest_dever_round1', code: 'BD0', title: 'Bounds Default',
+    statement: 'Tính tổng.', sampleInput: '1\n5\n', sampleOutput: '5\n',
+  }, adminToken);
+  assert.equal(def.status, 201);
+  assert.deepEqual(def.data.problem.bounds, { minN: 1, maxN: 200000, minVal: -1000000000, maxVal: 1000000000 });
+
+  // POST bounds sai: minN<1 và maxN>1e6 đều 422
+  const badMin = await call('/api/v1/admin/problems', 'POST', {
+    contest_id: 'contest_dever_round1', code: 'BDX1', title: 'Bad', statement: 'x',
+    bounds: { minN: 0, maxN: 10 },
+  }, adminToken);
+  assert.equal(badMin.status, 422);
+  const badMax = await call('/api/v1/admin/problems', 'POST', {
+    contest_id: 'contest_dever_round1', code: 'BDX2', title: 'Bad', statement: 'x',
+    bounds: { minN: 1, maxN: 2000000 },
+  }, adminToken);
+  assert.equal(badMax.status, 422);
+
+  // Tạo đề bounds custom maxN=10 để test validator
+  const c = await call('/api/v1/admin/problems', 'POST', {
+    contest_id: 'contest_dever_round1', code: 'BD', title: 'Bounds Fixture',
+    statement: 'Tính tổng.', sampleInput: '3\n1 2 3\n', sampleOutput: '6\n',
+    bounds: { minN: 1, maxN: 10, minVal: 0, maxVal: 100 },
+  }, adminToken);
+  assert.equal(c.status, 201);
+  assert.deepEqual(c.data.problem.bounds, { minN: 1, maxN: 10, minVal: 0, maxVal: 100 });
+  globalThis.__bdProblemId = c.data.problem.id;
+
+  // PUT patch bounds sai → 422
+  const putBad = await call(`/api/v1/admin/problems/${c.data.problem.id}`, 'PUT', { bounds: { maxN: 2000000 } }, adminToken);
+  assert.equal(putBad.status, 422);
+  const putBad2 = await call(`/api/v1/admin/problems/${c.data.problem.id}`, 'PUT', { bounds: { minN: 0 } }, adminToken);
+  assert.equal(putBad2.status, 422);
+  // PUT merge từng field: chỉ đổi maxVal, giữ maxN=10
+  const putOk = await call(`/api/v1/admin/problems/${c.data.problem.id}`, 'PUT', { bounds: { maxVal: 50 } }, adminToken);
+  assert.equal(putOk.status, 200);
+  assert.equal(putOk.data.problem.bounds.maxN, 10);
+  assert.equal(putOk.data.problem.bounds.maxVal, 50);
+  assert.equal(putOk.data.problem.bounds.minN, 1);
+});
+
+test('bounds: testcase vượt bounds 422, đúng bounds 201', async () => {
+  const bdId = globalThis.__bdProblemId;
+  assert.ok(bdId);
+  // N=15 vượt maxN=10 → 422 kèm message validator
+  const over = await call('/api/v1/admin/testcases', 'POST', {
+    problem_id: bdId, stdin: '15\n1 2 3 4 5 6 7 8 9 10 11 12 13 14 15\n',
+    expected_stdout: '120\n', is_pretest: false, strategy: 'manual',
+  }, adminToken);
+  assert.equal(over.status, 422);
+  assert.ok(over.data.message);
+  // Giá trị vượt maxVal=50 (sau PUT merge) → 422
+  const overVal = await call('/api/v1/admin/testcases', 'POST', {
+    problem_id: bdId, stdin: '2\n60 70\n', expected_stdout: '130\n', is_pretest: false,
+  }, adminToken);
+  assert.equal(overVal.status, 422);
+  // Đúng bounds → 201
+  const ok = await call('/api/v1/admin/testcases', 'POST', {
+    problem_id: bdId, stdin: '3\n1 2 3\n', expected_stdout: '6\n', is_pretest: true, strategy: 'manual',
+  }, adminToken);
+  assert.equal(ok.status, 201);
+  assert.equal(ok.data.testcase.problem_id, bdId);
+});
+
+test('bounds: hack payload sai format/bounds 422 (luật Polygon)', async () => {
+  const bdId = globalThis.__bdProblemId;
+  assert.ok(bdId);
+  // Nộp victim đúng để có target AC (vẫn CODING)
+  const victim = await call('/api/v1/submissions', 'POST', {
+    contest_id: 'contest_dever_round1', problem_id: bdId, language: 'python', source_code: MODEL,
+  }, heroToken);
+  assert.equal(victim.status, 201);
+  assert.equal(victim.data.submission.verdict, 'AC');
+  const targetId = victim.data.submission.id;
+  // Sang HACK_PHASE để được hack
+  const go = await call('/api/v1/admin/phase', 'POST', { contest_id: 'contest_dever_round1', phase: 'HACK_PHASE' }, adminToken);
+  assert.ok([200, 409].includes(go.status));
+  // Payload vượt bounds (N=15 > maxN=10) → 422
+  const hackOver = await call('/api/v1/hacks/execute', 'POST', {
+    contest_id: 'contest_dever_round1', target_submission_id: targetId,
+    test_payload: '15\n1 2 3 4 5 6 7 8 9 10 11 12 13 14 15\n',
+  }, hackerToken);
+  assert.equal(hackOver.status, 422);
+  assert.equal(hackOver.data.error, 'HACK_VALIDATOR_REJECT');
+  // Payload sai format (thiếu newline cuối) → 422
+  const hackBadFmt = await call('/api/v1/hacks/execute', 'POST', {
+    contest_id: 'contest_dever_round1', target_submission_id: targetId, test_payload: '3\n1 2 3',
+  }, hackerToken);
+  assert.equal(hackBadFmt.status, 422);
+});
