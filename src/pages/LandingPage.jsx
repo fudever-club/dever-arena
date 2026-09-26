@@ -81,27 +81,24 @@ export const LandingPage = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-3rem)] bg-[#0b0f19] text-slate-100 selection:bg-orange-500/30">
-      
+    <div className="min-h-[calc(100vh-3.5rem)] bg-[#010102] text-slate-100 selection:bg-orange-500/30">
+
       {/* 1. HERO SECTION */}
       <section className="relative pt-16 pb-20 px-6 max-w-6xl mx-auto text-center overflow-hidden">
-        {/* Ambient background glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-96 bg-gradient-to-b from-orange-500/15 via-cyan-500/10 to-transparent blur-3xl pointer-events-none -z-10"></div>
-
         {/* Live Contest Pill */}
         <img
           src="/brand/logo-dark.png"
           alt="CLB FU-DEVER — Work hard, Play hard"
-          className="h-24 w-24 rounded-3xl object-cover ring-1 ring-white/10 shadow-2xl mx-auto mb-6"
+          className="h-24 w-24 rounded-2xl object-cover ring-1 ring-[#23252a] mx-auto mb-6"
         />
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-[#ff6600] text-xs font-semibold mb-6 shadow-sm">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#141516] border border-[#23252a] text-[#d0d6e0] text-xs font-semibold mb-6">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           <span>Vòng thi đấu thuật toán của CLB FU-DEVER</span>
         </div>
 
-        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-tight max-w-4xl mx-auto">
+        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-semibold text-[#f7f8f8] tracking-tight leading-tight max-w-4xl mx-auto">
           Đấu trường thuật toán theo thể thức <br className="hidden sm:inline" />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff6600] via-orange-400 to-[#00f0ff]">
+          <span className="text-[#ff6600]">
             Codeforces
           </span>
         </h1>
@@ -114,14 +111,14 @@ export const LandingPage = () => {
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link
             to="/arena"
-            className="px-6 py-3 rounded-xl bg-[#ff6600] hover:bg-[#ff771a] text-white font-extrabold text-sm transition shadow-xl shadow-orange-500/25"
+            className="px-6 py-3 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-medium text-sm transition"
           >
             Vào Đấu Trường Arena
           </Link>
 
           <Link
             to="/problem/p102"
-            className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white font-bold text-sm transition border border-white/10"
+            className="px-6 py-3 rounded-lg bg-[#0f1011] hover:bg-[#141516] text-slate-200 hover:text-white font-medium text-sm transition border border-[#23252a]"
           >
             Mở Workspace Làm Bài
           </Link>
@@ -130,9 +127,9 @@ export const LandingPage = () => {
         {/* ======================================================== */}
         {/* INTERACTIVE LIVE CODE RUNNER (Preview Widget)            */}
         {/* ======================================================== */}
-        <div className="mt-14 max-w-3xl mx-auto rounded-2xl bg-[#090d18] border border-white/10 overflow-hidden shadow-2xl text-left">
+        <div className="mt-14 max-w-3xl mx-auto rounded-2xl bg-[#0f1011] border border-[#23252a] overflow-hidden text-left">
           {/* Sandbox Topbar */}
-          <div className="h-10 bg-[#0d1222] border-b border-white/10 px-4 flex items-center justify-between">
+          <div className="h-10 bg-[#141516] border-b border-[#23252a] px-4 flex items-center justify-between">
             <span className="text-xs font-bold text-slate-300">
               Chạy thử code ngay, không cần đăng nhập
             </span>
@@ -161,7 +158,7 @@ export const LandingPage = () => {
           </div>
 
           {/* Sandbox Code Input */}
-          <div className="p-4 bg-[#060912]">
+          <div className="p-4 bg-[#010102]">
             <textarea
               rows={8}
               value={sandboxCode}
@@ -172,7 +169,7 @@ export const LandingPage = () => {
           </div>
 
           {/* Sandbox Bottom Execution Bar */}
-          <div className="p-3 bg-[#0a0f1e] border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="p-3 bg-[#141516] border-t border-[#23252a] flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="text-[11px] text-slate-500 font-mono">
               Chạy thử trực tiếp trên trang, không cách ly như máy chấm thi
             </div>
@@ -197,22 +194,22 @@ export const LandingPage = () => {
       </section>
 
       {/* 2. STATS SECTION */}
-      <section className="border-y border-white/10 bg-[#090d18]/50 py-10 px-6">
+      <section className="border-y border-[#23252a] bg-[#0f1011] py-10 px-6">
         <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
           <div>
-            <span className="font-mono text-3xl font-black text-[#ff6600] block">{stats.contests ?? '—'}</span>
+            <span className="font-mono text-3xl font-bold text-[#ff6600] block">{stats.contests ?? '—'}</span>
             <span className="text-xs text-slate-400 mt-1 block">Kỳ thi trên hệ thống</span>
           </div>
           <div>
-            <span className="font-mono text-3xl font-black text-[#00f0ff] block">{stats.problems ?? '—'}</span>
+            <span className="font-mono text-3xl font-bold text-[#f7f8f8] block">{stats.problems ?? '—'}</span>
             <span className="text-xs text-slate-400 mt-1 block">Bài tập trong kho đề</span>
           </div>
           <div>
-            <span className="font-mono text-3xl font-black text-emerald-400 block">JS · Py</span>
+            <span className="font-mono text-3xl font-bold text-[#f7f8f8] block">JS · Py</span>
             <span className="text-xs text-slate-400 mt-1 block">Ngôn ngữ chấm thật (local)</span>
           </div>
           <div>
-            <span className="font-mono text-3xl font-black text-purple-400 block">5</span>
+            <span className="font-mono text-3xl font-bold text-[#f7f8f8] block">5</span>
             <span className="text-xs text-slate-400 mt-1 block">Giai đoạn một vòng thi</span>
           </div>
         </div>
@@ -230,9 +227,9 @@ export const LandingPage = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-6 rounded-2xl bg-[#0e1424] border border-white/10 space-y-3 hover:border-orange-500/40 transition group">
+          <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-3 hover:border-[#34343a] transition group">
             <div className="font-mono text-xs font-bold text-[#ff6600]">01</div>
-            <h3 className="text-base font-bold text-white group-hover:text-[#ff6600] transition">
+            <h3 className="text-base font-medium text-white tracking-tight">
               Thi đấu tính giờ
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed">
@@ -240,9 +237,9 @@ export const LandingPage = () => {
             </p>
           </div>
 
-          <div className="p-6 rounded-2xl bg-[#0e1424] border border-white/10 space-y-3 hover:border-cyan-500/40 transition group">
-            <div className="font-mono text-xs font-bold text-[#00f0ff]">02</div>
-            <h3 className="text-base font-bold text-white group-hover:text-[#00f0ff] transition">
+          <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-3 hover:border-[#34343a] transition group">
+            <div className="font-mono text-xs font-bold text-[#8a8f98]">02</div>
+            <h3 className="text-base font-medium text-white tracking-tight">
               Phòng thách đấu
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed">
@@ -250,9 +247,9 @@ export const LandingPage = () => {
             </p>
           </div>
 
-          <div className="p-6 rounded-2xl bg-[#0e1424] border border-white/10 space-y-3 hover:border-red-500/40 transition group">
-            <div className="font-mono text-xs font-bold text-red-400">03</div>
-            <h3 className="text-base font-bold text-white group-hover:text-red-400 transition">
+          <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-3 hover:border-[#34343a] transition group">
+            <div className="font-mono text-xs font-bold text-[#8a8f98]">03</div>
+            <h3 className="text-base font-medium text-white tracking-tight">
               Chống gian lận mã nguồn
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed">
@@ -261,12 +258,6 @@ export const LandingPage = () => {
           </div>
         </div>
       </section>
-
-      {/* 4. FOOTER */}
-      <footer className="border-t border-white/10 py-8 px-6 text-center text-xs text-slate-500">
-        <p>© 2026 DEVER Arena • CLB FU-DEVER • FPT University</p>
-        <p className="mt-1 text-[11px]">Nền tảng thi đấu giải thuật của sinh viên, cho sinh viên</p>
-      </footer>
 
     </div>
   );

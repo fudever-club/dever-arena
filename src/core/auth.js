@@ -212,7 +212,7 @@ export function getRoleBadgeInfo(role) {
         label: 'Thí Sinh',
         className: 'badge-participant',
         icon: 'fas fa-user-graduate',
-        color: '#00f0ff'
+        color: '#d0d6e0'
       };
     case ROLES.GUEST:
     default:

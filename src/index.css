@@ -1,28 +1,99 @@
 @import "tailwindcss";
 @import "katex/dist/katex.min.css";
 
+/* DEVER Arena — Linear DESIGN.md tokens (DESIGN.md root, dever-ui-craft skill).
+   Canvas gần-đen + surface ladder 4 bậc + hairline borders.
+   Accent duy nhất: cam FPT #ff6600 (thay lavender Linear, giữ brand CLB). */
 :root {
   --font-sans: 'Space Grotesk', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-code: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+
+  --dv-canvas: #010102;
+  --dv-surface-1: #0f1011;
+  --dv-surface-2: #141516;
+  --dv-surface-3: #18191a;
+  --dv-surface-4: #191a1b;
+  --dv-hairline: #23252a;
+  --dv-hairline-strong: #34343a;
+  --dv-hairline-tertiary: #3e3e44;
+  --dv-ink: #f7f8f8;
+  --dv-ink-muted: #d0d6e0;
+  --dv-ink-subtle: #8a8f98;
+  --dv-ink-tertiary: #62666d;
+  --dv-accent: #ff6600;
+  --dv-accent-hover: #ff771a;
+  --dv-success: #27a644;
 }
 
-/* Custom modern scrollbar */
+body {
+  background: var(--dv-canvas);
+  color: var(--dv-ink);
+}
+
+/* Component classes theo DESIGN.md components: (dùng cho code mới) */
+.dv-btn-primary {
+  background: var(--dv-accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  padding: 8px 14px;
+}
+.dv-btn-primary:hover { background: var(--dv-accent-hover); }
+.dv-btn-secondary {
+  background: var(--dv-surface-1);
+  color: var(--dv-ink);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--dv-hairline);
+}
+.dv-card {
+  background: var(--dv-surface-1);
+  color: var(--dv-ink);
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid var(--dv-hairline);
+}
+.dv-input {
+  background: var(--dv-surface-1);
+  color: var(--dv-ink);
+  border-radius: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--dv-hairline);
+}
+.dv-pill {
+  background: var(--dv-surface-2);
+  color: var(--dv-ink-muted);
+  font-size: 12px;
+  border-radius: 9999px;
+  padding: 2px 8px;
+}
+.dv-btn-primary:focus-visible,
+.dv-btn-secondary:focus-visible,
+.dv-input:focus-visible {
+  outline: 2px solid var(--dv-accent);
+  outline-offset: 1px;
+}
+
+/* Scrollbar theo hairline */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(11, 15, 25, 0.6);
+  background: var(--dv-canvas);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--dv-hairline-strong);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 102, 0, 0.4);
+  background: var(--dv-accent);
 }
 
-/* Custom glow and animations */
+/* Live dot pulse (status indicator duy nhất được phép pulse) */
 @keyframes pulse-cyan {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 1; }
@@ -32,8 +103,12 @@
   animation: pulse-cyan 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-cyan { animation: none; }
+}
+
 /* Resizer handle visual */
 .resizer-hover:hover {
-  background-color: #ff6600;
+  background-color: var(--dv-accent);
   transition: background-color 0.15s ease;
 }

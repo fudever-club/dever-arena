@@ -17,6 +17,8 @@ import { CONTEST_PHASES } from '../src/core/contestStateMachine.js';
 import { createVirtualSession, getVirtualElapsedMinutes } from '../src/core/virtualContest.js';
 import { applyFreeze, computeIcpcStandings } from '../src/core/contestResults.js';
 import { compareOutputs } from '../src/engine/isolateRunner.js';
+import { generateSuite } from '../src/engine/testGenerator.js';
+import { checkOutput } from '../src/engine/testlibValidator.js';
 
 const PORT = Number(process.env.PORT || 8787);
 // Store: DEVER_DATABASE_URL → Postgres (đa máy), không thì JSON file (mặc định server/data/db.json).
@@ -213,6 +215,15 @@ function computeStandings(contest) {
 
 const PHASE_ORDER = ['REGISTRATION', 'CODING', 'HACK_PHASE', 'SYSTEM_TESTING', 'FINISHED'];
 
+// ============================ OBSERVABILITY ============================
+const BOOT_TIME = Date.now();
+function logReq(req, code, ms) {
+  try {
+    const url = new URL(req.url, 'http://localhost');
+    console.log(JSON.stringify({ ts: new Date().toISOString(), level: code >= 500 ? 'error' : 'info', method: req.method, path: url.pathname, status: code, ms }));
+  } catch {}
+}
+
 // ============================ ROUTER ============================
 const routes = [];
 
@@ -221,6 +232,15 @@ function route(method, pattern, handler, opts = {}) {
 }
 
 async function handle(req, res) {
+  const t0 = Date.now();
+  // Log cấu trúc JSON khi response kết thúc (SSE long-lived sẽ log lúc client ngắt).
+  res.on('finish', () => {
+    try {
+      const u = new URL(req.url, 'http://localhost');
+      if (u.pathname.startsWith('/api/v1/stream/')) return; // tránh spam log SSE
+      logReq(req, res.statusCode || 200, Date.now() - t0);
+    } catch {}
+  });
   if (req.method === 'OPTIONS') { send(res, 204, {}); return; }
   const url = new URL(req.url, 'http://localhost');
   for (const r of routes) {
@@ -256,6 +276,20 @@ async function handle(req, res) {
   }
   send(res, 404, { error: 'NOT_FOUND', message: `Không có route ${req.method} ${url.pathname}` });
 }
+
+// ---- Health & readiness (public, rẻ, không auth) ----
+route('GET', '^/api/(v1/)?health$', async (req, res) => {
+  send(res, 200, { status: 'ok', uptime_s: Math.floor((Date.now() - BOOT_TIME) / 1000), store: storeKind, time: new Date().toISOString() });
+});
+route('GET', '^/api/(v1/)?ready$', async (req, res) => {
+  try {
+    const users = db.filter('users', () => true).length;
+    const contests = db.filter('contests', () => true).length;
+    send(res, 200, { ready: true, store: storeKind, users, contests });
+  } catch (e) {
+    send(res, 503, { ready: false, error: String(e.message || e) });
+  }
+});
 
 // ---- Auth ----
 route('POST', '^/api/v1/auth/login$', async (req, res) => {
@@ -671,6 +705,10 @@ route('POST', '^/api/v1/admin/problems$', async (req, res) => {
     sampleOutput: body.sampleOutput || '',
     editorial: body.editorial || '',
     solvedCount: 0,
+    workflow_status: 'DRAFT',
+    tester_id: null,
+    review_note: '',
+    test_reports: [],
   });
   db.insert('testcases', { id: `tc_${problem.id}_sample`, problem_id: problem.id, order_index: 0, stdin: problem.sampleInput, expected_stdout: problem.sampleOutput, is_sample: true, is_pretest: true });
   send(res, 201, { problem });
@@ -721,6 +759,155 @@ route('DELETE', '^/api/v1/admin/problems/([^/]+)$', async (req, res, url, m) => 
   db.save();
   send(res, 200, { deleted: p.id });
 }, { auth: true, admin: true });
+// ============================ POLYGON: STRESS + TESTCASES + WORKFLOW ============================
+// Stress test chuẩn Polygon: chạy model vs brute-force trên cùng bộ test seeded,
+// lệch nhau là FAIL. Kèm gợi ý time limit = max(1s, 2x thời gian model chậm nhất).
+route('POST', '^/api/v1/admin/stress$', async (req, res) => {
+  const body = await readBody(req);
+  const language = String(body.language || 'python');
+  const model_source = String(body.model_source || '');
+  const brute_source = String(body.brute_source || '');
+  if (!model_source.trim() || !brute_source.trim()) {
+    send(res, 422, { error: 'MISSING_FIELD', message: 'Thiếu model_source/brute_source.' }); return;
+  }
+  const count = Math.max(1, Math.min(30, Number(body.count) || 12));
+  const seed = String(body.seed ?? `stress-${Date.now()}`);
+  const timeLimitMs = Math.max(500, Math.min(5000, Number(body.timeLimitMs) || 2000));
+  const rules = { minN: 1, maxN: 100000, minVal: -1000000000, maxVal: 1000000000, ...(body.rules || {}) };
+  const checker = body.checker === 'float' ? 'float' : 'exact';
+  const epsilon = Number(body.epsilon) || 1e-6;
+  const suite = generateSuite({ count, seed, ...rules });
+
+  let modelMaxMs = 0;
+  let passed = 0;
+  const mismatches = [];
+  const outputs = [];
+  const BATCH = 4;
+  for (let i = 0; i < suite.length; i += BATCH) {
+    const results = await Promise.all(suite.slice(i, i + BATCH).map(async (c) => {
+      const [m, b] = await Promise.all([
+        judgeQueue.executeOne({ language, source: model_source, stdin: c.stdin, timeLimitMs }),
+        judgeQueue.executeOne({ language, source: brute_source, stdin: c.stdin, timeLimitMs }),
+      ]);
+      return { c, m, b };
+    }));
+    for (const { c, m, b } of results) {
+      if (m.verdict === 'SKIP' || b.verdict === 'SKIP') {
+        send(res, 422, { error: 'LANGUAGE_UNAVAILABLE', message: `Ngôn ngữ ${language} chưa có toolchain (giống luật judge).` }); return;
+      }
+      modelMaxMs = Math.max(modelMaxMs, Number(m.timeMs) || 0);
+      const ok = checker === 'float'
+        ? checkOutput(m.stdout || '', b.stdout || '', 'float_tolerance', { epsilon }).isCorrect
+        : compareOutputs(m.stdout || '', b.stdout || '');
+      if (ok) {
+        passed++;
+        outputs.push({ stdin: c.stdin, expected_stdout: b.stdout || '', strategy: c.strategy });
+      } else if (mismatches.length < 5) {
+        mismatches.push({
+          stdin: c.stdin.slice(0, 2000), strategy: c.strategy,
+          model_verdict: m.verdict, brute_verdict: b.verdict,
+          model_stdout: (m.stdout || '').slice(0, 1000), brute_stdout: (b.stdout || '').slice(0, 1000),
+        });
+      }
+    }
+  }
+  const failed = suite.length - passed;
+  const suggestedTimeLimitS = Math.max(1, Math.ceil(((2 * modelMaxMs) / 1000) * 2) / 2);
+  send(res, 200, {
+    ran: suite.length, passed, failed, mismatches, outputs,
+    modelMaxMs, suggestedTimeLimitS, seed,
+    verdict: failed === 0 ? 'PASS' : 'FAIL',
+  });
+}, { auth: true, admin: true });
+
+// Lưu 1 testcase chấm (pretest/system) cho đề — dùng sau khi stress PASS.
+route('POST', '^/api/v1/admin/testcases$', async (req, res) => {
+  const body = await readBody(req);
+  const p = db.find('problems', (x) => x.id === String(body.problem_id || ''));
+  if (!p) { send(res, 404, { error: 'PROBLEM_NOT_FOUND', message: 'Không tìm thấy đề.' }); return; }
+  const stdin = String(body.stdin ?? '');
+  if (!stdin) { send(res, 422, { error: 'MISSING_FIELD', message: 'Thiếu stdin.' }); return; }
+  const existing = db.filter('testcases', (t) => t.problem_id === p.id);
+  const order_index = existing.reduce((mx, t) => Math.max(mx, Number(t.order_index) || 0), 0) + 1;
+  const tc = db.insert('testcases', {
+    id: db.nextId('tc'), problem_id: p.id, order_index,
+    stdin, expected_stdout: String(body.expected_stdout ?? ''),
+    is_sample: false, is_pretest: body.is_pretest !== false,
+    strategy: String(body.strategy || 'manual'),
+  });
+  send(res, 201, { testcase: tc });
+}, { auth: true, admin: true });
+route('GET', '^/api/v1/admin/testcases$', async (req, res, url) => {
+  const problem_id = url.searchParams.get('problem_id') || '';
+  const rows = db.filter('testcases', (t) => !problem_id || t.problem_id === problem_id)
+    .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+    .map((t) => ({ ...t, stdin: String(t.stdin || '').slice(0, 2000), expected_stdout: String(t.expected_stdout || '').slice(0, 2000) }));
+  send(res, 200, { testcases: rows });
+}, { auth: true, admin: true });
+route('DELETE', '^/api/v1/admin/testcases/([^/]+)$', async (req, res, url, m) => {
+  const t = db.find('testcases', (x) => x.id === decodeURIComponent(m[1]));
+  if (!t) { send(res, 404, { error: 'NOT_FOUND', message: 'Không tìm thấy testcase.' }); return; }
+  if (t.is_sample) { send(res, 409, { error: 'IS_SAMPLE', message: 'Test mẫu sửa qua đề bài (PUT problem), không xóa lẻ.' }); return; }
+  db.data.testcases = db.data.testcases.filter((x) => x.id !== t.id);
+  db.save();
+  send(res, 200, { deleted: t.id });
+}, { auth: true, admin: true });
+
+// --- Blind-tester workflow: DRAFT → IN_TESTING → APPROVED (REJECTED về DRAFT) ---
+const WORKFLOW = ['DRAFT', 'IN_TESTING', 'APPROVED'];
+function workflowOf(p) { return WORKFLOW.includes(p.workflow_status) ? p.workflow_status : 'DRAFT'; }
+route('POST', '^/api/v1/admin/problems/([^/]+)/submit-testing$', async (req, res, url, m, user) => {
+  const p = db.find('problems', (x) => x.id === decodeURIComponent(m[1]));
+  if (!p) { send(res, 404, { error: 'NOT_FOUND', message: 'Không tìm thấy đề.' }); return; }
+  if (workflowOf(p) === 'IN_TESTING') { send(res, 409, { error: 'ALREADY_TESTING', message: 'Đề đang kiểm duyệt.' }); return; }
+  const body = await readBody(req);
+  const tester = db.find('users', (u) => u.id === String(body.tester_id || ''));
+  if (!tester) { send(res, 422, { error: 'TESTER_NOT_FOUND', message: 'Chọn tester (tài khoản có thật).' }); return; }
+  if (tester.id === user.id) { send(res, 422, { error: 'SELF_TEST', message: 'Không tự kiểm duyệt đề của mình (blind).' }); return; }
+  db.update('problems', (x) => x.id === p.id, { workflow_status: 'IN_TESTING', tester_id: tester.id, review_note: '' });
+  send(res, 200, { problem: db.find('problems', (x) => x.id === p.id) });
+}, { auth: true, admin: true });
+route('POST', '^/api/v1/admin/problems/([^/]+)/review$', async (req, res, url, m) => {
+  const p = db.find('problems', (x) => x.id === decodeURIComponent(m[1]));
+  if (!p) { send(res, 404, { error: 'NOT_FOUND', message: 'Không tìm thấy đề.' }); return; }
+  if (workflowOf(p) !== 'IN_TESTING') { send(res, 409, { error: 'NOT_TESTING', message: 'Đề chưa ở phase kiểm duyệt.' }); return; }
+  const body = await readBody(req);
+  const decision = String(body.decision || '').toUpperCase();
+  if (!['APPROVED', 'REJECTED'].includes(decision)) { send(res, 422, { error: 'BAD_DECISION', message: 'decision phải là APPROVED hoặc REJECTED.' }); return; }
+  db.update('problems', (x) => x.id === p.id, {
+    workflow_status: decision === 'APPROVED' ? 'APPROVED' : 'DRAFT',
+    review_note: String(body.note || ''),
+  });
+  send(res, 200, { problem: db.find('problems', (x) => x.id === p.id) });
+}, { auth: true, admin: true });
+// Hàng chờ kiểm duyệt: ADMIN thấy hết, tester chỉ thấy bài giao cho mình. ẨN editorial (blind).
+route('GET', '^/api/v1/testing/queue$', async (req, res, url, m, user) => {
+  const rows = db.filter('problems', (p) => workflowOf(p) === 'IN_TESTING' && (user.role === 'ADMIN' || p.tester_id === user.id));
+  send(res, 200, {
+    queue: rows.map((p) => ({
+      id: p.id, contest_id: p.contest_id, code: p.code, title: p.title,
+      rating: p.rating, tags: p.tags, timeLimit: p.timeLimit, memoryLimit: p.memoryLimit,
+      statement: p.statement, sampleInput: p.sampleInput, sampleOutput: p.sampleOutput,
+      tester_id: p.tester_id, reports: p.test_reports || [],
+    })),
+  });
+}, { auth: true });
+// Báo cáo tester: tự giải độc lập rồi nộp (solved?/bao lâu/nhận xét).
+route('POST', '^/api/v1/testing/report$', async (req, res, url, m, user) => {
+  const body = await readBody(req);
+  const p = db.find('problems', (x) => x.id === String(body.problem_id || ''));
+  if (!p) { send(res, 404, { error: 'NOT_FOUND', message: 'Không tìm thấy đề.' }); return; }
+  if (workflowOf(p) !== 'IN_TESTING') { send(res, 409, { error: 'NOT_TESTING', message: 'Đề không ở phase kiểm duyệt.' }); return; }
+  if (user.role !== 'ADMIN' && p.tester_id !== user.id) { send(res, 403, { error: 'FORBIDDEN', message: 'Đề này không giao cho bạn.' }); return; }
+  const report = {
+    id: db.nextId('tr'), tester_id: user.id, solved: Boolean(body.solved),
+    minutes_spent: Math.max(0, Number(body.minutes_spent) || 0),
+    feedback: String(body.feedback || '').slice(0, 2000), at: new Date().toISOString(),
+  };
+  db.update('problems', (x) => x.id === p.id, { test_reports: [...(p.test_reports || []), report] });
+  send(res, 201, { report });
+}, { auth: true });
+
 route('GET', '^/api/v1/stream/contests/([^/]+)$', async (req, res, url, m) => {
   const c = findContest(decodeURIComponent(m[1]));
   if (!c) { send(res, 404, { error: 'CONTEST_NOT_FOUND' }); return; }

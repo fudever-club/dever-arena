@@ -385,7 +385,7 @@ export const ProblemWorkspace = () => {
 
   return (
     <div 
-      className={`flex flex-col bg-[#0b0f19] text-slate-100 select-none ${
+      className={`flex flex-col bg-[#010102] text-slate-100 select-none ${
         isZenActive || isFullscreen ? 'fixed inset-0 z-50' : 'h-[calc(100vh-3rem)]'
       }`}
     >
@@ -400,8 +400,8 @@ export const ProblemWorkspace = () => {
 
       {/* Floating Zen Mode Exit Pill */}
       {isZenActive && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/90 border border-[#00f0ff]/40 text-xs shadow-2xl backdrop-blur-md animate-fade-in">
-          <span className="w-2 h-2 rounded-full bg-[#00f0ff] animate-pulse"></span>
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-3 py-1 rounded-full bg-[#141516] border border-[#34343a] text-xs backdrop-blur-md animate-fade-in">
+          <span className="w-2 h-2 rounded-full bg-[#ff6600] animate-pulse"></span>
           <span className="text-slate-200 font-semibold">
             {isZenEditorOnly ? 'Chế độ tập trung: chỉ khung code' : 'Chế độ tập trung: chia đôi'}
           </span>
@@ -575,7 +575,7 @@ export const ProblemWorkspace = () => {
         {!isZenEditorOnly && (
           <div 
             style={{ width: `${splitRatio}%` }}
-            className="hidden lg:flex flex-col bg-[#0b0f19] border-r border-white/10 overflow-hidden shrink-0"
+            className="hidden lg:flex flex-col bg-[#010102] border-r border-[#23252a] overflow-hidden shrink-0"
           >
             {/* Tabs Header */}
             <div className="h-9 bg-[#0c101c] border-b border-white/10 flex items-center px-2 gap-1 shrink-0 select-none">
@@ -731,16 +731,15 @@ export const ProblemWorkspace = () => {
               setIsDraggingHorizontal(true);
             }}
             onDoubleClick={handleResetHorizontalSplit}
-            className={`hidden lg:flex w-2 bg-[#0a0e1a] hover:bg-[#00f0ff]/40 cursor-col-resize transition-colors items-center justify-center relative group z-20 ${
-              isDraggingHorizontal ? 'bg-[#00f0ff] shadow-lg shadow-[#00f0ff]/50' : 'border-r border-white/10'
+            className={`hidden lg:flex w-2 bg-[#010102] hover:bg-[#34343a] cursor-col-resize transition-colors items-center justify-center relative group z-20 ${
+              isDraggingHorizontal ? 'bg-[#ff6600]' : 'border-r border-[#23252a]'
             }`}
-            title="Kéo sang trái/phải để điều chỉnh độ rộng (Nhấp đúp chuột để về 50:50)"
           >
-            <div className="w-1 h-8 rounded-full bg-slate-600 group-hover:bg-[#00f0ff] transition" />
+            <div className="w-1 h-8 rounded-full bg-slate-600 group-hover:bg-[#8a8f98] transition" />
             
             {/* Splitter ratio tooltip while dragging */}
             {isDraggingHorizontal && (
-              <div className="absolute top-10 -left-12 px-2 py-0.5 rounded bg-black/90 border border-[#00f0ff] text-[10px] font-mono font-bold text-[#00f0ff] whitespace-nowrap shadow-xl z-50">
+              <div className="absolute top-10 -left-12 px-2 py-0.5 rounded bg-black/90 border border-[#34343a] text-[10px] font-mono font-bold text-[#d0d6e0] whitespace-nowrap z-50">
                 {splitRatio.toFixed(0)}% : {(100 - splitRatio).toFixed(0)}%
               </div>
             )}
@@ -997,7 +996,7 @@ export const ProblemWorkspace = () => {
                   type="button"
                   onClick={handleSubmit}
                   disabled={isRunning || isSubmitting}
-                  className="px-5 py-1.5 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-bold text-xs transition shadow-md shadow-orange-500/20 disabled:opacity-50"
+                  className="px-5 py-1.5 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-medium text-xs transition disabled:opacity-50"
                 >
                   {isSubmitting ? 'Đang chấm...' : 'Nộp bài'}
                 </button>

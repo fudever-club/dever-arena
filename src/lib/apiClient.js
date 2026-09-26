@@ -77,6 +77,17 @@ export const api = {
   createProblem: (payload) => req('/api/v1/admin/problems', { method: 'POST', body: payload, auth: true }),
   updateProblem: (id, payload) => req(`/api/v1/admin/problems/${encodeURIComponent(id)}`, { method: 'PUT', body: payload, auth: true }),
   deleteProblem: (id) => req(`/api/v1/admin/problems/${encodeURIComponent(id)}`, { method: 'DELETE', auth: true }),
+  // Polygon: stress model vs brute + gợi ý time limit
+  stressRun: (payload) => req('/api/v1/admin/stress', { method: 'POST', body: payload, auth: true }),
+  // Polygon: testcase chấm (pretest/system)
+  saveTestcase: (payload) => req('/api/v1/admin/testcases', { method: 'POST', body: payload, auth: true }),
+  listTestcases: (problem_id) => req(`/api/v1/admin/testcases?problem_id=${encodeURIComponent(problem_id)}`, { auth: true }),
+  deleteTestcase: (id) => req(`/api/v1/admin/testcases/${encodeURIComponent(id)}`, { method: 'DELETE', auth: true }),
+  // Blind-tester workflow
+  submitTesting: (id, tester_id) => req(`/api/v1/admin/problems/${encodeURIComponent(id)}/submit-testing`, { method: 'POST', body: { tester_id }, auth: true }),
+  reviewProblem: (id, decision, note) => req(`/api/v1/admin/problems/${encodeURIComponent(id)}/review`, { method: 'POST', body: { decision, note }, auth: true }),
+  testingQueue: () => req('/api/v1/testing/queue', { auth: true }),
+  submitTestReport: (payload) => req('/api/v1/testing/report', { method: 'POST', body: payload, auth: true }),
 
   /** SSE realtime. Trả về EventSource; caller tự .close(). */
   streamContest(contestId, onEvent) {

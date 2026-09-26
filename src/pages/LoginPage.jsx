@@ -37,12 +37,9 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-3rem)] grid grid-cols-1 lg:grid-cols-12 bg-[#0b0f19] text-slate-100">
+    <div className="min-h-[calc(100vh-3.5rem)] grid grid-cols-1 lg:grid-cols-12 bg-[#010102] text-slate-100">
       {/* Left Branding Hero */}
-      <div className="lg:col-span-6 p-8 lg:p-12 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/10 relative overflow-hidden bg-gradient-to-br from-slate-950 via-[#0d1322] to-[#0b0f19]">
-        {/* Background ambient glow */}
-        <div className="absolute -top-32 -left-32 w-80 h-80 bg-orange-500/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="lg:col-span-6 p-8 lg:p-12 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-[#23252a] relative overflow-hidden bg-[#0f1011]">
 
         <div className="relative z-10">
           <img
@@ -55,8 +52,8 @@ export const LoginPage = () => {
             Hệ Thống Đấu Trường Giải Thuật CLB FU-DEVER
           </div>
 
-          <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight text-white mb-4 leading-tight">
-            Thi đấu theo thể thức <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff6600] to-orange-400">Codeforces</span>
+          <h1 className="text-3xl lg:text-4xl font-semibold tracking-tight text-[#f7f8f8] mb-4 leading-tight">
+            Thi đấu theo thể thức <span className="text-[#ff6600]">Codeforces</span>
           </h1>
 
           <p className="text-slate-400 text-sm leading-relaxed max-w-lg mb-8">
@@ -185,7 +182,7 @@ export const LoginPage = () => {
 
             <button
               type="submit"
-              className="w-full py-2.5 px-4 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] font-bold text-sm text-white transition shadow-lg shadow-orange-500/20"
+              className="w-full py-2.5 px-4 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] font-medium text-sm text-white transition"
             >
               Đăng Nhập Vào Arena
             </button>

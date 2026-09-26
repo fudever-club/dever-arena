@@ -55,6 +55,9 @@
 
 ### 1.5. Nhóm Quản Trị (`/api/v1/admin`)
 * Xem mục 1.1 (cấp tài khoản), 1.3 (phase, rejudge).
+* **Polygon stress:** `POST /api/v1/admin/stress` (ADMIN) `{language, model_source, brute_source, count≤30, seed, rules, checker, timeLimitMs}` → `{ran, passed, failed, mismatches[≤5], outputs[{stdin, expected_stdout, strategy}], modelMaxMs, suggestedTimeLimitS, verdict}`.
+* **Testcases:** `POST /api/v1/admin/testcases` `{problem_id, stdin, expected_stdout, is_pretest}` → 201; `GET /api/v1/admin/testcases?problem_id=` (nội dung cắt 2000 ký tự); `DELETE /api/v1/admin/testcases/{id}` (cấm xóa test mẫu → 409).
+* **Blind-tester workflow:** `POST /api/v1/admin/problems/{id}/submit-testing` `{tester_id}` (DRAFT→IN_TESTING, cấm tự giao); `POST /api/v1/admin/problems/{id}/review` `{decision: APPROVED|REJECTED, note}`; `GET /api/v1/testing/queue` (tester chỉ thấy bài giao cho mình, **ẩn editorial**); `POST /api/v1/testing/report` `{problem_id, solved, minutes_spent, feedback}`.
 
 > Ghi chú: nhóm Clan Wars (`/api/v1/clans`) đã gỡ khỏi nền tảng. Tài khoản thi đấu là cá nhân hoặc đội (`team`, `members`), do admin cấp.
 

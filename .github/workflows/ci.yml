@@ -1,0 +1,36 @@
+name: dever-arena-ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install (clean)
+        run: npm ci
+
+      - name: Detect architecture contract
+        run: node detect.mjs
+
+      - name: ESLint (0 errors)
+        run: npm run lint:js
+
+      - name: Unit + integration tests
+        run: npm run test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Dependency audit (high+)
+        run: npm audit --audit-level=high

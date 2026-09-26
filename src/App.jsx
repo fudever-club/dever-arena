@@ -1,8 +1,9 @@
 import React, { Suspense, lazy } from 'react';
-import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { HashRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ContestProvider } from './context/ContestContext';
-import { Navbar } from './components/layout/Navbar';
+import { GuestLayout } from './components/layout/GuestLayout';
+import { UserLayout } from './components/layout/UserLayout';
 import { AdminLayout } from './components/layout/AdminLayout';
 import { LoginPage } from './pages/LoginPage';
 import { LandingPage } from './pages/LandingPage';
@@ -19,16 +20,23 @@ const PageFallback = () => (
   </div>
 );
 
-// Member Portal Layout (clean CP Navbar, contestant workspace)
-const MemberLayout = () => {
-  return (
-    <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col font-sans">
-      <Navbar />
-      <main className="flex-1 overflow-hidden">
-        <Outlet />
-      </main>
-    </div>
-  );
+// Chặn khách (GUEST) khỏi khu thí sinh — giữ nguyên hành vi demo (mặc định PARTICIPANT).
+const RequireAuth = () => {
+  const { user } = useAuth();
+  const location = useLocation();
+  if (!user || user.role === 'GUEST') {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+  return <Outlet />;
+};
+
+// Chặn non-ADMIN khỏi khu quản trị (AdminLayout cũng tự guard phía trong).
+const RequireAdmin = () => {
+  const { user } = useAuth();
+  if (!user || user.role !== 'ADMIN') {
+    return <Navigate to="/login" replace state={{ from: '/admin' }} />;
+  }
+  return <Outlet />;
 };
 
 export function App() {
@@ -37,20 +45,29 @@ export function App() {
       <ContestProvider>
         <HashRouter>
           <Routes>
-            {/* DEDICATED ADMIN PORTAL ROUTE (Completely separate layout with Sidebar & Protected Guard) */}
-            <Route path="/admin/*" element={<AdminLayout />} />
-            <Route path="/admin" element={<AdminLayout />} />
-
-            {/* DEDICATED MEMBER & CONTESTANT PORTAL ROUTES — Core CF loop */}
-            <Route element={<MemberLayout />}>
+            {/* KHU CÔNG KHAI (GuestLayout): chỉ Landing + Login */}
+            <Route element={<GuestLayout />}>
               <Route path="/" element={<LandingPage />} />
-              <Route path="/arena" element={<ContestHub />} />
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/problem/:id" element={<Suspense fallback={<PageFallback />}><ProblemWorkspace /></Suspense>} />
-              <Route path="/standings" element={<Suspense fallback={<PageFallback />}><StandingsPage /></Suspense>} />
-              <Route path="/hack-room" element={<Suspense fallback={<PageFallback />}><HackRoomPage /></Suspense>} />
-              <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
+
+            {/* KHU THÍ SINH (UserLayout + RequireAuth): vòng CF core */}
+            <Route element={<RequireAuth />}>
+              <Route element={<UserLayout />}>
+                <Route path="/arena" element={<ContestHub />} />
+                <Route path="/problem/:id" element={<Suspense fallback={<PageFallback />}><ProblemWorkspace /></Suspense>} />
+                <Route path="/standings" element={<Suspense fallback={<PageFallback />}><StandingsPage /></Suspense>} />
+                <Route path="/hack-room" element={<Suspense fallback={<PageFallback />}><HackRoomPage /></Suspense>} />
+              </Route>
+            </Route>
+
+            {/* KHU QUẢN TRỊ (RequireAdmin + AdminLayout riêng) */}
+            <Route element={<RequireAdmin />}>
+              <Route path="/admin/*" element={<AdminLayout />} />
+              <Route path="/admin" element={<AdminLayout />} />
+            </Route>
+
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </HashRouter>
       </ContestProvider>
@@ -59,4 +76,3 @@ export function App() {
 }
 
 export default App;
-

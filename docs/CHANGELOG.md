@@ -349,6 +349,42 @@
 - **Postgres:** adapter `server/pg.js` (1 bảng KV + meta, migrate tự động, write-through + flush) + service `db` trong compose + `.env`; logic verify bằng pool giả (4 tests) — chạy thật cần server Postgres.
 - **Verify:** `npm run test` **136 pass / 0 fail**, `node detect.mjs` 0 error, `npm run build` sạch.
 
+## Vòng 22: SDLC Ops — CI + Observability + Backup + Runbook + Load
+
+- **CI:** `.github/workflows/ci.yml` (npm ci → detect → test → build → audit high); `CONTRIBUTING.md` quy định vòng verify PR.
+- **Observability:** `GET /api/health`, `/api/v1/health`, `/api/ready` + log JSON `{ts,level,method,path,status,ms}`; `tests/health.test.js` (3 tests).
+- **Backup/DR:** `scripts/backup.mjs`/`restore.mjs` (`npm run backup/restore`, tự giữ `.pre-restore`), compose thêm `healthcheck` API + `deploy.resources.limits` (api 2CPU/2G, web 1CPU/512M); `docs/ops/{INCIDENT_RUNBOOK,BACKUP_RESTORE,DATA_RETENTION}.md`.
+- **Load:** `scripts/load_test.mjs` (`npm run test:load`): 20 job Python đồng loạt → 20/20 AC, tổng ~413ms, p50 ~254ms. Audit: 0 high/critical (1 moderate transitive dompurify qua monaco, không chạm).
+- **Verify:** `npm run test` **139 pass / 0 fail**, `node detect.mjs` 0 error, `npm run build` sạch (~332ms).
+
+## Vòng 23: Design Library (getdesign.md) + Luxury-Minimal + 4 skills mới
+
+- **Thư viện design:** `npx getdesign add linear.app` → `DESIGN.md` root; thêm `docs/design-{linear,vercel,notion,apple}.md`. Rút consensus 4 bản: một accent duy nhất, cấm gradient/glow/shadow màu trang trí, body 400 / display 600 + tracking âm, depth bằng hairline.
+- **Skills mới:** `dever-deploy-release` (CI/Docker/health/rollback), `dever-live-ops` (pre-contest/on-call/backup), `dever-ui-craft` (DESIGN.md + Luxury-Minimal Rules cấm neon), `dever-quality-gate` (gate matrix). Orchestrator thêm SDLC Phase Gates Plan→Build→Verify→Deploy→Operate.
+- **Luxury-minimal refinement:** khử toàn bộ neon `#00f0ff`, gradient, `blur-3xl`, colored shadows khỏi `src/` (grep 0 sót: Navbar h-14 canvas, Landing/Login/ContestHub/HackRoom panels surface-1 + hairline, headline solid cam 600, CTA 8px không shadow, splitter/tooltip/code về xám). Màu semantic chỉ sống trong product surfaces dạng pill mờ.
+- **Verify:** `npm run test` **139 pass / 0 fail**, `node detect.mjs` 0 error, `npm run build` sạch (~231ms).
+
+## Vòng 24: Gates thật + Production boot proof
+
+- **Fix gate vỡ:** `npm run lint:js` cũ dùng `|| true` (chết trên Windows) + không config → thay bằng `eslint.config.mjs` flat (globals Node+Browser gộp) + `eslint` devDep + CI chạy `lint:js`: **0 errors** (36 warnings). Lần chạy đầu lòi 19 `no-undef` thiếu globals, đã bổ sung.
+- **Docker sẵn sàng:** `.dockerignore` mới (api context 1.13kB, chặn `.env`/data lọt image); base image `node:20→22-alpine` (20 EOL, hết EBADENGINE).
+- **Boot proof trên Docker thật:** `docker compose up --build -d` → api **Healthy** (`store: pg`, seed 7 users/4 contests), `GET /app.html` 200, `/api/health` + `/api/ready` 200 qua nginx, login `dever_hero` + list 4 contests thật, log JSON chảy. Dọn sạch `down -v` + xóa `.env` test.
+- **Còn lại trước contest (không chặn lab):** TLS public (compose hiện port 80 — đặt sau reverse proxy/Cloudflare khi public), rebuild image node:22 trước giờ thi, uptime alert ping `/api/health`.
+
+## Vòng 25: Tách 3 shell (guest/user/admin) + Đại tu admin
+
+- **Tách vỏ:** `GuestLayout` (bar gọn + CTA Đăng nhập + footer, chỉ `/` + `/login`), `UserLayout` (Navbar thí sinh: timer, tabs, profile), `AdminLayout` giữ `/admin/*` + thêm `RequireAuth` (GUEST→/login) / `RequireAdmin` (non-ADMIN→/login). Bỏ footer trùng trong LandingPage.
+- **Admin mới:** sidebar surface-1 + hairline + nhãn QUẢN TRỊ, active = surface lift (hết đỏ rực), topbar canvas, nút phase neon đặc → neutral (chỉ HACK giữ accent CTA), component `AdminSection` (eyebrow + tên + mô tả) cho 6 modules, nút freeze cyan → accent-tint.
+- **Verify:** `npm run test` **139 pass / 0 fail** (E2E Playwright chạy qua shell + guard mới), `node detect.mjs` 0 error, `npm run lint:js` 0 errors, `npm run build` sạch (57 modules).
+
+## Vòng 26: Polygon Generator + Stress + Blind-tester workflow
+
+- **Generator (`src/engine/testGenerator.js`):** seeded mulberry32 (cùng seed → cùng suite, tái hiện), 5 bẫy biên mọi suite (N min, N=1, all-equal, overflow, N max) + xoay pattern; dùng chung browser + server.
+- **Stress (`POST /api/v1/admin/stress`):** model vs brute qua worker pool (batch 4, count≤30), `PASS/FAIL` + mismatches ≤5 chi tiết + `modelMaxMs` + `suggestedTimeLimitS = max(1s, 2×)`. Testcase CRUD (`POST/GET/DELETE /api/v1/admin/testcases`, cấm xóa mẫu).
+- **Blind-tester:** `DRAFT→IN_TESTING→APPROVED` (reject về DRAFT), cấm tự giao đề, queue ẩn editorial, báo cáo tester (solved/phút/nhận xét) lưu trên đề.
+- **UI:** Studio `StressPanel` (xem trước strategies → chạy → áp TL → lưu pretests từ outputs brute) + badge workflow + thanh Gửi duyệt/Duyệt/Từ chối; ContestHub thêm `TestingQueue` cho tester.
+- **Verify:** `npm run test` **150 pass / 0 fail** (6 generator + 5 stress/workflow mới), lint 0 errors, build sạch (58 modules).
+
 
 
 

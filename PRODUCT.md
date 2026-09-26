@@ -36,7 +36,7 @@ Tên `DEVER-Forces` / `DEVER Arena Enterprise`, màu FPT Orange `#ff6600` + Cyan
 - Code: `server/{index,judge,oracles,auth,db}.js` (REST + SSE + judge JS/Python/Java/C++ + hack oracle + Elo, 18 tests server + 4 tests E2E + 4 tests PG), `src/core/{scoring,rating,contestStateMachine,auth,virtualContest,scoreboardFreeze}.js`, `src/engine/{astDiff,runner,workerQueue,isolateRunner,testlibValidator}.js` (105 tests PASS), `src/data/problems.js` 5 bài, `src/db/{index,seed,api}.js` (mock layer), `src/lib/apiClient.js`, `src/pages/*.jsx` (không còn Clan Wars, icon thuần text + SVG svgl)
 - Docs: SPEC.md, CAPABILITY_MAP.md, DEVER_FORCES_SPECIFICATION.md, DATABASE_SCHEMA.md, API_SPECIFICATION.md, CONTEST_RULEBOOK.md, ANTI_CHEAT_POLICY.md, JUDGE_ARCHITECTURE.md, DESIGN_SYSTEM.md, CHANGELOG.md, ADR-001 tới ADR-004 (15+ docs synced)
 - Sản phẩm chạy: `index.html` landing, `arena.html` client, `admin.html` admin, `app.html` React SPA, `css/style.css`, `db/schema.sql` (IndexedDB: 11 stores)
-- Hạ tầng kiểm thử: tests: 136 pass 100% (25 suites), backend API thật (`npm run server`) + test vòng đời đầy đủ trong 18 tests server + 4 tests E2E + 4 tests PG, linter `detect.mjs` đạt 0 error, build Vite production sạch (~250ms, main ~88KB)
+- Hạ tầng kiểm thử: tests: 150 pass 100% (27 suites), backend API thật (`npm run server`) + test vòng đời đầy đủ trong 18 tests server + 4 tests E2E + 4 tests PG, linter `detect.mjs` đạt 0 error, build Vite production sạch (~250ms, main ~88KB)
 
 
 ## Product Principles

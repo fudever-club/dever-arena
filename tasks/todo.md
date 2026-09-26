@@ -141,3 +141,28 @@
 - [x] Task 71: Telemetry duyệt + chấm lại bài nộp, reset mật khẩu từng tài khoản, polygon chọn kỳ thi đích.
 - [x] Task 72: Adapter Postgres (`server/pg.js`, service compose) + 4 tests pool giả; verify 136/136 tests, lint 0, build sạch.
 
+## Phase 22: SDLC Ops — CI + Observability + Backup + Runbook + Load (Completed)
+- [x] Task 73: `.github/workflows/ci.yml` (npm ci + detect + test + build + audit high), `CONTRIBUTING.md`.
+- [x] Task 74: `GET /api/health`, `/api/v1/health`, `/api/ready` + log JSON mỗi request (`server/index.js`), `tests/health.test.js` (3 tests).
+- [x] Task 75: `scripts/backup.mjs` / `restore.mjs` + `npm run backup/restore`, compose `healthcheck` + resource limits, `docs/ops/{INCIDENT_RUNBOOK,BACKUP_RESTORE,DATA_RETENTION}.md`.
+- [x] Task 76: `scripts/load_test.mjs` (`npm run test:load`: 20 job đồng loạt, 20/20 AC ~413ms) + `lint:js`/`audit:high`; verify 139/139 tests, lint 0, build sạch.
+
+## Phase 23: Design Library + Luxury-Minimal + Skills mới (Completed)
+- [x] Task 77: `npx getdesign add` → `DESIGN.md` (Linear) + `docs/design-{linear,vercel,notion,apple}.md`; consensus 4 bản: 1 accent, cấm gradient/glow/shadow màu, body 400/display 600.
+- [x] Task 78: 4 skills mới `dever-deploy-release`, `dever-live-ops`, `dever-ui-craft`, `dever-quality-gate` + SDLC Phase Gates vào orchestrator (Plan→Build→Verify→Deploy→Operate).
+- [x] Task 79: Luxury-minimal refinement: khử neon `#00f0ff`/gradient/blur/colored-shadow toàn `src/` (grep 0 sót), canvas `#010102` + hairline, headline 600, CTA 8px không shadow; verify 139/139 tests, lint 0, build sạch.
+
+## Phase 24: Gates thật + Production boot proof (Completed)
+- [x] Task 80: Fix `lint:js` (script `|| true` vỡ trên Windows + thiếu config): `eslint.config.mjs` flat + `eslint` devDep + CI chạy `lint:js` → 0 errors (36 warnings).
+- [x] Task 81: `.dockerignore` (chặn `.env`/data lọt image, context api 1.13kB), base `node:20→22-alpine` (20 EOL + EBADENGINE).
+- [x] Task 82: Boot proof `docker compose up --build -d`: api **Healthy** (store **pg**, seed 7 users/4 contests), web 200, login `dever_hero` + 4 contests qua nginx; dọn `down -v` + xóa `.env` test.
+
+## Phase 25: Tách 3 shell + Đại tu admin (Completed)
+- [x] Task 83: `GuestLayout` (/, /login — bar gọn + footer) / `UserLayout` (Navbar thí sinh) / `AdminLayout` riêng + `RequireAuth`/`RequireAdmin` trong `App.jsx` (giữ đủ route strings hợp đồng).
+- [x] Task 84: Admin luxury-minimal: sidebar surface-1 + hairline + nhãn QUẢN TRỊ, topbar canvas, nút phase neon đặc → neutral/accent, `AdminSection` header cho 6 modules, bỏ footer trùng Landing; verify 139/139 tests (E2E chạy trên shell mới), lint 0, build sạch.
+
+## Phase 26: Polygon Generator + Stress + Blind-tester workflow (Completed)
+- [x] Task 85: `src/engine/testGenerator.js` (seeded mulberry32, 5 bẫy biên, patterns) + `tests/test_generator.test.js` (6 tests).
+- [x] Task 86: `POST /api/v1/admin/stress` (model vs brute qua worker pool, mismatches ≤5, gợi ý TL = 2× model max) + testcase CRUD + workflow DRAFT→IN_TESTING→APPROVED (queue ẩn editorial, cấm tự giao) + `tests/stress_workflow.test.js` (5 tests).
+- [x] Task 87: Studio `StressPanel` (xem trước → chạy → áp TL → lưu pretests) + badge/nút Gửi duyệt/Duyệt/Từ chối + `TestingQueue` ở ContestHub; verify 150/150 tests, lint 0, build sạch.
+

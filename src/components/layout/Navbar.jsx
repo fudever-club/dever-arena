@@ -42,7 +42,7 @@ export const Navbar = () => {
       )}
 
       {/* 2. MEMBER PORTAL MAIN NAVBAR */}
-      <header className="h-12 bg-[#0c101c] border-b border-white/10 px-4 flex items-center justify-between">
+      <header className="h-14 bg-[#010102] border-b border-[#23252a] px-4 flex items-center justify-between">
         {/* Brand & Nav items */}
         <div className="flex items-center gap-5">
           <Link to="/" className="flex items-center gap-2 group">

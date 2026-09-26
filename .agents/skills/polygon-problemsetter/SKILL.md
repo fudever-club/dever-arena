@@ -30,3 +30,8 @@ This skill guides the authoring, formatting, validation, and test generation for
   - Verify sample test inputs/outputs against the testcase schema.
   - Real-time publish automatically propagates to all contestant sessions via `BroadcastChannel`.
 
+## Generator + Stress + Blind-Tester Workflow (Phase 26)
+* **Generator** (`src/engine/testGenerator.js`, shared browser + server): seeded mulberry32 — same seed → same suite. Every suite opens with 5 traps (N min, N=1, all-equal, overflow, N max), then rotates random/sorted/alternating. Preview strategies in Studio before running.
+* **Stress** (`POST /api/v1/admin/stress`): run model vs brute-force on the same suite through the judge worker pool (batch 4, count ≤ 30). `FAIL` with ≤5 detailed mismatches means the tests (or model) are wrong — fix before publishing. On `PASS`: apply `suggestedTimeLimitS` (= 2× slowest model run, min 1s) and save brute outputs as pretests (`POST /api/v1/admin/testcases`).
+* **Blind review** (status on problem row, no schema change): `DRAFT → IN_TESTING → APPROVED` (reject → `DRAFT`). Never self-assign (`SELF_TEST` 422). Testers see the queue at ContestHub with the statement only — editorial stays hidden. Reports (solved/minutes/feedback) accumulate on the problem for the coordinator's approve/reject decision.
+

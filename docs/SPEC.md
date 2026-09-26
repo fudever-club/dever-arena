@@ -58,7 +58,7 @@ DEVER Arena/
 │   ├── components/                # React layouts (MemberLayout, AdminLayout) and MathRenderer
 │   ├── pages/                     # ProblemWorkspace (LeetCode 3-pane), Landing, Standings, etc.
 │   └── data/problems.js           # Built-in problems database & editorials
-├── tests/                         # 124 tests across 25 test suites (Node.js test runner)
+├── tests/                         # 150 tests across 27 test suites (Node.js test runner)
 │   ├── scoring.test.js            # Codeforces dynamic decay tests
 │   ├── rating.test.js             # Elo rating engine tests
 │   ├── contest.test.js            # Contest state machine transitions

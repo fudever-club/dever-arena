@@ -76,3 +76,11 @@ Mục tiêu: Không chỉ sinh số ngẫu nhiên mà phải chủ động tạo
 3. **Giai đoạn 3 (Cân chỉnh Time Limit & Memory Limit):**
    * Giới hạn thời gian (Time Limit) phải đặt gấp **tối thiểu 2 lần** thời gian chạy của Lời giải chuẩn C++ tối ưu (để hỗ trợ các thí sinh dùng Python / Java vẫn có cơ hội AC nếu giải thuật đúng).
    * Lời giải $O(N^2)$ phải bị TLE dứt khoát trên các testcase $N \ge 10^5$.
+
+---
+
+## 4. TRIỂN KHAI TRÊN DEVER ARENA (POLYGON STUDIO)
+
+1. **Sinh test (`src/engine/testGenerator.js`):** seeded (mulberry32) → cùng seed cùng bộ test. Mọi suite gồm 5 bẫy: N min, N=1, toàn bằng nhau, tràn số, N max; còn lại xoay pattern random/sorted/alternating.
+2. **Stress (`POST /api/v1/admin/stress`):** chạy model vs brute-force trên cùng suite qua worker pool; `verdict: PASS/FAIL` + `mismatches` (tối đa 5) + `modelMaxMs` + `suggestedTimeLimitS = max(1s, 2× model chậm nhất)`. Trong Studio: xem trước strategies → Chạy stress → Áp dụng TL → Lưu outputs thành pretests.
+3. **Kiểm duyệt mù:** `DRAFT → IN_TESTING → APPROVED` (từ chối về `DRAFT`). Admin giao tester (cấm tự giao); tester nhận queue tại ContestHub (**ẩn editorial**), giải độc lập rồi nộp báo cáo (solved?/số phút/nhận xét); coordinator duyệt kèm ghi chú.

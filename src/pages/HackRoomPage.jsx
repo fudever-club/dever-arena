@@ -238,10 +238,10 @@ export const HackRoomPage = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-3rem)] bg-[#0b0f19] text-slate-100 p-6 lg:p-10 max-w-7xl mx-auto space-y-6">
+    <div className="min-h-[calc(100vh-3.5rem)] bg-[#010102] text-slate-100 p-6 lg:p-10 max-w-7xl mx-auto space-y-6">
       
       {/* 1. Room Header Banner */}
-      <div className="p-6 rounded-2xl bg-gradient-to-r from-red-950/40 via-[#131124] to-slate-900 border border-red-500/20 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-2">
             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30">
@@ -419,7 +419,7 @@ export const HackRoomPage = () => {
             <button
               onClick={handleExecuteHack}
               disabled={isExecuting || !testlibResult.isValid || activeProblem?.isHacked || (dataSource === 'live' && !activeProblem?.submissionId)}
-              className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 font-extrabold text-sm text-white transition shadow-lg shadow-red-500/25 disabled:opacity-50"
+              className="w-full py-3 px-6 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] font-medium text-sm text-white transition disabled:opacity-50"
             >
               {isExecuting ? 'Đang chấm...' : 'Tung đòn hack (−50đ / +100đ)'}
             </button>

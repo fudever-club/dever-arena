@@ -4,6 +4,181 @@ import { useAuth } from '../../context/AuthContext';
 import { useContest } from '../../context/ContestContext';
 import { MathRenderer } from '../common/MathRenderer';
 import { api } from '../../lib/apiClient';
+import { generateSuite } from '../../engine/testGenerator';
+
+/** Tiêu đề chuẩn cho mỗi module quản trị: eyebrow + tên + mô tả một dòng. */
+const AdminSection = ({ eyebrow, title, desc }) => (
+  <div>
+    <div className="text-[10px] font-semibold tracking-widest text-[#62666d] uppercase mb-1">{eyebrow}</div>
+    <h2 className="text-lg font-semibold text-[#f7f8f8] tracking-tight">{title}</h2>
+    {desc && <p className="text-xs text-slate-400 mt-0.5">{desc}</p>}
+  </div>
+);
+
+/** Panel stress test Polygon: sinh bộ test seeded → chạy model vs brute → gợi ý TL → lưu pretests. */
+const StressPanel = ({ problems, notify, refresh }) => {
+  const [language, setLanguage] = useState('python');
+  const [model, setModel] = useState('');
+  const [brute, setBrute] = useState('');
+  const [count, setCount] = useState(12);
+  const [seed, setSeed] = useState('round-1');
+  const [maxN, setMaxN] = useState(2000);
+  const [preview, setPreview] = useState(null);
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState(null);
+  const [targetId, setTargetId] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const doPreview = () => {
+    try {
+      const suite = generateSuite({ count: Number(count) || 12, seed, maxN: Number(maxN) || 2000 });
+      setPreview(suite.map((c) => c.strategy));
+    } catch (e) {
+      notify?.({ type: 'error', message: e.message });
+    }
+  };
+  const doStress = async () => {
+    if (!model.trim() || !brute.trim()) {
+      notify?.({ type: 'error', message: 'Nhập cả lời giải model và brute-force.' }); return;
+    }
+    setRunning(true); setResult(null);
+    try {
+      const r = await api.stressRun({
+        language, model_source: model, brute_source: brute,
+        count: Number(count) || 12, seed,
+        rules: { maxN: Number(maxN) || 2000 },
+      });
+      setResult(r);
+    } catch (e) {
+      notify?.({ type: 'error', message: e?.message || 'Stress thất bại.' });
+    } finally {
+      setRunning(false);
+    }
+  };
+  const applyTL = async () => {
+    if (!targetId || !result) return;
+    try {
+      await api.updateProblem(targetId, { timeLimit: `${result.suggestedTimeLimitS.toFixed(1)}s` });
+      notify?.(`Đã đặt time limit ${result.suggestedTimeLimitS.toFixed(1)}s cho đề.`);
+      refresh?.();
+    } catch (e) {
+      notify?.({ type: 'error', message: e?.message || 'Không đặt được time limit.' });
+    }
+  };
+  const saveTests = async () => {
+    if (!targetId || !result?.outputs?.length) return;
+    setSaving(true);
+    try {
+      let ok = 0;
+      for (const o of result.outputs) {
+        await api.saveTestcase({ problem_id: targetId, stdin: o.stdin, expected_stdout: o.expected_stdout, is_pretest: true, strategy: o.strategy });
+        ok++;
+      }
+      notify?.(`Đã lưu ${ok} test vào pretests (đáp án từ brute-force).`);
+    } catch (e) {
+      notify?.({ type: 'error', message: e?.message || 'Lưu test thất bại.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="p-5 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-4">
+      <div>
+        <div className="text-[10px] font-semibold tracking-widest text-[#62666d] uppercase mb-1">Polygon · Stress</div>
+        <h3 className="text-sm font-bold text-white">Stress test model vs brute-force</h3>
+        <p className="text-[11px] text-slate-400 mt-0.5">Cùng bộ test seeded (luôn có bẫy N min/max, tràn số). Lệch nhau là FAIL. Kèm gợi ý time limit = 2× model chậm nhất.</p>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <textarea value={model} onChange={(e) => setModel(e.target.value)} rows={6} spellCheck="false"
+          placeholder="Lời giải model (tối ưu) — Python/JS"
+          className="w-full p-3 rounded-lg bg-[#141516] border border-[#23252a] text-slate-200 font-mono text-xs outline-none resize-none" />
+        <textarea value={brute} onChange={(e) => setBrute(e.target.value)} rows={6} spellCheck="false"
+          placeholder="Lời giải brute-force (trâu, đúng với N nhỏ)"
+          className="w-full p-3 rounded-lg bg-[#141516] border border-[#23252a] text-slate-200 font-mono text-xs outline-none resize-none" />
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <select value={language} onChange={(e) => setLanguage(e.target.value)}
+          className="px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-white outline-none">
+          <option value="python">Python</option>
+          <option value="javascript">JavaScript</option>
+        </select>
+        <label className="text-slate-400">Số test <input value={count} onChange={(e) => setCount(e.target.value)} type="number" min="5" max="30"
+          className="w-16 ml-1 px-2 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-white outline-none" /></label>
+        <label className="text-slate-400">Seed <input value={seed} onChange={(e) => setSeed(e.target.value)}
+          className="w-28 ml-1 px-2 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-white outline-none" /></label>
+        <label className="text-slate-400">N max <input value={maxN} onChange={(e) => setMaxN(e.target.value)} type="number" min="10"
+          className="w-24 ml-1 px-2 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-white outline-none" /></label>
+        <button onClick={doPreview} className="px-3 py-2 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#23252a] text-slate-300">
+          Xem trước bộ test
+        </button>
+        <button onClick={doStress} disabled={running}
+          className="px-4 py-2 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-medium disabled:opacity-50">
+          {running ? 'Đang stress...' : 'Chạy stress'}
+        </button>
+      </div>
+      {preview && (
+        <div className="flex flex-wrap gap-1.5">
+          {preview.map((s, i) => (
+            <span key={i} className="px-1.5 py-0.5 rounded bg-white/5 text-[10px] text-slate-400 font-mono border border-white/5">{s}</span>
+          ))}
+        </div>
+      )}
+      {result && (
+        <div className="p-4 rounded-lg bg-[#010102] border border-[#23252a] space-y-3 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`px-2 py-0.5 rounded text-[11px] font-bold border ${result.verdict === 'PASS'
+              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+              : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
+              {result.verdict} — {result.passed}/{result.ran} khớp
+            </span>
+            <span className="text-slate-400 font-mono">model chậm nhất {result.modelMaxMs}ms → gợi ý TL {result.suggestedTimeLimitS}s</span>
+          </div>
+          {result.mismatches?.length > 0 && (
+            <div className="space-y-2">
+              {result.mismatches.map((m, i) => (
+                <details key={i} className="p-2 rounded bg-red-500/5 border border-red-500/20">
+                  <summary className="cursor-pointer text-red-300 font-mono text-[11px]">{m.strategy} — model:{m.model_verdict} brute:{m.brute_verdict}</summary>
+                  <pre className="mt-1 text-[10px] text-slate-400 whitespace-pre-wrap font-mono">in: {m.stdin.slice(0, 300)}{m.stdin.length > 300 ? '…' : ''}{'\n'}model: {(m.model_stdout || '').slice(0, 200)}{'\n'}brute: {(m.brute_stdout || '').slice(0, 200)}</pre>
+                </details>
+              ))}
+            </div>
+          )}
+          {result.verdict === 'PASS' && (
+            <div className="flex flex-wrap items-center gap-2">
+              <select value={targetId} onChange={(e) => setTargetId(e.target.value)}
+                className="px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-white outline-none">
+                <option value="">— Chọn đề để áp dụng —</option>
+                {(problems || []).map((p) => (<option key={p.id} value={p.id}>{p.code} · {p.title}</option>))}
+              </select>
+              <button onClick={applyTL} disabled={!targetId} className="px-3 py-2 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#23252a] text-slate-200 disabled:opacity-50">
+                Áp dụng time limit
+              </button>
+              <button onClick={saveTests} disabled={!targetId || saving} className="px-3 py-2 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-medium disabled:opacity-50">
+                {saving ? 'Đang lưu...' : `Lưu ${result.outputs.length} test vào pretests`}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/** Badge trạng thái kiểm duyệt mù của đề. */
+const WorkflowBadge = ({ status }) => {  const s = status || 'DRAFT';
+  const cls = s === 'APPROVED'
+    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+    : s === 'IN_TESTING'
+      ? 'bg-[#ff6600]/10 text-[#ff6600] border-[#ff6600]/30'
+      : 'bg-white/5 text-slate-400 border-white/10';
+  const label = s === 'APPROVED' ? 'Đã duyệt' : s === 'IN_TESTING' ? 'Đang kiểm duyệt' : 'Nháp';
+  return (
+    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${cls}`}>
+      {label}
+    </span>
+  );
+};
 
 export const AdminLayout = ({ children }) => {
   const { user, isAdmin, logout } = useAuth();
@@ -29,6 +204,43 @@ export const AdminLayout = ({ children }) => {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [targetContestId, setTargetContestId] = useState('contest_dever_round1');
   const [contestOptions, setContestOptions] = useState([]);
+  // Thanh gửi duyệt / duyệt đề (blind-tester workflow)
+  const [reviewBar, setReviewBar] = useState(null); // { mode:'assign'|'review', problem, users, testerId, decision, note, busy, msg }
+
+  const openAssignBar = async (prob) => {
+    setReviewBar({ mode: 'assign', problem: prob, users: [], testerId: '', note: '', busy: true, msg: '' });
+    try {
+      const data = await api.listUsers();
+      const users = (data?.users || []).filter((u) => u.role !== 'ADMIN');
+      setReviewBar((v) => v && ({ ...v, users, busy: false }));
+    } catch (e) {
+      setReviewBar((v) => v && ({ ...v, busy: false, msg: e?.message || 'Không tải được danh sách.' }));
+    }
+  };
+  const openReviewBar = (prob, decision) => {
+    setReviewBar({ mode: 'review', problem: prob, users: [], testerId: '', decision, note: '', busy: false, msg: '' });
+  };
+  const confirmReviewBar = async () => {
+    if (!reviewBar || reviewBar.busy) return;
+    setReviewBar((v) => ({ ...v, busy: true, msg: '' }));
+    try {
+      if (reviewBar.mode === 'assign') {
+        if (!reviewBar.testerId) throw new Error('Chọn tester.');
+        await api.submitTesting(reviewBar.problem.id, reviewBar.testerId);
+        setPolygonNotification(`Đã gửi bài ${reviewBar.problem.code} cho tester kiểm duyệt mù.`);
+      } else {
+        await api.reviewProblem(reviewBar.problem.id, reviewBar.decision, reviewBar.note);
+        setPolygonNotification(reviewBar.decision === 'APPROVED'
+          ? `Đã duyệt bài ${reviewBar.problem.code}.`
+          : `Đã trả bài ${reviewBar.problem.code} về nháp.`);
+      }
+      await loadProblemsFromServer();
+      setReviewBar(null);
+      setTimeout(() => setPolygonNotification(null), 5000);
+    } catch (e) {
+      setReviewBar((v) => v && ({ ...v, busy: false, msg: e?.message || 'Thất bại.' }));
+    }
+  };
 
   useEffect(() => {
     if (activeTab === 'polygon') {
@@ -152,22 +364,22 @@ export const AdminLayout = ({ children }) => {
   // Protected Route Check
   if (!isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#070a12] p-4 text-center">
-        <div className="max-w-md p-8 rounded-2xl bg-[#0c101d] border border-red-500/30 shadow-2xl space-y-4">
-          <h2 className="text-xl font-bold text-white tracking-tight">Khu vực hạn chế quản trị</h2>
+      <div className="min-h-screen flex items-center justify-center bg-[#010102] p-4 text-center">
+        <div className="max-w-md p-8 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-4">
+          <h2 className="text-xl font-semibold text-[#f7f8f8] tracking-tight">Khu vực hạn chế quản trị</h2>
           <p className="text-xs text-slate-400 leading-relaxed">
             Khu vực này chỉ dành cho ban tổ chức và ban giám khảo CLB FU-DEVER.
           </p>
           <div className="pt-2 flex flex-col gap-2">
             <button
               onClick={() => navigate('/login?redirect=/admin')}
-              className="w-full py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-xs transition"
+              className="w-full py-2 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-medium text-xs transition"
             >
               Đăng nhập tài khoản giám khảo
             </button>
             <button
               onClick={() => navigate('/arena')}
-              className="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-semibold text-xs transition border border-white/10"
+              className="w-full py-2 rounded-lg bg-[#141516] hover:bg-[#18191a] text-slate-300 font-medium text-xs transition border border-[#23252a]"
             >
               Quay lại đấu trường thí sinh
             </button>
@@ -178,55 +390,58 @@ export const AdminLayout = ({ children }) => {
   }
 
   return (
-    <div className="min-h-screen bg-[#070a12] text-slate-100 flex flex-col lg:flex-row font-sans">
+    <div className="min-h-screen bg-[#010102] text-slate-100 flex flex-col lg:flex-row font-sans">
       
       {/* ======================================================== */}
       {/* DEDICATED ADMIN SIDEBAR                                  */}
       {/* ======================================================== */}
-      <aside className="w-full lg:w-64 bg-[#0a0e1a] border-r border-white/10 flex flex-col shrink-0 select-none">
-        
+      <aside className="w-full lg:w-64 bg-[#0f1011] border-r border-[#23252a] flex flex-col shrink-0 select-none">
+
         {/* Admin Header / Brand */}
-        <div className="h-14 px-4 flex items-center justify-between border-b border-white/10 bg-[#080b15]">
+        <div className="h-14 px-4 flex items-center justify-between border-b border-[#23252a] bg-[#0f1011]">
           <div className="flex items-center gap-2">
-            <img src="/brand/icon-192.png" alt="DEVER Arena" className="w-8 h-8 rounded-lg ring-1 ring-red-500/30" />
+            <img src="/brand/icon-192.png" alt="DEVER Arena" className="w-8 h-8 rounded-lg ring-1 ring-[#34343a]" />
             <div>
-              <div className="font-extrabold text-sm tracking-tight text-white flex items-center gap-1.5">
-                DEVER<span className="text-red-500">ADMIN</span>
+              <div className="font-bold text-sm tracking-tight text-white flex items-center gap-1.5">
+                DEVER<span className="text-[#ff6600]">ADMIN</span>
               </div>
               <span className="text-[10px] text-slate-400 font-mono block leading-none">Ban giám khảo</span>
             </div>
           </div>
-          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400 border border-red-500/30 uppercase">
+          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#141516] text-[#8a8f98] border border-[#34343a] uppercase">
             Root
           </span>
         </div>
 
         {/* Contest Info Ticker */}
-        <div className="p-3 bg-red-500/5 border-b border-white/5 text-xs space-y-1">
+        <div className="p-3 bg-[#010102] border-b border-[#23252a] text-xs space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-slate-400">Vòng thi:</span>
-            <span className="font-bold text-slate-200">DEVER Round #1</span>
+            <span className="font-semibold text-slate-200">DEVER Round #1</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-slate-400">Pha:</span>
-            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               {phase}
             </span>
           </div>
           <div className="flex items-center justify-between font-mono">
             <span className="text-[11px] text-slate-400">Thời gian:</span>
-            <span className="text-orange-400 font-bold">{formattedTime}</span>
+            <span className="text-[#ff6600] font-bold">{formattedTime}</span>
           </div>
         </div>
 
         {/* Sidebar Nav Links */}
         <nav className="flex-1 p-2 space-y-1 overflow-y-auto text-xs">
+          <div className="px-3 pt-2 pb-1 text-[10px] font-semibold tracking-widest text-[#62666d] uppercase">
+            Quản trị
+          </div>
           <button
             onClick={() => setActiveTab('phase')}
             className={`w-full px-3 py-2.5 rounded-lg font-semibold transition text-left ${
               activeTab === 'phase'
-                ? 'bg-red-500/15 text-red-400 border border-red-500/30'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                ? 'bg-[#141516] text-white border border-[#34343a]'
+                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
             }`}
           >
             1. Điều khiển phase
@@ -236,8 +451,8 @@ export const AdminLayout = ({ children }) => {
             onClick={() => setActiveTab('anticheat')}
             className={`w-full px-3 py-2.5 rounded-lg font-semibold transition text-left ${
               activeTab === 'anticheat'
-                ? 'bg-red-500/15 text-red-400 border border-red-500/30'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                ? 'bg-[#141516] text-white border border-[#34343a]'
+                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
             }`}
           >
             2. Soát gian lận AST
@@ -247,8 +462,8 @@ export const AdminLayout = ({ children }) => {
             onClick={() => setActiveTab('polygon')}
             className={`w-full px-3 py-2.5 rounded-lg font-semibold transition text-left ${
               activeTab === 'polygon'
-                ? 'bg-red-500/15 text-red-400 border border-red-500/30'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                ? 'bg-[#141516] text-white border border-[#34343a]'
+                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
             }`}
           >
             3. Soạn đề thi
@@ -258,8 +473,8 @@ export const AdminLayout = ({ children }) => {
             onClick={() => setActiveTab('telemetry')}
             className={`w-full px-3 py-2.5 rounded-lg font-semibold transition text-left ${
               activeTab === 'telemetry'
-                ? 'bg-red-500/15 text-red-400 border border-red-500/30'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                ? 'bg-[#141516] text-white border border-[#34343a]'
+                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
             }`}
           >
             4. Giám sát máy chấm
@@ -269,8 +484,8 @@ export const AdminLayout = ({ children }) => {
             onClick={() => setActiveTab('rooms')}
             className={`w-full px-3 py-2.5 rounded-lg font-semibold transition text-left ${
               activeTab === 'rooms'
-                ? 'bg-red-500/15 text-red-400 border border-red-500/30'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                ? 'bg-[#141516] text-white border border-[#34343a]'
+                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
             }`}
           >
             5. Thí sinh và phòng hack
@@ -280,8 +495,8 @@ export const AdminLayout = ({ children }) => {
             onClick={() => setActiveTab('accounts')}
             className={`w-full px-3 py-2.5 rounded-lg font-semibold transition text-left ${
               activeTab === 'accounts'
-                ? 'bg-red-500/15 text-red-400 border border-red-500/30'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                ? 'bg-[#141516] text-white border border-[#34343a]'
+                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
             }`}
           >
             6. Cấp tài khoản
@@ -289,11 +504,11 @@ export const AdminLayout = ({ children }) => {
         </nav>
 
         {/* Sidebar Footer: Switch to Contestant View & Logout */}
-        <div className="p-3 border-t border-white/10 bg-[#080b15] space-y-2 text-xs">
+        <div className="p-3 border-t border-[#23252a] bg-[#0f1011] space-y-2 text-xs">
           {/* Switch to Contestant Mode Button */}
           <Link
             to="/arena"
-            className="w-full py-2 px-3 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white font-medium transition group"
+            className="w-full py-2 px-3 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#23252a] text-slate-300 hover:text-white font-medium transition group"
           >
             Xem góc nhìn thí sinh →
           </Link>
@@ -304,11 +519,11 @@ export const AdminLayout = ({ children }) => {
               <img
                 src={user.avatar}
                 alt={user.username}
-                className="w-7 h-7 rounded-full border border-red-500/40 bg-slate-800"
+                className="w-7 h-7 rounded-full border border-[#34343a] bg-slate-800"
               />
               <div className="text-left leading-none">
                 <span className="font-bold text-white text-xs block">{user.username}</span>
-                <span className="text-[10px] text-red-400 font-mono">Giám khảo ({user.rating} Elo)</span>
+                <span className="text-[10px] text-[#ff6600] font-mono">Giám khảo</span>
               </div>
             </div>
             <button
@@ -326,12 +541,12 @@ export const AdminLayout = ({ children }) => {
       {/* ======================================================== */}
       {/* MAIN ADMIN WORKSPACE VIEW                                */}
       {/* ======================================================== */}
-      <main className="flex-1 flex flex-col bg-[#070a12] overflow-y-auto">
-        
+      <main className="flex-1 flex flex-col bg-[#010102] overflow-y-auto">
+
         {/* Admin Topbar */}
-        <header className="h-14 bg-[#090d18] border-b border-white/10 px-6 flex items-center justify-between shrink-0 select-none">
+        <header className="h-14 bg-[#010102] border-b border-[#23252a] px-6 flex items-center justify-between shrink-0 select-none">
           <div className="flex items-center gap-3">
-            <h1 className="text-base font-extrabold text-white tracking-tight">
+            <h1 className="text-base font-semibold text-[#f7f8f8] tracking-tight">
               <span>Bảng điều hành ban giám khảo</span>
             </h1>
           </div>
@@ -339,10 +554,10 @@ export const AdminLayout = ({ children }) => {
           <div className="flex items-center gap-3 text-xs">
             <button
               onClick={() => toggleFrozen()}
-              className={`px-3 py-1.5 rounded-lg border font-semibold transition ${
+              className={`px-3 py-1.5 rounded-lg border font-medium transition ${
                 frozen
-                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                  : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                  ? 'bg-[#ff6600]/10 text-[#ff6600] border-[#ff6600]/30'
+                  : 'bg-[#141516] text-slate-300 border-[#23252a] hover:bg-[#18191a]'
               }`}
             >
               {frozen ? 'Đang đóng băng bảng điểm' : 'Đóng băng bảng điểm'}
@@ -350,7 +565,7 @@ export const AdminLayout = ({ children }) => {
 
             <button
               onClick={() => setAdminNotice('Chức năng thông báo khẩn chưa được kết nối tới máy chủ.')}
-              className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold transition"
+              className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium transition"
             >
               Thông báo khẩn
             </button>
@@ -368,8 +583,9 @@ export const AdminLayout = ({ children }) => {
           {/* TAB 1: PHASE ORCHESTRATOR */}
           {activeTab === 'phase' && (
             <div className="space-y-6">
+              <AdminSection eyebrow="Điều hành" title="Điều khiển tiến trình kỳ thi" desc="Mở kỳ thi, chuyển phase — đồng bộ tới tab thí sinh qua backend." />
               <CreateContestPanel />
-              <div className="p-6 rounded-xl bg-[#0d1222] border border-white/10 space-y-4">
+              <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-base font-bold text-white">Điều khiển tiến trình kỳ thi</h2>
@@ -388,7 +604,7 @@ export const AdminLayout = ({ children }) => {
                     <p className="text-[11px] text-slate-400 mb-3">Mở nộp bài, chấm Pretests, khóa xem code đối thủ.</p>
                     <button
                       onClick={() => handlePhaseChange('CODING')}
-                      className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition"
+                      className="w-full py-2 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#34343a] text-emerald-400 font-medium text-xs transition"
                     >
                       Kích Hoạt CODING
                     </button>
@@ -410,18 +626,18 @@ export const AdminLayout = ({ children }) => {
                     <p className="text-[11px] text-slate-400 mb-3">Chạy 45 test ẩn, chốt điểm chung cuộc.</p>
                     <button
                       onClick={() => handlePhaseChange('SYSTEM_TESTING')}
-                      className="w-full py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-white font-bold text-xs transition"
+                      className="w-full py-2 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#34343a] text-yellow-400 font-medium text-xs transition"
                     >
                       Chạy System Test
                     </button>
                   </div>
 
-                  <div className={`p-4 rounded-xl border transition ${phase === 'FINISHED' ? 'bg-cyan-500/10 border-cyan-500/40' : 'bg-white/5 border-white/10'}`}>
-                    <h4 className="text-xs font-bold text-[#00f0ff] mb-1">4. Finished (Rating)</h4>
+                  <div className={`p-4 rounded-xl border transition ${phase === 'FINISHED' ? 'bg-white/5 border-[#34343a]' : 'bg-white/5 border-white/10'}`}>
+                    <h4 className="text-xs font-bold text-[#8a8f98] mb-1">4. Finished (Rating)</h4>
                     <p className="text-[11px] text-slate-400 mb-3">Đóng giải, tính toán cập nhật Elo 7 bậc.</p>
                     <button
                       onClick={() => handlePhaseChange('FINISHED')}
-                      className="w-full py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition"
+                      className="w-full py-2 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#34343a] text-slate-200 font-medium text-xs transition"
                     >
                       Chốt Điểm & Tính Elo
                     </button>
@@ -433,7 +649,9 @@ export const AdminLayout = ({ children }) => {
 
           {/* TAB 2: AST ANTI-CHEAT */}
           {activeTab === 'anticheat' && (
-            <div className="p-6 rounded-xl bg-[#0d1222] border border-white/10 space-y-4">
+            <div className="space-y-6">
+              <AdminSection eyebrow="Liêm chính" title="Soát gian lận mã nguồn" desc="Quét AST toàn contest, gắn cờ khi tương đồng vượt ngưỡng." />
+            <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-base font-bold text-white">Soát gian lận mã nguồn (AST)</h2>
@@ -457,11 +675,12 @@ export const AdminLayout = ({ children }) => {
                 </div>
                 <button
                   onClick={() => setAdminNotice('Chức năng truất quyền thi đấu chưa được kết nối tới máy chủ.')}
-                  className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-xs transition shrink-0"
+                  className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium text-xs transition shrink-0"
                 >
                   Truất quyền thi đấu
                 </button>
               </div>
+            </div>
             </div>
           )}
 
@@ -487,7 +706,7 @@ export const AdminLayout = ({ children }) => {
               )}
 
               {/* Header Strip with Actions */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl bg-[#0d1222] border border-white/10">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl bg-[#0f1011] border border-[#23252a]">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#ff6600]/10 text-[#ff6600] border border-[#ff6600]/30 uppercase">
@@ -532,7 +751,7 @@ export const AdminLayout = ({ children }) => {
 
                       <button
                         onClick={handleOpenCreateProblem}
-                        className="px-4 py-2 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-bold text-xs transition shadow-lg shadow-orange-500/20"
+                        className="px-4 py-2 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-medium text-xs transition"
                       >
                         + Soạn đề bài mới
                       </button>
@@ -544,9 +763,54 @@ export const AdminLayout = ({ children }) => {
               {/* VIEW 1: PROBLEMS TABLE */}
               {polygonView === 'list' && (
                 <div className="space-y-6">
+                  {/* Thanh gửi duyệt / duyệt đề (blind-tester) */}
+                  {reviewBar && (
+                    <div className="p-4 rounded-xl bg-[#0f1011] border border-[#34343a] flex flex-col sm:flex-row sm:items-center gap-3 text-xs">
+                      <span className="font-bold text-white shrink-0">
+                        {reviewBar.mode === 'assign'
+                          ? `Gửi bài ${reviewBar.problem.code} kiểm duyệt mù:`
+                          : `${reviewBar.decision === 'APPROVED' ? 'Duyệt' : 'Từ chối'} bài ${reviewBar.problem.code}:`}
+                      </span>
+                      {reviewBar.mode === 'assign' ? (
+                        <select
+                          value={reviewBar.testerId}
+                          onChange={(e) => setReviewBar((v) => ({ ...v, testerId: e.target.value }))}
+                          className="flex-1 px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-white outline-none"
+                        >
+                          <option value="">— Chọn tester (không phải tác giả) —</option>
+                          {reviewBar.users.map((u) => (
+                            <option key={u.id} value={u.id}>{u.username} ({u.rating} Elo)</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          value={reviewBar.note}
+                          onChange={(e) => setReviewBar((v) => ({ ...v, note: e.target.value }))}
+                          placeholder="Ghi chú duyệt (tùy chọn)"
+                          className="flex-1 px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-white placeholder-slate-500 outline-none"
+                        />
+                      )}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={confirmReviewBar}
+                          disabled={reviewBar.busy}
+                          className="px-3 py-2 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-medium disabled:opacity-50"
+                        >
+                          {reviewBar.busy ? 'Đang gửi...' : 'Xác nhận'}
+                        </button>
+                        <button
+                          onClick={() => setReviewBar(null)}
+                          className="px-3 py-2 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#23252a] text-slate-300"
+                        >
+                          Hủy
+                        </button>
+                      </div>
+                      {reviewBar.msg && <span className="text-red-400">{reviewBar.msg}</span>}
+                    </div>
+                  )}
                   {/* Table */}
-                  <div className="bg-[#0e1424] border border-white/10 rounded-xl overflow-hidden shadow-xl">
-                    <div className="h-10 bg-[#0c101c] px-4 flex items-center justify-between border-b border-white/10 text-xs">
+                  <div className="bg-[#0f1011] border border-[#23252a] rounded-xl overflow-hidden">
+                    <div className="h-10 bg-[#141516] px-4 flex items-center justify-between border-b border-white/10 text-xs">
                       <span className="font-bold text-slate-200">
                         Danh sách {problems.length} bài toán đang trong vòng thi
                       </span>
@@ -596,15 +860,40 @@ export const AdminLayout = ({ children }) => {
                               <div>{prob.memoryLimit || '256 MB'}</div>
                             </td>
                             <td className="py-3 px-4 text-center">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-white/5 text-slate-400 border border-white/10">
-                                Nháp
-                              </span>
+                              <WorkflowBadge status={prob.workflow_status} />
                             </td>
                             <td className="py-3 px-4 text-right">
                               <div className="flex items-center justify-end gap-1.5">
+                                {(!prob.workflow_status || prob.workflow_status === 'DRAFT') && (
+                                  <button
+                                    onClick={() => openAssignBar(prob)}
+                                    className="px-2 py-1.5 rounded hover:bg-white/10 text-slate-400 hover:text-[#ff6600] transition text-[11px]"
+                                    title="Gửi tester kiểm duyệt mù"
+                                  >
+                                    Gửi duyệt
+                                  </button>
+                                )}
+                                {prob.workflow_status === 'IN_TESTING' && (
+                                  <>
+                                    <button
+                                      onClick={() => openReviewBar(prob, 'APPROVED')}
+                                      className="px-2 py-1.5 rounded hover:bg-emerald-500/10 text-slate-400 hover:text-emerald-400 transition text-[11px]"
+                                      title="Duyệt đề"
+                                    >
+                                      Duyệt
+                                    </button>
+                                    <button
+                                      onClick={() => openReviewBar(prob, 'REJECTED')}
+                                      className="px-2 py-1.5 rounded hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition text-[11px]"
+                                      title="Trả về nháp"
+                                    >
+                                      Từ chối
+                                    </button>
+                                  </>
+                                )}
                                 <Link
                                   to={`/problem/${prob.id}`}
-                                  className="px-2 py-1.5 rounded hover:bg-white/10 text-slate-400 hover:text-[#00f0ff] transition text-[11px]"
+                                  className="px-2 py-1.5 rounded hover:bg-white/10 text-slate-400 hover:text-white transition text-[11px]"
                                   title="Xem giao diện workspace"
                                 >
                                   Xem
@@ -658,6 +947,13 @@ export const AdminLayout = ({ children }) => {
                       <div className="p-2 rounded bg-black/40 border border-white/5">So số thực theo sai số</div>
                     </div>
                   </div>
+
+                  {/* Stress test: model vs brute + gợi ý TL + lưu pretests */}
+                  <StressPanel
+                    problems={problems}
+                    notify={(m) => { setPolygonNotification(m); setTimeout(() => setPolygonNotification(null), 5000); }}
+                    refresh={loadProblemsFromServer}
+                  />
                 </div>
               )}
 
@@ -666,7 +962,7 @@ export const AdminLayout = ({ children }) => {
                 <form onSubmit={handleSaveProblem} className="space-y-6">
                   
                   {/* Basic Metadata */}
-                  <div className="p-5 rounded-xl bg-[#0d1222] border border-white/10 space-y-4">
+                  <div className="p-5 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-4">
                       <h3 className="text-sm font-bold text-white border-b border-white/10 pb-2">
                         <span>1. Thông tin cơ bản</span>
                       </h3>
@@ -678,7 +974,7 @@ export const AdminLayout = ({ children }) => {
                         <select
                           value={targetContestId}
                           onChange={(e) => setTargetContestId(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg bg-[#070a12] border border-white/15 text-white text-xs font-semibold focus:border-[#ff6600] outline-none"
+                          className="w-full px-3 py-2 rounded-lg bg-[#141516] border border-white/15 text-white text-xs font-semibold focus:border-[#ff6600] outline-none"
                         >
                           <option value="contest_dever_round1">DEVER Round #1 (mặc định)</option>
                           {contestOptions.filter((c) => c.id !== 'contest_dever_round1').map((c) => (
@@ -695,7 +991,7 @@ export const AdminLayout = ({ children }) => {
                           maxLength={3}
                           value={formData.code}
                           onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                          className="w-full px-3 py-2 rounded-lg bg-[#070a12] border border-white/15 text-white font-mono font-bold text-sm text-center focus:border-[#ff6600] outline-none"
+                          className="w-full px-3 py-2 rounded-lg bg-[#141516] border border-white/15 text-white font-mono font-bold text-sm text-center focus:border-[#ff6600] outline-none"
                           placeholder="F"
                         />
                       </div>
@@ -708,7 +1004,7 @@ export const AdminLayout = ({ children }) => {
                           required
                           value={formData.title}
                           onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                          className="w-full px-3 py-2 rounded-lg bg-[#070a12] border border-white/15 text-white text-xs font-semibold focus:border-[#ff6600] outline-none"
+                          className="w-full px-3 py-2 rounded-lg bg-[#141516] border border-white/15 text-white text-xs font-semibold focus:border-[#ff6600] outline-none"
                           placeholder="Ví dụ: Da Nang Bridge Network Maximum Flow"
                         />
                       </div>
@@ -724,7 +1020,7 @@ export const AdminLayout = ({ children }) => {
                           step={100}
                           value={formData.rating}
                           onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
-                          className="w-full px-3 py-2 rounded-lg bg-[#070a12] border border-white/15 text-[#00f0ff] font-mono font-bold text-xs focus:border-[#ff6600] outline-none"
+                          className="w-full px-3 py-2 rounded-lg bg-[#141516] border border-white/15 text-slate-200 font-mono font-bold text-xs focus:border-[#ff6600] outline-none"
                         />
                       </div>
 
@@ -735,7 +1031,7 @@ export const AdminLayout = ({ children }) => {
                           type="text"
                           value={formData.tags}
                           onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                          className="w-full px-3 py-2 rounded-lg bg-[#070a12] border border-white/15 text-slate-200 font-mono text-xs focus:border-[#ff6600] outline-none"
+                          className="w-full px-3 py-2 rounded-lg bg-[#141516] border border-white/15 text-slate-200 font-mono text-xs focus:border-[#ff6600] outline-none"
                           placeholder="math, dynamic-programming, greedy"
                         />
                       </div>
@@ -747,7 +1043,7 @@ export const AdminLayout = ({ children }) => {
                           type="text"
                           value={formData.timeLimit}
                           onChange={(e) => setFormData({ ...formData, timeLimit: e.target.value })}
-                          className="w-full px-3 py-2 rounded-lg bg-[#070a12] border border-white/15 text-slate-200 font-mono text-xs focus:border-[#ff6600] outline-none"
+                          className="w-full px-3 py-2 rounded-lg bg-[#141516] border border-white/15 text-slate-200 font-mono text-xs focus:border-[#ff6600] outline-none"
                           placeholder="1.0s"
                         />
                       </div>
@@ -759,7 +1055,7 @@ export const AdminLayout = ({ children }) => {
                           type="text"
                           value={formData.memoryLimit}
                           onChange={(e) => setFormData({ ...formData, memoryLimit: e.target.value })}
-                          className="w-full px-3 py-2 rounded-lg bg-[#070a12] border border-white/15 text-slate-200 font-mono text-xs focus:border-[#ff6600] outline-none"
+                          className="w-full px-3 py-2 rounded-lg bg-[#141516] border border-white/15 text-slate-200 font-mono text-xs focus:border-[#ff6600] outline-none"
                           placeholder="256 MB"
                         />
                       </div>
@@ -767,7 +1063,7 @@ export const AdminLayout = ({ children }) => {
                   </div>
 
                   {/* Statement Editor with Live KaTeX Preview */}
-                  <div className="p-5 rounded-xl bg-[#0d1222] border border-white/10 space-y-3">
+                  <div className="p-5 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-3">
                     <div className="flex items-center justify-between border-b border-white/10 pb-2">
                       <h3 className="text-sm font-bold text-white border-b border-white/10 pb-2">
                         <span>2. Nội dung đề bài (Markdown và công thức toán)</span>
@@ -786,7 +1082,7 @@ export const AdminLayout = ({ children }) => {
                           required
                           value={formData.statement}
                           onChange={(e) => setFormData({ ...formData, statement: e.target.value })}
-                          className="w-full p-3 rounded-lg bg-[#070a12] border border-white/15 text-slate-200 font-mono text-xs leading-relaxed focus:border-[#ff6600] outline-none"
+                          className="w-full p-3 rounded-lg bg-[#141516] border border-white/15 text-slate-200 font-mono text-xs leading-relaxed focus:border-[#ff6600] outline-none"
                           placeholder="Mô tả đề bài. Dùng $N$ cho công thức trong dòng, $$...$$ cho công thức khối."
                         />
                       </div>
@@ -794,7 +1090,7 @@ export const AdminLayout = ({ children }) => {
                       {/* Right: Live KaTeX Math Preview */}
                       <div className="flex flex-col space-y-1">
                         <span className="text-[11px] font-semibold text-emerald-400">Xem trước:</span>
-                        <div className="p-4 rounded-lg bg-[#070a12] border border-white/10 min-h-[160px] max-h-[260px] overflow-y-auto">
+                        <div className="p-4 rounded-lg bg-[#141516] border border-white/10 min-h-[160px] max-h-[260px] overflow-y-auto">
                           <MathRenderer content={formData.statement || 'Chưa có nội dung đề bài...'} />
                         </div>
                       </div>
@@ -802,7 +1098,7 @@ export const AdminLayout = ({ children }) => {
                   </div>
 
                   {/* Sample Testcases */}
-                  <div className="p-5 rounded-xl bg-[#0d1222] border border-white/10 space-y-3">
+                  <div className="p-5 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-3">
                     <h3 className="text-sm font-bold text-white border-b border-white/10 pb-2">
                       3. Test mẫu
                     </h3>
@@ -814,7 +1110,7 @@ export const AdminLayout = ({ children }) => {
                           rows={3}
                           value={formData.sampleInput}
                           onChange={(e) => setFormData({ ...formData, sampleInput: e.target.value })}
-                          className="w-full p-2.5 rounded-lg bg-[#070a12] border border-white/15 text-emerald-400 font-mono text-xs focus:border-[#ff6600] outline-none"
+                          className="w-full p-2.5 rounded-lg bg-[#141516] border border-white/15 text-emerald-400 font-mono text-xs focus:border-[#ff6600] outline-none"
                           placeholder="3\n1 2 3"
                         />
                       </div>
@@ -825,7 +1121,7 @@ export const AdminLayout = ({ children }) => {
                           rows={3}
                           value={formData.sampleOutput}
                           onChange={(e) => setFormData({ ...formData, sampleOutput: e.target.value })}
-                          className="w-full p-2.5 rounded-lg bg-[#070a12] border border-white/15 text-orange-400 font-mono text-xs focus:border-[#ff6600] outline-none"
+                          className="w-full p-2.5 rounded-lg bg-[#141516] border border-white/15 text-orange-400 font-mono text-xs focus:border-[#ff6600] outline-none"
                           placeholder="6"
                         />
                       </div>
@@ -833,7 +1129,7 @@ export const AdminLayout = ({ children }) => {
                   </div>
 
                   {/* Editorial */}
-                  <div className="p-5 rounded-xl bg-[#0d1222] border border-white/10 space-y-3">
+                  <div className="p-5 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-3">
                     <h3 className="text-sm font-bold text-white border-b border-white/10 pb-2">
                       4. Lời giải
                     </h3>
@@ -844,12 +1140,12 @@ export const AdminLayout = ({ children }) => {
                           rows={5}
                           value={formData.editorial}
                           onChange={(e) => setFormData({ ...formData, editorial: e.target.value })}
-                          className="w-full p-3 rounded-lg bg-[#070a12] border border-white/15 text-slate-200 font-mono text-xs focus:border-[#ff6600] outline-none"
+                          className="w-full p-3 rounded-lg bg-[#141516] border border-white/15 text-slate-200 font-mono text-xs focus:border-[#ff6600] outline-none"
                           placeholder="Hướng dẫn giải và phân tích độ phức tạp..."
                         />
                       </div>
 
-                      <div className="p-3 rounded-lg bg-[#070a12] border border-white/10 max-h-[140px] overflow-y-auto">
+                      <div className="p-3 rounded-lg bg-[#141516] border border-white/10 max-h-[140px] overflow-y-auto">
                         <MathRenderer content={formData.editorial || 'Chưa có lời giải...'} />
                       </div>
                     </div>
@@ -867,7 +1163,7 @@ export const AdminLayout = ({ children }) => {
 
                     <button
                       type="submit"
-                      className="px-6 py-2.5 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-bold text-xs transition shadow-xl shadow-orange-500/20"
+                      className="px-6 py-2.5 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-medium text-xs transition"
                     >
                       {editingId ? 'Lưu thay đổi' : 'Xuất bản đề bài'}
                     </button>
@@ -882,16 +1178,25 @@ export const AdminLayout = ({ children }) => {
 
           {/* TAB 4: TELEMETRY */}
           {activeTab === 'telemetry' && (
-            <TelemetryPanel />
+            <div className="space-y-6">
+              <AdminSection eyebrow="Vận hành" title="Giám sát máy chấm" desc="Hàng đợi judge, worker và bài nộp theo thời gian thực." />
+              <TelemetryPanel />
+            </div>
           )}
 
           {/* TAB 5: ROOMS */}
           {activeTab === 'rooms' && (
-            <RoomsPanel />
+            <div className="space-y-6">
+              <AdminSection eyebrow="Thí sinh" title="Phòng thi và Hack Room" desc="Room 25 người, theo dõi hack theo từng phòng." />
+              <RoomsPanel />
+            </div>
           )}
 
           {activeTab === 'accounts' && (
-            <AccountsPanel />
+            <div className="space-y-6">
+              <AdminSection eyebrow="Tài khoản" title="Cấp tài khoản" desc="Tạo và reset tài khoản cá nhân, đội thi — không đăng ký công khai." />
+              <AccountsPanel />
+            </div>
           )}
 
         </div>
@@ -932,7 +1237,7 @@ const CreateContestPanel = () => {
   const inputCls = 'w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs placeholder-slate-500 outline-none focus:border-[#ff6600]';
 
   return (
-    <div className="p-6 rounded-xl bg-[#0d1222] border border-white/10 space-y-4">
+    <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-4">
       <div>
         <h2 className="text-base font-bold text-white">Mở kỳ thi mới</h2>
         <p className="text-xs text-slate-400 mt-0.5">Kỳ thi tạo ra ở trạng thái mở đăng ký. Đề thi gán sau ở tab Soạn đề.</p>
@@ -1020,7 +1325,7 @@ const TelemetryPanel = () => {
     : [];
 
   return (
-    <div className="p-6 rounded-xl bg-[#0d1222] border border-white/10 space-y-4">
+    <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-4">
       <h2 className="text-base font-bold text-white">Giám sát máy chấm</h2>
       {!stats ? (
         <p className="text-xs text-slate-400">Chưa kết nối được máy chủ (npm run server). Số liệu sẽ hiện ở đây khi online.</p>
@@ -1101,7 +1406,7 @@ const RoomsPanel = () => {
   }, []);
 
   return (
-    <div className="p-6 rounded-xl bg-[#0d1222] border border-white/10 space-y-4">
+    <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-4">
       <h2 className="text-base font-bold text-white">Phân phối phòng thi</h2>
       <p className="text-xs text-slate-400">Mỗi phòng tối đa 25 thí sinh. Phòng dùng để bẻ khóa bài nhau trong Hack Phase.</p>
       {!rooms ? (
@@ -1193,7 +1498,7 @@ const AccountsPanel = () => {
   const inputCls = 'w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs placeholder-slate-500 outline-none focus:border-[#ff6600]';
 
   return (
-    <div className="p-6 rounded-xl bg-[#0d1222] border border-white/10 space-y-5">
+    <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-5">
       <div>
         <h2 className="text-base font-bold text-white">Cấp tài khoản thi đấu</h2>
         <p className="text-xs text-slate-400 mt-0.5">
@@ -1233,7 +1538,7 @@ const AccountsPanel = () => {
 
       <div className="bg-[#0e1424] border border-white/10 rounded-xl overflow-hidden">
         <table className="w-full text-left text-xs">
-          <thead className="bg-[#0c101c] border-b border-white/10 text-slate-400 uppercase tracking-wider text-[11px]">
+          <thead className="bg-[#141516] border-b border-white/10 text-slate-400 uppercase tracking-wider text-[11px]">
             <tr>
               <th className="py-2.5 px-4">Username</th>
               <th className="py-2.5 px-4">Tên hiển thị</th>

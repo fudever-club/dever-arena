@@ -25,7 +25,7 @@
 `core-engine` & `rulebook-docs` ➔ `storage-db` ➔ `problem-suite` ➔ `web-arena` ➔ `sandbox-judge-spec` ➔ `virtual-contest` & `multi-contest-sched` ➔ `judge-worker-queue` ➔ `scoreboard-freeze` ➔ `testlib-validator` ➔ `react-vite-workspace` ➔ `full-system-portal-separation` ➔ `api-backend` ➔ `team-accounts`
 
 ### Verification Standard:
-- **Unit & Integration:** `node --test tests/*.test.js` (136 tests across 25 suites PASS 100%)
+- **Unit & Integration:** `node --test tests/*.test.js` (150 tests across 27 suites PASS 100%)
 - **Architecture & Design:** `node detect.mjs` (0 errors)
 - **Vite Production Build:** `npm run build` (Clean production bundle in ~250ms)
 - **Source of truth:** `docs/design.md`, `docs/DESIGN_SYSTEM.md`, `docs/SPEC.md`, `docs/decisions/ADR-003-pure-core-engine-and-zero-ai.md`

@@ -2,6 +2,79 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useContest } from '../context/ContestContext';
 import { api, getToken } from '../lib/apiClient';
+import { MathRenderer } from '../components/common/MathRenderer';
+
+/** Hàng chờ kiểm duyệt mù: tester tự giải độc lập rồi nộp báo cáo (không thấy editorial). */
+const TestingQueue = () => {
+  const [queue, setQueue] = useState(null);
+  const [forms, setForms] = useState({});
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const d = await api.testingQueue();
+        if (!cancelled) setQueue(d.queue || []);
+      } catch { if (!cancelled) setQueue([]); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  if (!queue || queue.length === 0) return null;
+  const set = (id, patch) => setForms((f) => ({ ...f, [id]: { solved: false, minutes: '', feedback: '', ...(f[id] || {}), ...patch } }));
+  const submit = async (p) => {
+    const f = forms[p.id] || {};
+    set(p.id, { busy: true, msg: '' });
+    try {
+      await api.submitTestReport({ problem_id: p.id, solved: Boolean(f.solved), minutes_spent: Number(f.minutes) || 0, feedback: f.feedback || '' });
+      set(p.id, { busy: false, done: true });
+    } catch (e) {
+      set(p.id, { busy: false, msg: e?.message || 'Gửi thất bại.' });
+    }
+  };
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold text-[#f7f8f8] tracking-tight">Bài chờ tôi kiểm duyệt</h2>
+        <p className="text-xs text-slate-400">Giải độc lập (mù, không xem editorial), rồi nộp báo cáo cho coordinator.</p>
+      </div>
+      {queue.map((p) => {
+        const f = forms[p.id] || {};
+        return (
+          <div key={p.id} className="p-5 rounded-xl bg-[#0f1011] border border-[#ff6600]/30 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="font-mono font-bold text-[#ff6600] text-sm">{p.code}</span>
+              <span className="font-bold text-white text-sm">{p.title}</span>
+              <span className="text-[10px] text-slate-500 font-mono">TL {p.timeLimit} · {p.memoryLimit}</span>
+            </div>
+            <MathRenderer content={p.statement || ''} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono">
+              <div className="p-2 rounded bg-[#010102] border border-[#23252a]"><div className="text-slate-500 text-[10px]">Input mẫu</div><pre className="text-slate-300 whitespace-pre-wrap">{p.sampleInput}</pre></div>
+              <div className="p-2 rounded bg-[#010102] border border-[#23252a]"><div className="text-slate-500 text-[10px]">Output mẫu</div><pre className="text-slate-300 whitespace-pre-wrap">{p.sampleOutput}</pre></div>
+            </div>
+            {f.done ? (
+              <div className="text-xs text-emerald-400 font-semibold">Đã gửi báo cáo. Cảm ơn bạn đã kiểm duyệt.</div>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-2 text-xs">
+                <label className="flex items-center gap-1.5 text-slate-300 shrink-0">
+                  <input type="checkbox" checked={Boolean(f.solved)} onChange={(e) => set(p.id, { solved: e.target.checked })} />
+                  Tôi giải được
+                </label>
+                <input value={f.minutes || ''} onChange={(e) => set(p.id, { minutes: e.target.value })} type="number" min="0" placeholder="Số phút đã giải"
+                  className="w-32 px-2 py-1.5 rounded-lg bg-[#141516] border border-[#23252a] text-white outline-none" />
+                <input value={f.feedback || ''} onChange={(e) => set(p.id, { feedback: e.target.value })} placeholder="Nhận xét (độ khó, test mẫu...)"
+                  className="flex-1 px-2 py-1.5 rounded-lg bg-[#141516] border border-[#23252a] text-white placeholder-slate-500 outline-none" />
+                <button onClick={() => submit(p)} disabled={f.busy}
+                  className="px-3 py-1.5 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-medium disabled:opacity-50 shrink-0">
+                  {f.busy ? 'Đang gửi...' : 'Nộp báo cáo'}
+                </button>
+                {f.msg && <span className="text-red-400">{f.msg}</span>}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 export const ContestHub = () => {
   const { phase, formattedTime, getDynamicScore, problems = [] } = useContest();
@@ -66,11 +139,10 @@ export const ContestHub = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-3rem)] bg-[#0b0f19] text-slate-100 p-6 lg:p-10 max-w-7xl mx-auto space-y-8">
+    <div className="min-h-[calc(100vh-3.5rem)] bg-[#010102] text-slate-100 p-6 lg:p-10 max-w-7xl mx-auto space-y-8">
       
       {/* Contest Hero Banner */}
-      <div className="relative rounded-2xl bg-gradient-to-r from-slate-900 via-[#10172a] to-slate-900 border border-white/10 p-6 lg:p-8 overflow-hidden shadow-2xl">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="relative rounded-xl bg-[#0f1011] border border-[#23252a] p-6 lg:p-8 overflow-hidden">
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -84,7 +156,7 @@ export const ContestHub = () => {
               </span>
             </div>
 
-            <h1 className="text-2xl lg:text-3xl font-extrabold text-white tracking-tight">
+            <h1 className="text-2xl lg:text-3xl font-semibold text-[#f7f8f8] tracking-tight">
               DEVER Round #1 (Div. 3) — đấu trường thuật toán
             </h1>
 
@@ -93,17 +165,17 @@ export const ContestHub = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-4 bg-slate-950/80 p-4 rounded-xl border border-white/10 shrink-0">
+          <div className="flex items-center gap-4 bg-[#010102] p-4 rounded-xl border border-[#23252a] shrink-0">
             <div className="text-right">
               <span className="text-[11px] text-slate-400 font-medium block">Thời gian còn lại</span>
-              <span className="font-mono text-2xl font-black text-orange-400 tracking-wider">
+              <span className="font-mono text-2xl font-bold text-[#ff6600] tracking-wider">
                 {formattedTime}
               </span>
             </div>
-            <div className="h-8 border-r border-white/10"></div>
+            <div className="h-8 border-r border-[#23252a]"></div>
             <Link
               to="/problem/p102"
-              className="px-4 py-2 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] font-bold text-xs text-white transition shadow-md shadow-orange-500/20"
+              className="px-4 py-2 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] font-medium text-xs text-white transition"
             >
               Vào Workspace →
             </Link>
@@ -147,6 +219,9 @@ export const ContestHub = () => {
           </div>
         </div>
       )}
+
+      {/* Hàng chờ kiểm duyệt mù (chỉ hiện khi có bài giao cho tôi) */}
+      <TestingQueue />
 
       {/* Problems Table */}
       <div className="space-y-4">

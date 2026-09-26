@@ -6,7 +6,7 @@
 
 ## 1. Nguyên tắc thiết kế
 
-1. **Content-first, chrome-second:** Bảng điểm và đề bài chiếm 70% viewport. Mọi decoration (glow, gradient) ở `opacity < 0.12`.
+1. **Content-first, chrome-second:** Bảng điểm và đề bài chiếm 70% viewport. Marketing chrome tối giản kiểu Linear: surface ladder + hairline, **không glow/gradient/shadow trang trí**.
 2. **Mật độ cao nhưng đọc được:** Bảng standings 13px/1.4 line-height như Codeforces, không dãn dòng kiểu marketing.
 3. **Tốc độ > màu mè:** Mọi tương tác <100ms, animation chỉ `transform` + `opacity`, tôn trọng `prefers-reduced-motion`.
 4. **Accessibility WCAG AA:** Contrast tối thiểu 4.5:1. Mọi control có `aria-label`, focus ring rõ.
@@ -15,38 +15,38 @@
 
 ## 2. Design Tokens
 
-### 2.1 Màu sắc
+### 2.1 Màu sắc (Linear DESIGN.md — xem `DESIGN.md` ở root repo)
 ```css
 :root {
-  --bg-base: #060910; --bg-surface: #0c101c; --bg-card: #121829;
-  --border-subtle: rgba(255,255,255,0.08);
-  --accent-orange: #ff6600; --accent-cyan: #00f0ff;
-  --accent-green: #00e676; --accent-red: #ff3366; --accent-yellow: #ffb300;
-  /* Rank — đã tăng contrast so với bản cũ #808080 */
+  --dv-canvas: #010102; --dv-surface-1: #0f1011; --dv-surface-2: #141516;
+  --dv-surface-3: #18191a; --dv-surface-4: #191a1b;
+  --dv-hairline: #23252a; --dv-hairline-strong: #34343a; --dv-hairline-tertiary: #3e3e44;
+  --dv-ink: #f7f8f8; --dv-ink-muted: #d0d6e0; --dv-ink-subtle: #8a8f98; --dv-ink-tertiary: #62666d;
+  --dv-accent: #ff6600; --dv-accent-hover: #ff771a; /* cam FPT thay lavender Linear — giữ brand CLB */
+  --dv-success: #27a644;
+  /* Rank — giữ semantic trong product surfaces (DESIGN.md Known Gaps cho phép) */
   --rank-newbie: #9e9e9e; --rank-pupil: #4caf50; --rank-specialist: #00b8a9;
   --rank-expert: #3b5bdb; --rank-cm: #9c27b0; --rank-master: #ff8c00; --rank-gm: #e53935;
 }
-[data-theme="light"] {
-  --bg-base: #f8fafc; --bg-surface: #ffffff; --bg-card: #f1f5f9;
-  --border-subtle: rgba(15,23,42,0.08);
-}
 ```
+Quy tắc Linear đã áp: hierarchy bằng surface ladder + hairline (cấm glow/gradient/shadow trang trí), accent duy nhất dùng tiết kiệm (brand, CTA, focus ring), marketing chrome tối giản — màu semantic chỉ sống trong product surfaces (standings, workspace, rank badge).
 
 ### 2.2 Typography
-- UI: `Outfit 400/600/700` — tiêu đề contest 28px/800, table header 12px/600 uppercase.
+- UI: `Space Grotesk 400/500/600` thay Inter (đã kiểm chứng subset Việt, `detect.mjs` khóa font) — display 600 tracking âm, body 400.
 - Code: `JetBrains Mono 400/500` — editor 14px/1.5, console 13px.
 
-### 2.3 Spacing & Radius
-`4, 8, 12, 16, 24` scale. Card `12px`, button `8px`, badge `4px`.
+### 2.3 Spacing & Radius (DESIGN.md)
+`4, 8, 12, 16, 24, 32, 48` scale, section `96`. Button/input `8px`, card `12px`, screenshot panel `16px`, pill/status `9999px`. Không pill cho CTA.
 
 ---
 
 ## 3. Components chuẩn thi đấu
 
-### 3.1 Navbar (Codeforces pattern)
-- Trái: `DEVER FORCES Enterprise` brand
-- Giữa: 4 tab + Admin (chỉ.ADMIN) — active có `border-bottom 2px orange`
-- Phải: Role switcher + SFX + Auth cluster. Mobile <900px → hamburger `aria-expanded`.
+### 3.1 Navbar (Linear top-nav 56px)
+- Trái: `DEVER FORCES` brand + pill `Arena`
+- Giữa: 5 link 14px — active = surface lift (`bg-white/10`), không underline dày
+- Phải: countdown pill + profile badge. Mobile <900px → hamburger `aria-expanded`.
+- Nền canvas `#010102`, viền hairline `#23252a`, cao `h-14`.
 
 ### 3.2 Contest Hero
 - Gradient `rgba(255,102,0,0.14)` + timer box `border: rgba(255,102,0,0.35)` như hiện tại.
@@ -109,7 +109,7 @@
 
 - `app.html` — SPA shell duy nhất (`<div id="root">`, favicon, fonts Space Grotesk + JetBrains Mono, KaTeX CDN)
 - `src/index.css` — Tailwind v4 + Cyber Dark theme tokens (single source of truth cho style)
-- `src/App.jsx` — Routes core: `/`, `/arena`, `/login`, `/problem/:id`, `/standings`, `/hack-room`, `/admin` (không còn `/clans`)
+- `src/App.jsx` — 3 shell tách biệt + guards: `GuestLayout` (`/`, `/login`), `UserLayout` + `RequireAuth` (`/arena`, `/problem/:id`, `/standings`, `/hack-room`), `RequireAdmin` + `AdminLayout` (`/admin`, sidebar 6 modules + `AdminSection` headers) (không còn `/clans`)
 - `manifest.json` — PWA manifest (`name: DEVER Arena`, `short_name: DEVER`, icons 192/512 trỏ `/brand/`, `start_url: app.html`, `display: standalone`, `theme_color: #ff6600`)
 - `public/brand/` — Brand assets chính thức CLB FU-DEVER (single source of truth cho logo web): `logo-dark.png` (nền tối, dùng Navbar/Login/Landing hero), `logo-light.png` (nền sáng), `icon-192.png` / `icon-512.png` (cube mark đã crop + padding, dùng PWA + Navbar thumb), `apple-touch-icon.png`, `og.png` (share preview 1200×630). Nguồn gốc: `docs/assets/*.png`. Vite copy nguyên thư mục `public/` vào `dist/`.
 - `public/icons/` — SVG logo ngôn ngữ duy nhất được phép dùng làm icon (nguồn svgl.app): `python.svg`, `javascript.svg`, `java.svg`, `nodejs.svg`. Mọi icon trang trí khác (lucide, emoji) đã gỡ — UI dùng chữ và số.

@@ -42,7 +42,7 @@ export const MathRenderer = ({ content, className = '' }) => {
           strict: false
         });
         blockMaths.push(
-          `<div class="katex-display-container my-3.5 p-3 rounded-xl bg-[#090d18] border border-white/10 overflow-x-auto text-[#00f0ff] flex items-center justify-center shadow-inner select-text font-serif text-base">${rendered}</div>`
+          `<div class="katex-display-container my-3.5 p-3 rounded-xl bg-[#0f1011] border border-[#23252a] overflow-x-auto text-[#f7f8f8] flex items-center justify-center select-text font-serif text-base">${rendered}</div>`
         );
       } catch (e) {
         blockMaths.push(`<div class="katex-display-container my-2 p-2 bg-red-500/10 text-red-400 font-mono text-xs">${formula}</div>`);
@@ -107,7 +107,7 @@ export const MathRenderer = ({ content, className = '' }) => {
 
     // Inline codes
     inlineCodes.forEach((code, i) => {
-      const codeHtml = `<code class="px-1.5 py-0.5 rounded bg-white/10 text-[#00f0ff] font-mono text-xs border border-white/10">${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code>`;
+      const codeHtml = `<code class="px-1.5 py-0.5 rounded bg-white/10 text-[#d0d6e0] font-mono text-xs border border-[#23252a]">${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code>`;
       processed = processed.replace(`___INLINE_CODE_${i}___`, codeHtml);
     });
 
