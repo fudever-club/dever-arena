@@ -80,11 +80,17 @@ export const ContestHub = () => {
   const { phase, formattedTime, getDynamicScore, problems = [] } = useContest();
   const navigate = useNavigate();
 
-  const [virtual, setVirtual] = useState(null); // { session_id, elapsedMinutes, standings }
-  const [virtualSupported, setVirtualSupported] = useState(false);
+  const [virtual, setVirtual] = useState(null); // { session_id, elapsedMinutes, standings, slug }
   const [virtualLoading, setVirtualLoading] = useState(false);
   const [contests, setContests] = useState(null);
   const [regMsg, setRegMsg] = useState('');
+  const [now, setNow] = useState(() => Date.now());
+
+  // Tick nhẹ 30s cho countdown từng kỳ thi (không animation)
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, []);
 
   // Danh sách kỳ thi thật từ backend
   useEffect(() => {
@@ -98,28 +104,81 @@ export const ContestHub = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // Virtual Contest: chỉ hiện khi backend reachable
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        await api.getContest('dever-round-0-archive');
-        if (!cancelled) setVirtualSupported(true);
-      } catch { /* backend chưa chạy → ẩn thẻ ảo */ }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  // Virtual Contest: nút nằm trên từng thẻ contest FINISHED
 
-  const startVirtual = async () => {
+  const startVirtual = async (slug) => {
     if (!getToken()) { navigate('/login?redirect=/arena'); return; }
     setVirtualLoading(true);
     try {
-      const s = await api.createVirtual('dever-round-0-archive');
-      const v = await api.getVirtual('dever-round-0-archive', s.session_id);
-      setVirtual(v);
+      const s = await api.createVirtual(slug);
+      const v = await api.getVirtual(slug, s.session_id);
+      setVirtual({ ...v, slug });
     } catch { /* im lặng, giữ thẻ */ }
     finally { setVirtualLoading(false); }
   };
+
+  // Nhóm kiểu Codeforces: live / upcoming / past
+  const live = (contests || []).filter((c) => ['CODING', 'HACK_PHASE', 'SYSTEM_TESTING'].includes(c.status));
+  const upcoming = (contests || []).filter((c) => ['REGISTRATION'].includes(c.status))
+    .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+  const past = (contests || []).filter((c) => ['FINISHED'].includes(c.status))
+    .sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
+
+  const countdownOf = (c) => {
+    const start = new Date(c.start_time).getTime();
+    const end = start + (Number(c.duration_minutes) || 0) * 60000;
+    if (['FINISHED'].includes(c.status) || now >= end) return 'Đã kết thúc';
+    if (now < start) {
+      const d = Math.floor((start - now) / 86400000);
+      const h = Math.floor(((start - now) % 86400000) / 3600000);
+      return d > 0 ? `Còn ${d} ngày ${h} giờ` : `Còn ${h} giờ ${Math.floor(((start - now) % 3600000) / 60000)} phút`;
+    }
+    const left = Math.max(0, end - now);
+    return `Còn ${Math.floor(left / 60000)}′`;
+  };
+
+  const ContestCard = ({ c }) => (
+    <div key={c.id} className="p-5 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-bold text-white text-sm">{c.title}</span>
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-white/5 text-slate-300 border-white/10">
+          {c.status}
+        </span>
+      </div>
+      <div className="text-[11px] text-slate-500 font-mono">
+        Bắt đầu {new Date(c.start_time).toLocaleString('vi-VN')} • {countdownOf(c)}
+      </div>
+      <div className="text-[11px] text-slate-500 font-mono">
+        {c.contest_format} • {c.duration_minutes} phút
+        {c.min_rating != null && ` • từ ${c.min_rating} Elo`}
+        {c.max_rating != null && ` • đến ${c.max_rating} Elo`}
+      </div>
+      <div className="flex items-center gap-2 pt-1">
+        {['REGISTRATION', 'CODING'].includes(c.status) && (
+          <button
+            onClick={() => handleRegister(c.slug)}
+            className="px-3 py-1.5 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-medium text-xs transition"
+          >
+            Đăng ký thi
+          </button>
+        )}
+        {c.status === 'FINISHED' && (
+          <button
+            onClick={() => startVirtual(c.slug)}
+            disabled={virtualLoading}
+            className="px-3 py-1.5 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#34343a] text-slate-200 font-medium text-xs transition disabled:opacity-50"
+          >
+            {virtualLoading ? 'Đang tạo...' : 'Thi ảo (Ghost Replay)'}
+          </button>
+        )}
+      </div>
+      {virtual && virtual.slug === c.slug && (
+        <div className="text-[11px] text-slate-400 font-mono pt-1">
+          Phiên {virtual.session_id} • đã trôi {virtual.elapsedMinutes}′ • {virtual.standings?.length || 0} ghost trên bảng
+        </div>
+      )}
+    </div>
+  );
 
   const handleRegister = async (slug) => {
     if (!getToken()) { navigate('/login?redirect=/arena'); return; }
@@ -166,11 +225,22 @@ export const ContestHub = () => {
           </div>
 
           <div className="flex items-center gap-4 bg-[#010102] p-4 rounded-xl border border-[#23252a] shrink-0">
-            <div className="text-right">
+            <div className="text-right min-w-[120px]">
               <span className="text-[11px] text-slate-400 font-medium block">Thời gian còn lại</span>
               <span className="font-mono text-2xl font-bold text-[#ff6600] tracking-wider">
                 {formattedTime}
               </span>
+              {(() => {
+                const hc = live[0];
+                if (!hc) return null;
+                const total = (Number(hc.duration_minutes) || 1) * 60000;
+                const pct = Math.max(0, Math.min(100, ((now - new Date(hc.start_time).getTime()) / total) * 100));
+                return (
+                  <div className="mt-1.5 h-1 w-full rounded-full bg-[#23252a] overflow-hidden" title={`${hc.title} — đã trôi ${Math.round(pct)}%`}>
+                    <div className="h-full bg-[#ff6600] transition-none" style={{ width: `${pct}%` }} />
+                  </div>
+                );
+              })()}
             </div>
             <div className="h-8 border-r border-[#23252a]"></div>
             <Link
@@ -183,40 +253,38 @@ export const ContestHub = () => {
         </div>
       </div>
 
-      {/* Contests Roster (từ máy chủ) */}
+      {/* Contests Roster: nhóm Live / Sắp tới / Đã kết thúc (kiểu Codeforces) */}
       {contests && contests.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-bold text-white tracking-tight">Các kỳ thi</h2>
+        <div className="space-y-8">
           {regMsg && (
             <div className="p-3 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-300" role="status">
               {regMsg}
             </div>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {contests.map((c) => (
-              <div key={c.id} className="p-5 rounded-2xl bg-[#0e1424] border border-white/10 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-bold text-white text-sm">{c.title}</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-white/5 text-slate-300 border-white/10">
-                    {c.status}
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-500 font-mono">
-                  {c.contest_format} • {c.duration_minutes} phút
-                  {c.min_rating != null && ` • từ ${c.min_rating} Elo`}
-                  {c.max_rating != null && ` • đến ${c.max_rating} Elo`}
-                </div>
-                {['REGISTRATION', 'CODING'].includes(c.status) && (
-                  <button
-                    onClick={() => handleRegister(c.slug)}
-                    className="px-3 py-1.5 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-bold text-xs transition"
-                  >
-                    Đăng ký thi
-                  </button>
-                )}
+          {live.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-lg font-semibold text-[#f7f8f8] tracking-tight">Đang diễn ra</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {live.map((c) => <ContestCard key={c.id} c={c} />)}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+          {upcoming.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-lg font-semibold text-[#f7f8f8] tracking-tight">Sắp tới</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {upcoming.map((c) => <ContestCard key={c.id} c={c} />)}
+              </div>
+            </div>
+          )}
+          {past.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-lg font-semibold text-[#f7f8f8] tracking-tight">Đã kết thúc</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {past.map((c) => <ContestCard key={c.id} c={c} />)}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -235,9 +303,9 @@ export const ContestHub = () => {
           </span>
         </div>
 
-        <div className="bg-[#0e1424] border border-white/10 rounded-xl overflow-hidden shadow-lg">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#0c101c] border-b border-white/10 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+        <div className="bg-[#0f1011] border border-[#23252a] rounded-xl overflow-x-auto">
+          <table className="w-full text-left text-xs min-w-[720px]">
+            <thead className="bg-[#141516] border-b border-[#23252a] text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
               <tr>
                 <th className="py-3 px-4 w-16">Mã</th>
                 <th className="py-3 px-4">Tên bài toán</th>
@@ -304,30 +372,6 @@ export const ContestHub = () => {
           </table>
         </div>
       </div>
-
-      {/* Virtual Contest (Archive) */}
-      {virtualSupported && (
-        <div className="p-6 rounded-2xl bg-[#0e1424] border border-cyan-500/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-sm font-bold text-white">DEVER Round #0 (Archive) — Thi đấu ảo</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">Ghost Replay</span>
-            </div>
-            <p className="text-xs text-slate-400">
-              {virtual
-                ? `Phiên ${virtual.session_id} • đã trôi qua ${virtual.elapsedMinutes}′ • ${virtual.standings?.length || 0} ghost trên bảng. Mở bài bất kỳ để làm song song.`
-                : 'Thi lại contest đã kết thúc với đồng hồ cá nhân, ghost submissions hiện đúng timeline lịch sử.'}
-            </p>
-          </div>
-          <button
-            onClick={startVirtual}
-            disabled={virtualLoading}
-            className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition shrink-0 disabled:opacity-50"
-          >
-            {virtualLoading ? 'Đang tạo phiên...' : virtual ? 'Tạo phiên mới' : 'Bắt đầu thi ảo'}
-          </button>
-        </div>
-      )}
 
     </div>
   );
