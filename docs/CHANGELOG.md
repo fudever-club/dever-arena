@@ -385,6 +385,13 @@
 - **UI:** Studio `StressPanel` (xem trước strategies → chạy → áp TL → lưu pretests từ outputs brute) + badge workflow + thanh Gửi duyệt/Duyệt/Từ chối; ContestHub thêm `TestingQueue` cho tester.
 - **Verify:** `npm run test` **150 pass / 0 fail** (6 generator + 5 stress/workflow mới), lint 0 errors, build sạch (58 modules).
 
+## Vòng 27–28: Công ty multi-agent + Merge 8 nhánh page/*
+
+- **Tổ chức:** leader + 6 reviewer (47 gaps) + 5 builder song song, mỗi agent 1 worktree riêng (`Temp/opencode/dever-*`, junction node_modules) + 1 nhánh riêng: admin (overview dashboard, validation inline, testcase CRUD, bounds form), auth (login lỗi inline, tokens), backend (bounds theo đề + 3 tests), docs (audit stale + manifest PAGE_BRANCHES), design (review tuân thủ).
+- **Merge về main:** landing → contesthub → workspace → standings → hackroom → backend → admin (1 xung đột indent, resolve) → auth → docs. Không mất code agent nào.
+- **QA bắt lỗi thật:** docs agent ghi sai số liệu (150/21) → đếm lại: **153 tests / 25 suites**; design reviewer quét còn 1 sót `app.html` → đã fix; grep neon/gradient/glow/shadow màu toàn repo = 0 hit.
+- **Verify cuối:** `npm run test` **153 pass / 0 fail**, `node detect.mjs` 0, `npm run lint:js` 0 errors, `npm run build` sạch, `test:load` 20/20 PASS, audit 0 high/critical.
+
 
 
 

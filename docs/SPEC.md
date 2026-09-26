@@ -61,7 +61,7 @@ DEVER Arena/
 │   ├── pages/                     # LandingPage, LoginPage, ContestHub (+TestingQueue), ProblemWorkspace, StandingsPage, HackRoomPage
 │   └── context/                   # AuthContext, ContestContext (BroadcastChannel sync)
 │   └── data/problems.js           # Built-in problems database & editorials
-├── tests/                         # 150 tests across 21 test suites (Node.js test runner)
+├── tests/                         # 153 tests across 25 test suites (Node.js test runner)
 │   ├── scoring.test.js            # Codeforces dynamic decay tests
 │   ├── rating.test.js             # Elo rating engine tests
 │   ├── contest.test.js            # Contest state machine transitions
