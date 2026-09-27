@@ -34,6 +34,7 @@ export const GuestLayout = () => {
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-500">
           <span>© 2026 DEVER Arena • CLB FU-DEVER • Tài khoản thi đấu do ban tổ chức cấp</span>
           <div className="flex items-center gap-4">
+            <a href="/#faq" className="hover:text-slate-300 transition">Nội quy</a>
             <span>Thể thức Codeforces • Hack Room • Elo</span>
             <span>club.dever@gmail.com</span>
             <a href="https://github.com/fudever-club" target="_blank" rel="noreferrer" className="hover:text-slate-300 transition">GitHub</a>
