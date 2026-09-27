@@ -65,7 +65,7 @@ export const ProblemWorkspace = () => {
   const { id = 'p102' } = useParams();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
-  const { getDynamicScore, formattedTime, problems = [], contestId, contestSlug } = useContest();
+  const { getDynamicScore, formattedTime, problems = [], contestId, contestSlug, phase } = useContest();
   const [editorialOpen, setEditorialOpen] = useState(false);
 
   // Lời giải chỉ mở khi vòng thi đã kết thúc (mặc định khóa để chống lộ đề)
@@ -189,6 +189,9 @@ export const ProblemWorkspace = () => {
   const [runAllBusy, setRunAllBusy] = useState(false);
   const [mobilePane, setMobilePane] = useState('code'); // 'problem' | 'code' (mobile <lg)
   const [history, setHistory] = useState(null); // lịch sử nộp bài từ API
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const shortcutCloseRef = useRef(null);
+  const shortcutDialogRef = useRef(null);
 
   // =====================================================================
   // SPLITTER DRAG HANDLERS WITH SMOOTH MOUSE CAPTURE
@@ -262,7 +265,7 @@ export const ProblemWorkspace = () => {
     } catch (e) {}
   };
 
-  // Keyboard Shortcuts (Ctrl + Enter = Submit, Ctrl + ' = Run Code, Esc = Exit Zen)
+  // Keyboard Shortcuts (Ctrl + Enter = Submit, Ctrl + ' = Run Code, Esc = Exit Zen / Close Shortcuts)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -274,6 +277,10 @@ export const ProblemWorkspace = () => {
         handleRunCode();
       }
       if (e.key === 'Escape') {
+        if (showShortcuts) {
+          setShowShortcuts(false);
+          return;
+        }
         if (zenMode !== 'none') {
           setZenMode('none');
         }
@@ -285,7 +292,7 @@ export const ProblemWorkspace = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [code, activeCaseIndex, zenMode, isFullscreen]);
+  }, [code, activeCaseIndex, zenMode, isFullscreen, showShortcuts]);
 
   const handleCopyInput = () => {
     if (currentProblem.sampleInput) {
@@ -339,6 +346,20 @@ export const ProblemWorkspace = () => {
     setTestCases([...testCases, newCase]);
     setActiveCaseIndex(testCases.length);
   };
+
+  // 1-click: nạp sampleInput của đề vào active case input
+  const handleLoadSample = () => {
+    const sample = currentProblem.sampleInput || '';
+    setTestCases((prev) => prev.map((tc, i) => (i === activeCaseIndex ? { ...tc, input: sample } : tc)));
+    setIsConsoleOpen(true);
+  };
+
+  // Focus cơ bản cho overlay phím tắt khi mở
+  useEffect(() => {
+    if (showShortcuts) {
+      shortcutCloseRef.current?.focus();
+    }
+  }, [showShortcuts]);
 
   // Run Code: thực thi thật qua runner local (JS chạy thật, các ngôn ngữ khác mô phỏng)
   const handleRunCode = async () => {
@@ -434,6 +455,7 @@ export const ProblemWorkspace = () => {
         verdict: 'Nộp bài thất bại',
         detail: err?.message || 'Không kết nối được máy chấm. Kiểm tra npm run server.',
         points: 0,
+        code: err?.code || null,
       });
       setActiveTab('submissions');
     } finally {
@@ -481,7 +503,7 @@ export const ProblemWorkspace = () => {
       {/* ======================================================== */}
       {/* 1. PROBLEM HEADER NAVIGATION & ERGONOMIC TOOLBAR         */}
       {/* ======================================================== */}
-      <div className="h-10 bg-[#0e1424] border-b border-white/10 px-4 flex items-center justify-between text-xs shrink-0 select-none">
+      <div className="h-10 bg-[#0f1011] border-b border-[#23252a] px-4 flex items-center justify-between text-xs shrink-0 select-none">
         
         {/* Left: Problem Title & Prev/Next */}
         <div className="flex items-center gap-3">
@@ -580,7 +602,7 @@ export const ProblemWorkspace = () => {
 
             {/* Zen Mode Dropdown Menu */}
             {showZenMenu && (
-              <div className="absolute right-0 mt-1.5 w-48 rounded-xl bg-[#0c101d] border border-white/15 shadow-2xl p-1 z-50 text-xs space-y-0.5">
+              <div className="absolute right-0 mt-1.5 w-48 rounded-xl bg-[#141516] border border-[#23252a] shadow-2xl p-1 z-50 text-xs space-y-0.5">
                 <button
                   onClick={() => { setZenMode('split'); setShowZenMenu(false); }}
                   className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-slate-200 transition"
@@ -621,6 +643,21 @@ export const ProblemWorkspace = () => {
 
         </div>
       </div>
+
+      {/* Phase-aware banner: CODING gọn, ngoài CODING cảnh báo 409 */}
+      {phase !== 'CODING' ? (
+        <div className="px-4 py-1.5 bg-[#141516] border-b border-[#23252a] text-[11px] flex items-center gap-2 shrink-0">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+          <span className="text-amber-300 font-semibold">Ngoài giờ Coding — bài nộp không tính điểm</span>
+          <span className="text-slate-500 font-mono">(server 409 • phase {String(phase || 'UNKNOWN')})</span>
+        </div>
+      ) : (
+        <div className="px-4 py-1 bg-[#0f1011] border-b border-[#23252a] text-[11px] flex items-center gap-2 shrink-0 text-slate-500">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+          <span className="font-medium">Đang trong giờ Coding</span>
+          <span className="font-mono text-slate-400">{formattedTime}</span>
+        </div>
+      )}
 
       {/* ======================================================== */}
       {/* 2. RESIZABLE MULTI-PANE WORKSPACE CONTAINER             */}
@@ -783,6 +820,15 @@ export const ProblemWorkspace = () => {
                       <div>
                         <span className={`text-xs font-bold block ${submissionVerdict.ok ? 'text-emerald-300' : 'text-red-300'}`}>{submissionVerdict.verdict}</span>
                         <span className="text-[11px] opacity-80">{submissionVerdict.detail}</span>
+                        {submissionVerdict.code === 'NO_TOKEN' && (
+                          <button
+                            type="button"
+                            onClick={() => navigate('/login?redirect=' + encodeURIComponent(window.location.pathname))}
+                            className="mt-2 px-3 py-1 rounded-lg bg-[#141516] border border-[#34343a] text-slate-200 text-[11px] font-semibold hover:bg-[#18191a] transition"
+                          >
+                            Đăng nhập lại
+                          </button>
+                        )}
                       </div>
                       {submissionVerdict.ok && (
                         <span className="text-sm font-extrabold text-emerald-400">+{submissionVerdict.points}đ</span>
@@ -1022,12 +1068,28 @@ export const ProblemWorkspace = () => {
                     >
                       {runAllBusy ? 'Đang chạy...' : 'Chạy hết'}
                     </button>
+                    <button
+                      onClick={handleLoadSample}
+                      className="px-2 py-0.5 rounded text-[11px] bg-[#0f1011] hover:bg-[#18191a] border border-[#23252a] text-slate-300 transition"
+                      title="Copy sampleInput của đề vào input của case đang chọn"
+                    >
+                      Nạp mẫu vào console
+                    </button>
                   </div>
                 )}
               </div>
 
-              <div className="flex items-center gap-3 text-[11px] text-slate-400">
+              <div className="flex items-center gap-2 text-[11px] text-slate-400">
                 <span className="hidden sm:inline">Phím tắt: <kbd className="px-1 py-0.5 rounded bg-white/10 text-[10px] font-mono">Ctrl + '</kbd> Chạy thử • <kbd className="px-1 py-0.5 rounded bg-white/10 text-[10px] font-mono">Ctrl + Enter</kbd> Nộp bài</span>
+                <button
+                  type="button"
+                  onClick={() => setShowShortcuts(true)}
+                  className="w-6 h-6 rounded-full bg-[#0f1011] border border-[#23252a] text-slate-300 hover:text-white hover:bg-[#18191a] transition text-xs font-bold"
+                  title="Xem phím tắt (?)"
+                  aria-label="Mở bảng phím tắt"
+                >
+                  ?
+                </button>
               </div>
             </div>
 
@@ -1145,6 +1207,66 @@ export const ProblemWorkspace = () => {
         </div>
 
       </div>
+
+      {/* Overlay phím tắt: mở bằng "?", đóng bằng Esc / click ngoài, focus trap cơ bản */}
+      {showShortcuts && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setShowShortcuts(false); }}
+        >
+          <div
+            ref={shortcutDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Phím tắt workspace"
+            tabIndex={-1}
+            onKeyDown={(e) => {
+              if (e.key !== 'Tab') return;
+              const root = shortcutDialogRef.current;
+              if (!root) return;
+              const items = root.querySelectorAll('button, [href], [tabindex]:not([tabindex="-1"])');
+              if (items.length === 0) return;
+              const first = items[0];
+              const last = items[items.length - 1];
+              if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+              } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+              }
+            }}
+            className="w-full max-w-sm rounded-xl bg-[#141516] border border-[#23252a] p-4 text-sm"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-white font-bold text-sm">Phím tắt</h3>
+              <button
+                ref={shortcutCloseRef}
+                type="button"
+                onClick={() => setShowShortcuts(false)}
+                className="px-2 py-0.5 rounded-lg bg-[#0f1011] border border-[#23252a] text-slate-300 hover:text-white text-xs"
+              >
+                Đóng (Esc)
+              </button>
+            </div>
+            <ul className="space-y-2 text-xs text-slate-300">
+              <li className="flex items-center justify-between gap-3">
+                <span>Nộp bài</span>
+                <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[11px]">Ctrl + Enter</kbd>
+              </li>
+              <li className="flex items-center justify-between gap-3">
+                <span>Chạy thử</span>
+                <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[11px]">Ctrl + &apos;</kbd>
+              </li>
+              <li className="flex items-center justify-between gap-3">
+                <span>Thoát zen / đóng overlay</span>
+                <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[11px]">Esc</kbd>
+              </li>
+            </ul>
+            <p className="mt-3 text-[11px] text-slate-500">Nhấn Esc hoặc click ngoài để đóng.</p>
+          </div>
+        </div>
+      )}
 
     </div>
   );
