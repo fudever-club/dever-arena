@@ -105,6 +105,23 @@ export const StandingsPage = () => {
   const [dataSource, setDataSource] = useState('demo'); // demo | live
   const [refreshIn, setRefreshIn] = useState(30);
   const autoPlayTimerRef = useRef(null);
+  const FRIENDS_KEY = 'dever_friends';
+  const [friends, setFriends] = useState(() => {
+    try {
+      const raw = localStorage.getItem(FRIENDS_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string') : [];
+    } catch { return []; }
+  });
+  const [friendsOnly, setFriendsOnly] = useState(false);
+
+  const toggleFriend = (username) => {
+    setFriends((prev) => {
+      const next = prev.includes(username) ? prev.filter((u) => u !== username) : [...prev, username];
+      try { localStorage.setItem(FRIENDS_KEY, JSON.stringify(next)); } catch { /* quota riêng tư: giữ state ram */ }
+      return next;
+    });
+  };
 
   // Màu rank 7 bậc Codeforces (đồng bộ Navbar)
   const rankColor = (rating) => {
@@ -284,7 +301,8 @@ export const StandingsPage = () => {
   const filteredStandings = standings.filter((coder) => {
     const matchesName = coder.username.toLowerCase().includes(searchTerm.toLowerCase()) || coder.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRoom = !roomFilter || (coder.room_id || '') === roomFilter;
-    return matchesName && matchesRoom;
+    const matchesFriend = !friendsOnly || friends.includes(coder.username);
+    return matchesName && matchesRoom && matchesFriend;
   });
   const rooms = [...new Set(standings.map((c) => c.room_id).filter(Boolean))].sort();
   const pageCount = Math.max(1, Math.ceil(filteredStandings.length / PAGE_SIZE));
@@ -292,13 +310,77 @@ export const StandingsPage = () => {
   const pagedStandings = filteredStandings.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
   const solvedCountOf = (coder) => Object.values(coder.problems || {}).filter((p) => p.status === 'AC').length;
 
-  const getProblemBadge = (prob) => {
+  // First-blood mỗi cột bài: minute AC nhỏ nhất (guard khi thiếu minute).
+  const firstBloodMinuteByProblem = {};
+  problemCodes.forEach((code) => {
+    let best = null;
+    standings.forEach((coder) => {
+      const p = (coder.problems || {})[code];
+      if (p && p.status === 'AC' && p.minute != null && Number.isFinite(Number(p.minute))) {
+        const m = Number(p.minute);
+        if (best === null || m < best) best = m;
+      }
+    });
+    if (best !== null) firstBloodMinuteByProblem[code] = best;
+  });
+
+  const escapeCsvCell = (value) => {
+    const s = String(value ?? '');
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const problemCellToCsv = (prob) => {
+    if (!prob) return '';
+    if (prob.status === 'AC') return String(prob.points);
+    if (prob.status === 'FROZEN') return '?';
+    if (prob.status === 'HACKED') return 'HACKED';
+    if (prob.status === 'WA') return `-${prob.attempts ?? 0}`;
+    return '';
+  };
+
+  const handleExportCsv = () => {
+    const header = ['rank', 'username', 'rating', 'total', 'solved', 'hack', ...problemCodes];
+    const lines = [header.join(',')];
+    filteredStandings.forEach((coder) => {
+      const row = [
+        coder.rank,
+        coder.username,
+        coder.rating ?? '',
+        calculateTotal(coder),
+        solvedCountOf(coder),
+        coder.hackScore ?? 0,
+        ...problemCodes.map((code) => problemCellToCsv((coder.problems || {})[code])),
+      ].map(escapeCsvCell).join(',');
+      lines.push(row);
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'standings.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const getProblemBadge = (prob, code) => {
     if (!prob) return <span className="text-slate-600 font-mono">-</span>;
     if (prob.status === 'AC') {
       const extra = [prob.attempts > 1 ? `${prob.attempts} lần` : null, prob.minute != null ? `${prob.minute}′` : null].filter(Boolean).join(' • ');
+      const isFirstBlood = code != null
+        && prob.minute != null
+        && Number.isFinite(Number(prob.minute))
+        && firstBloodMinuteByProblem[code] != null
+        && Number(prob.minute) === firstBloodMinuteByProblem[code];
       return (
         <span>
-          <span className="px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono font-bold">
+          <span
+            title={isFirstBlood ? 'First blood' : undefined}
+            className={isFirstBlood
+              ? 'px-2 py-0.5 rounded bg-emerald-500/15 border-2 border-emerald-400 text-emerald-300 font-mono font-bold'
+              : 'px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono font-bold'}
+          >
             +{prob.points}
           </span>
           {extra && <span className="block text-[10px] text-slate-500 font-mono mt-0.5">{extra}</span>}
@@ -407,17 +489,34 @@ export const StandingsPage = () => {
             className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:border-[#ff6600] outline-none"
           />
         </div>
-        {rooms.length > 0 && (
-          <select
-            value={roomFilter}
-            onChange={(e) => { setRoomFilter(e.target.value); setPage(0); }}
-            className="px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-slate-200 outline-none"
-            aria-label="Lọc theo phòng thi"
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+          <label className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-slate-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={friendsOnly}
+              onChange={(e) => { setFriendsOnly(e.target.checked); setPage(0); }}
+              className="accent-amber-500"
+            />
+            Chỉ bạn bè
+          </label>
+          <button
+            onClick={handleExportCsv}
+            className="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 font-semibold border border-white/10 transition"
           >
-            <option value="">Tất cả các phòng</option>
-            {rooms.map((r) => (<option key={r} value={r}>{r}</option>))}
-          </select>
-        )}
+            Xuất CSV
+          </button>
+          {rooms.length > 0 && (
+            <select
+              value={roomFilter}
+              onChange={(e) => { setRoomFilter(e.target.value); setPage(0); }}
+              className="px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-slate-200 outline-none"
+              aria-label="Lọc theo phòng thi"
+            >
+              <option value="">Tất cả các phòng</option>
+              {rooms.map((r) => (<option key={r} value={r}>{r}</option>))}
+            </select>
+          )}
+        </div>
       </div>
 
       {/* 3. Standings Table */}
@@ -447,17 +546,26 @@ export const StandingsPage = () => {
           <tbody className="divide-y divide-white/5">
             {pagedStandings.map((coder) => {
               const total = calculateTotal(coder);
-              const isCurrentUser = coder.username === user.username;
+              const isCurrentUser = coder.username === user?.username;
+              const isFriend = friends.includes(coder.username);
               return (
                 <tr
                   key={coder.id}
-                  className={`transition ${isCurrentUser ? 'bg-orange-500/10 hover:bg-orange-500/15' : 'hover:bg-white/5'}`}
+                  className={`transition border-l-2 ${isCurrentUser ? 'bg-orange-500/10 hover:bg-orange-500/15' : isFriend ? 'bg-amber-500/5 hover:bg-amber-500/10' : 'hover:bg-white/5'} ${isFriend ? 'border-l-amber-400/60' : 'border-l-transparent'}`}
                 >
                   <td className="py-3.5 px-3 text-center font-bold font-mono text-sm">
                     {coder.rank}
                   </td>
                   <td className="py-3.5 px-4">
                     <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => toggleFriend(coder.username)}
+                        aria-label={isFriend ? `Bỏ theo dõi ${coder.username}` : `Theo dõi ${coder.username}`}
+                        title={isFriend ? 'Bỏ bạn bè' : 'Thêm bạn bè'}
+                        className={`text-sm leading-none transition ${isFriend ? 'text-amber-400' : 'text-slate-600 hover:text-amber-300'}`}
+                      >
+                        {isFriend ? '★' : '☆'}
+                      </button>
                       <span className={`font-bold text-sm hover:underline cursor-pointer ${rankColor(coder.rating)}`}>
                         {coder.username}
                       </span>
@@ -496,7 +604,7 @@ export const StandingsPage = () => {
                     )}
                   </td>
                   {problemCodes.map((code) => (
-                    <td key={code} className="py-3.5 px-3 text-center">{getProblemBadge(coder.problems[code])}</td>
+                    <td key={code} className="py-3.5 px-3 text-center">{getProblemBadge(coder.problems[code], code)}</td>
                   ))}
                     </>
                   )}
