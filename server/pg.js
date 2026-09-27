@@ -24,7 +24,7 @@ export const MIGRATE_SQL = [
    ON CONFLICT (key) DO NOTHING`,
 ];
 
-const COLLECTIONS = ['users', 'contests', 'problems', 'testcases', 'submissions', 'hacks', 'participants', 'virtual_sessions', 'clans'];
+const COLLECTIONS = ['users', 'contests', 'problems', 'testcases', 'submissions', 'hacks', 'participants', 'virtual_sessions', 'clans', 'clarifications', 'announcements'];
 
 export async function createPgStore(pool, opts = {}) {
   const flushMs = opts.flushMs ?? 5000;

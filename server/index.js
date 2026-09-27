@@ -955,6 +955,78 @@ route('POST', '^/api/v1/testing/report$', async (req, res, url, m, user) => {
   send(res, 201, { report });
 }, { auth: true });
 
+// ---- Clarifications (hỏi đáp jury, chuẩn ICPC) ----
+route('POST', '^/api/v1/clarifications$', async (req, res, url, m, user) => {
+  const { contest_id, problem_id = null, question } = await readBody(req);
+  const c = db.find('contests', (x) => x.id === contest_id);
+  if (!c) { send(res, 404, { error: 'CONTEST_NOT_FOUND', message: 'Contest không tồn tại.' }); return; }
+  const q = String(question || '').trim();
+  if (!q) { send(res, 422, { error: 'EMPTY_QUESTION', message: 'Câu hỏi không được để trống.' }); return; }
+  let pid = null;
+  if (problem_id !== null && problem_id !== undefined && String(problem_id).trim() !== '') {
+    const prob = db.find('problems', (p) => p.id === String(problem_id));
+    if (!prob) { send(res, 404, { error: 'PROBLEM_NOT_FOUND', message: 'Không tìm thấy đề.' }); return; }
+    pid = prob.id;
+  }
+  void url; void m;
+  const clar = db.insert('clarifications', {
+    id: db.nextId('clr'), contest_id: c.id, problem_id: pid, asker_id: user.id,
+    question: q, answer: null, answered_by: null, answered_at: null, created_at: new Date().toISOString(),
+  });
+  send(res, 201, { clarification: clar });
+}, { auth: true });
+route('GET', '^/api/v1/clarifications$', async (req, res, url, m, user) => {
+  const contest_id = url.searchParams.get('contest_id') || '';
+  if (!contest_id) { send(res, 422, { error: 'MISSING_CONTEST_ID', message: 'Thiếu contest_id.' }); return; }
+  void req; void m;
+  const rows = db.filter('clarifications', (x) => x.contest_id === contest_id)
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  if (user.role === 'ADMIN') {
+    send(res, 200, { clarifications: rows });
+    return;
+  }
+  const visible = rows.filter((x) => x.answer != null || x.asker_id === user.id);
+  send(res, 200, {
+    clarifications: visible.map((x) => {
+      const { asker_id, ...rest } = x;
+      return { ...rest, asker: asker_id === user.id ? 'me' : null };
+    }),
+  });
+}, { auth: true });
+route('POST', '^/api/v1/admin/clarifications/([^/]+)/answer$', async (req, res, url, m, user) => {
+  const clar = db.find('clarifications', (x) => x.id === decodeURIComponent(m[1]));
+  if (!clar) { send(res, 404, { error: 'NOT_FOUND', message: 'Không tìm thấy câu hỏi.' }); return; }
+  void url;
+  const { answer } = await readBody(req);
+  const a = String(answer || '').trim();
+  if (!a) { send(res, 422, { error: 'EMPTY_ANSWER', message: 'Câu trả lời không được để trống.' }); return; }
+  db.update('clarifications', (x) => x.id === clar.id, { answer: a, answered_by: user.id, answered_at: new Date().toISOString() });
+  send(res, 200, { clarification: db.find('clarifications', (x) => x.id === clar.id) });
+}, { auth: true, admin: true });
+
+// ---- Announcements (thông báo toàn contest) ----
+route('POST', '^/api/v1/admin/announcements$', async (req, res, url, m, user) => {
+  const { contest_id, message } = await readBody(req);
+  const c = db.find('contests', (x) => x.id === contest_id);
+  if (!c) { send(res, 404, { error: 'CONTEST_NOT_FOUND', message: 'Contest không tồn tại.' }); return; }
+  void url; void m;
+  const msg = String(message || '').trim();
+  if (!msg) { send(res, 422, { error: 'EMPTY_MESSAGE', message: 'Thông báo không được để trống.' }); return; }
+  const ann = db.insert('announcements', {
+    id: db.nextId('ann'), contest_id: c.id, message: msg, created_by: user.id, created_at: new Date().toISOString(),
+  });
+  broadcast(c.id, 'EVENT_ANNOUNCEMENT', { announcement: ann });
+  send(res, 201, { announcement: ann });
+}, { auth: true, admin: true });
+route('GET', '^/api/v1/announcements$', async (req, res, url, m, user) => {
+  const contest_id = url.searchParams.get('contest_id') || '';
+  void req; void m; void user;
+  let rows = [...db.data.announcements];
+  if (contest_id) rows = rows.filter((x) => x.contest_id === contest_id);
+  rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  send(res, 200, { announcements: rows });
+}, { auth: true });
+
 route('GET', '^/api/v1/stream/contests/([^/]+)$', async (req, res, url, m) => {
   const c = findContest(decodeURIComponent(m[1]));
   if (!c) { send(res, 404, { error: 'CONTEST_NOT_FOUND' }); return; }
