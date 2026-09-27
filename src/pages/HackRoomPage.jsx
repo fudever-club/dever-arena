@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useContest } from '../context/ContestContext';
 import { validateInput } from '../engine/testlibValidator.js';
+import { generateSuite } from '../engine/testGenerator.js';
 import { api, getToken } from '../lib/apiClient';
+
+const HACK_HISTORY_KEY = 'dever_hack_history';
+const DEFAULT_BOUNDS = { minN: 1, maxN: 200000, minVal: -1000000000, maxVal: 1000000000 };
 
 const ROOM_PARTICIPANTS = [
   {
@@ -82,7 +86,7 @@ if __name__ == '__main__':
 ];
 
 export const HackRoomPage = () => {
-  const { phase, formattedTime, contestId, contestSlug } = useContest();
+  const { phase, formattedTime, contestId, contestSlug, problems } = useContest();
 
   const [selectedCoder, setSelectedCoder] = useState(ROOM_PARTICIPANTS[0]);
   const [selectedProblemCode, setSelectedProblemCode] = useState('B');
@@ -93,8 +97,25 @@ export const HackRoomPage = () => {
   const [roomData, setRoomData] = useState(ROOM_PARTICIPANTS);
   const [dataSource, setDataSource] = useState('demo'); // demo | live
   const [myId, setMyId] = useState(null);
-  const [hackHistory, setHackHistory] = useState([]);
+  const [hackHistory, setHackHistory] = useState(() => {
+    try {
+      const raw = localStorage.getItem(HACK_HISTORY_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.slice(0, 20) : [];
+    } catch {
+      return [];
+    }
+  });
   const canHack = phase === 'HACK_PHASE';
+
+  const contestProblem = (problems || []).find((p) => p.code === selectedProblemCode);
+  const bounds = {
+    minN: contestProblem?.bounds?.minN ?? DEFAULT_BOUNDS.minN,
+    maxN: contestProblem?.bounds?.maxN ?? DEFAULT_BOUNDS.maxN,
+    minVal: contestProblem?.bounds?.minVal ?? DEFAULT_BOUNDS.minVal,
+    maxVal: contestProblem?.bounds?.maxVal ?? DEFAULT_BOUNDS.maxVal,
+  };
 
   const loadRoom = async () => {
     try {
@@ -146,21 +167,57 @@ export const HackRoomPage = () => {
   const isSelf = Boolean(myId && selectedCoder.id === myId);
   const openChallenges = roomData.reduce((n, c) => n + c.solvedProblems.filter((p) => !p.isHacked).length, 0);
 
-  const pushHistory = (entry) => setHackHistory((h) => [{ at: new Date().toISOString(), ...entry }, ...h].slice(0, 20));
+  const pushHistory = (entry) => {
+    setHackHistory((h) => {
+      const next = [{ at: new Date().toISOString(), ...entry }, ...h].slice(0, 20);
+      try { localStorage.setItem(HACK_HISTORY_KEY, JSON.stringify(next)); } catch { /* quota riêng tư: giữ state memory */ }
+      return next;
+    });
+  };
 
   const handleTestcaseChange = (val) => {
     setCounterTestcase(val);
-    // Live Testlib Validator
+    // Live Testlib Validator theo bounds của đề đang chọn
     const validation = validateInput(val, {
-      minN: 1,
-      maxN: 200000,
-      minVal: -1000000000,
-      maxVal: 1000000000,
+      minN: bounds.minN,
+      maxN: bounds.maxN,
+      minVal: bounds.minVal,
+      maxVal: bounds.maxVal,
       requireTrailingNewline: true,
       disallowTrailingSpaces: true
     });
     setTestlibResult(validation);
   };
+
+  const handlePreset = (kind) => {
+    const suite = generateSuite({
+      count: 12,
+      seed: `hack-${selectedProblemCode}-${kind}`,
+      minN: bounds.minN,
+      maxN: bounds.maxN,
+      minVal: bounds.minVal,
+      maxVal: bounds.maxVal,
+    });
+    let picked = null;
+    if (kind === 'overflow') picked = suite.find((c) => c.strategy === 'trap:overflow');
+    else if (kind === 'nmax') picked = suite.find((c) => c.strategy === 'trap:n-max');
+    else if (kind === 'n1') picked = suite.find((c) => c.strategy === 'trap:n-1');
+    const stdin = picked?.stdin || suite[0]?.stdin || '';
+    if (stdin) handleTestcaseChange(stdin);
+  };
+
+  // Kiểm tra lại input hiện tại khi đổi bài (bounds đổi theo đề)
+  useEffect(() => {
+    setTestlibResult(validateInput(counterTestcase, {
+      minN: bounds.minN,
+      maxN: bounds.maxN,
+      minVal: bounds.minVal,
+      maxVal: bounds.maxVal,
+      requireTrailingNewline: true,
+      disallowTrailingSpaces: true
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProblemCode, problems]);
 
   const handleExecuteHack = async () => {
     if (!testlibResult.isValid) {
@@ -427,9 +484,35 @@ export const HackRoomPage = () => {
               className="w-full p-3 rounded-xl bg-[#010102] border border-[#23252a] font-mono text-xs text-slate-200 focus:border-[#ff6600] outline-none disabled:opacity-50"
               placeholder="VD: 3\n100000 100000 100000\n"
             />
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => handlePreset('overflow')}
+                disabled={!canHack}
+                className="px-2.5 py-1.5 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#34343a] text-slate-300 text-[11px] font-semibold transition disabled:opacity-50"
+              >
+                Tràn số
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePreset('nmax')}
+                disabled={!canHack}
+                className="px-2.5 py-1.5 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#34343a] text-slate-300 text-[11px] font-semibold transition disabled:opacity-50"
+              >
+                N max
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePreset('n1')}
+                disabled={!canHack}
+                className="px-2.5 py-1.5 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#34343a] text-slate-300 text-[11px] font-semibold transition disabled:opacity-50"
+              >
+                N=1
+              </button>
+            </div>
             <p className="text-[11px] text-slate-500">
               Input phải đúng định dạng đề bài: kết thúc bằng một ký tự xuống dòng, không dư khoảng trắng cuối dòng.
-              Đang kiểm tra theo N trong [1, 200000], phần tử trong ±10⁹ (đổi theo từng bài trong bản Polygon đầy đủ).
+              Đang kiểm tra theo N∈[{bounds.minN},{bounds.maxN}], phần tử trong [{bounds.minVal},{bounds.maxVal}].
             </p>
           </div>
 
