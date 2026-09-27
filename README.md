@@ -15,7 +15,7 @@
 [![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8.2-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4.3-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Tests](https://img.shields.io/badge/Tests-153%2F153%20Passed%20(100%25)-success?logo=checkmarx&logoColor=white)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-157%2F157%20Passed%20(100%25)-success?logo=checkmarx&logoColor=white)](tests/)
 [![Website](https://img.shields.io/badge/Website-fudever.com-FF6600?logo=google-chrome&logoColor=white)](https://fu-dever-landingpage-v2.vercel.app/)
 [![GitHub Org](https://img.shields.io/badge/GitHub-fudever--club-181717?logo=github&logoColor=white)](https://github.com/fudever-club)
 
@@ -195,7 +195,7 @@ Bản build tối ưu hóa sẽ được tạo tại thư mục `dist/`.
 Dự án áp dụng quy chuẩn kiểm thử nghiêm ngặt với bộ Test Runner tích hợp sẵn trong Node.js (Zero external test runner bloatware):
 
 ```bash
-# Chạy toàn bộ Test Suites (153 tests / 25 suites)
+# Chạy toàn bộ Test Suites (157 tests / 25 suites)
 npm run test
 
 # Chạy chế độ theo dõi (Watch mode)
@@ -210,9 +210,9 @@ npm run lint
 ✔ DEVER-Forces Rating Engine Tests
 ✔ DEVER Server API Lifecycle Tests (judge thật, hack oracle, Elo, SSE)
 ...
-ℹ tests 153
+ℹ tests 157
 ℹ suites 21
-ℹ pass 153
+ℹ pass 157
 ℹ fail 0
 ```
 
@@ -262,7 +262,7 @@ dever-arena/
 ├── docker-compose.yml          # Production: web + api + db (Postgres)
 ├── .env.example                # Mẫu biến môi trường production
 ├── DESIGN.md                   # Design library (Linear consensus)
-├── tests/                      # Bộ test suites kiểm thử tự động (153 tests / 25 suites)
+├── tests/                      # Bộ test suites kiểm thử tự động (157 tests / 25 suites)
 ├── app.html                    # Giao diện ứng dụng SPA (duy nhất)
 ├── detect.mjs                  # Bộ kiểm tra ràng buộc kiến trúc bất biến
 ├── package.json

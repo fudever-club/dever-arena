@@ -12,7 +12,7 @@ Seed: `dever_hero/hero123` (thí sinh), `dever_admin/admin123` (giám khảo).
 
 ## 2. Vòng verify bắt buộc trước mọi PR
 ```bash
-npm run test    # 153 tests / 25 suites, phải 153 pass
+npm run test    # 157 tests / 25 suites, phải 157 pass
 node detect.mjs # 0 error
 npm run build   # bundle sạch
 ```

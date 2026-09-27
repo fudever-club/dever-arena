@@ -131,10 +131,12 @@ describe('DEVER Arena Platform Quality & Ticker Suite', () => {
   test('Core routes contract: src/App.jsx has CF loop routes and no /clans', () => {
     const appJsx = readFileSync('src/App.jsx', 'utf8');
 
-    for (const route of ['path="/"', 'path="/arena"', 'path="/login"', 'path="/problem/:id"', 'path="/standings"', 'path="/hack-room"', 'path="/admin']) {
+    for (const route of ['path="/"', 'path="/arena"', 'path="/login"', 'path="/problem/:id"', 'path="/standings"', 'path="/hack-room"', 'path="/admin"', 'path="/problemset"', 'path="/profile"']) {
       assert.ok(appJsx.includes(route), `src/App.jsx phải có route ${route}`);
     }
     assert.ok(!appJsx.includes('ClansPage') && !appJsx.includes('"/clans"') && !appJsx.includes("'/clans'"), 'src/App.jsx không còn route /clans');
   });
+
+});
 
 });
