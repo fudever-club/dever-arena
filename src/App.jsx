@@ -13,6 +13,7 @@ import { ContestHub } from './pages/ContestHub';
 const ProblemWorkspace = lazy(() => import('./pages/ProblemWorkspace.jsx').then(m => ({ default: m.ProblemWorkspace })));
 const StandingsPage = lazy(() => import('./pages/StandingsPage.jsx').then(m => ({ default: m.StandingsPage })));
 const HackRoomPage = lazy(() => import('./pages/HackRoomPage.jsx').then(m => ({ default: m.HackRoomPage })));
+const ProblemsetPage = lazy(() => import('./pages/ProblemsetPage.jsx').then(m => ({ default: m.ProblemsetPage })));
 
 const PageFallback = () => (
   <div className="min-h-[50vh] flex items-center justify-center text-slate-400 text-sm">
@@ -58,6 +59,7 @@ export function App() {
                 <Route path="/problem/:id" element={<Suspense fallback={<PageFallback />}><ProblemWorkspace /></Suspense>} />
                 <Route path="/standings" element={<Suspense fallback={<PageFallback />}><StandingsPage /></Suspense>} />
                 <Route path="/hack-room" element={<Suspense fallback={<PageFallback />}><HackRoomPage /></Suspense>} />
+                <Route path="/problemset" element={<Suspense fallback={<PageFallback />}><ProblemsetPage /></Suspense>} />
               </Route>
             </Route>
 
