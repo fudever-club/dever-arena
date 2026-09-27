@@ -140,12 +140,12 @@ export const LandingPage = () => {
         <div className="mt-14 max-w-3xl mx-auto rounded-2xl bg-[#0f1011] border border-[#23252a] overflow-hidden text-left">
           {/* Sandbox Topbar */}
           <div className="h-10 bg-[#141516] border-b border-[#23252a] px-4 flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-300">
+            <span className="text-xs font-semibold text-slate-300">
               Chạy thử code ngay, không cần đăng nhập
             </span>
 
             {/* Language Picker */}
-            <div className="flex items-center gap-1 bg-black/40 p-0.5 rounded border border-white/5 text-xs">
+            <div className="flex items-center gap-1 bg-[#010102] p-0.5 rounded border border-[#23252a] text-xs">
               <button
                 onClick={() => handleLangChange('cpp')}
                 className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${sandboxLang === 'cpp' ? 'bg-[#ff6600] text-white' : 'text-slate-400 hover:text-white'}`}
@@ -195,7 +195,7 @@ export const LandingPage = () => {
 
           {/* Sandbox Output Console */}
           {sandboxOutput && (
-            <div className="p-3.5 bg-black/80 border-t border-white/10 font-mono text-xs text-emerald-400 whitespace-pre-line animate-fadeIn">
+            <div className="p-3.5 bg-[#010102] border-t border-[#23252a] font-mono text-xs text-emerald-400 whitespace-pre-line">
               <span className="text-[10px] text-slate-500 block mb-1">Standard Output (stdout):</span>
               {sandboxOutput}
             </div>
@@ -210,7 +210,7 @@ export const LandingPage = () => {
             <div className="p-5 rounded-xl bg-[#010102] border border-[#ff6600]/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <div className="text-[10px] font-semibold tracking-widest text-[#62666d] uppercase mb-1">Kỳ thi tiếp theo</div>
-                <div className="font-bold text-white">{nextContest.title}</div>
+                <div className="font-semibold text-white">{nextContest.title}</div>
                 <div className="text-[11px] text-slate-400 font-mono mt-0.5">
                   Bắt đầu {new Date(nextContest.start_time).toLocaleString('vi-VN')} • {nextContest.duration_minutes} phút • {nextContest.contest_format}
                 </div>
@@ -233,12 +233,12 @@ export const LandingPage = () => {
                 </thead>
                 <tbody className="divide-y divide-[#23252a]">
                   {contests.slice(0, 8).map((c) => (
-                    <tr key={c.id} className="hover:bg-white/[0.02] transition">
-                      <td className="py-3 px-4 font-bold text-slate-200">{c.title}</td>
+                      <tr key={c.id} className="hover:bg-[#141516] transition">
+                      <td className="py-3 px-4 font-semibold text-slate-200">{c.title}</td>
                       <td className="py-3 px-4 font-mono text-slate-400">{new Date(c.start_time).toLocaleString('vi-VN')}</td>
                       <td className="py-3 px-4 font-mono text-slate-400">{c.duration_minutes}′</td>
                       <td className="py-3 px-4 text-right">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-white/5 text-slate-300 border-white/10">{c.status}</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-[#141516] text-slate-300 border-[#23252a]">{c.status}</span>
                       </td>
                     </tr>
                   ))}
@@ -248,19 +248,19 @@ export const LandingPage = () => {
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
               <div>
-                <span className="font-mono text-3xl font-bold text-[#ff6600] block">{stats.contests ?? '—'}</span>
+                <span className="font-mono text-3xl font-semibold text-[#ff6600] block">{stats.contests ?? '—'}</span>
                 <span className="text-xs text-slate-400 mt-1 block">Kỳ thi trên hệ thống</span>
               </div>
               <div>
-                <span className="font-mono text-3xl font-bold text-[#f7f8f8] block">{stats.problems ?? '—'}</span>
+                <span className="font-mono text-3xl font-semibold text-[#f7f8f8] block">{stats.problems ?? '—'}</span>
                 <span className="text-xs text-slate-400 mt-1 block">Bài tập trong kho đề</span>
               </div>
               <div>
-                <span className="font-mono text-3xl font-bold text-[#f7f8f8] block">JS · Py</span>
+                <span className="font-mono text-3xl font-semibold text-[#f7f8f8] block">JS · Py</span>
                 <span className="text-xs text-slate-400 mt-1 block">Ngôn ngữ chấm thật (local)</span>
               </div>
               <div>
-                <span className="font-mono text-3xl font-bold text-[#f7f8f8] block">5</span>
+                <span className="font-mono text-3xl font-semibold text-[#f7f8f8] block">5</span>
                 <span className="text-xs text-slate-400 mt-1 block">Giai đoạn một vòng thi</span>
               </div>
             </div>
@@ -277,57 +277,135 @@ export const LandingPage = () => {
           </div>
           <div className="rounded-xl border border-[#23252a] overflow-hidden divide-y divide-[#23252a]">
             {topProblems.map((p) => (
-              <Link key={p.id} to="/arena" className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition">
-                <span className="font-mono font-bold text-[#ff6600] text-sm w-10">{p.code}</span>
+              <Link key={p.id} to="/arena" className="flex items-center gap-3 px-4 py-3 hover:bg-[#141516] transition">
+                <span className="font-mono font-semibold text-[#ff6600] text-sm w-10">{p.code}</span>
                 <span className="flex-1 font-medium text-slate-200 text-sm truncate">{p.title}</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-white/5 text-slate-400 border border-white/10 font-mono">{p.rating || 1000}</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[#141516] text-slate-400 border border-[#23252a] font-mono">{p.rating || 1000}</span>
               </Link>
             ))}
           </div>
         </section>
       )}
 
-      {/* 3. CORE FEATURES GRID */}
+      {/* 3. LUẬT CHƠI 4 BƯỚC */}
       <section className="py-20 px-6 max-w-6xl mx-auto">
         <div className="text-center mb-12">
           <h2 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight">
-            Thể thức thi đấu
+            Luật chơi 4 bước
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-xl mx-auto">
-            Luật thi theo vòng: làm bài tính giờ, bẻ khóa bài đối thủ, chấm lại toàn bộ rồi xếp hạng Elo.
+            Đăng ký → Coding 120 phút → Hack 15 phút → System Test + Elo. Tổng 135 phút một vòng thi chuẩn.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-3 hover:border-[#34343a] transition group">
-            <div className="font-mono text-xs font-bold text-[#ff6600]">01</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-3">
+            <div className="font-mono text-xs font-semibold text-[#8a8f98]">01</div>
             <h3 className="text-base font-medium text-white tracking-tight">
-              Thi đấu tính giờ
+              Đăng ký
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Điểm mỗi bài giảm dần theo từng phút: <code className="text-[#ff6600]">Pmax - Pmax*t/250 - 50*W</code>. Nộp càng sớm điểm càng cao.
+              Tài khoản thi đấu do BTC cấp. Đăng nhập đúng tài khoản trước giờ thi để được tính Elo.
             </p>
           </div>
 
-          <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-3 hover:border-[#34343a] transition group">
-            <div className="font-mono text-xs font-bold text-[#8a8f98]">02</div>
+          <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-3">
+            <div className="font-mono text-xs font-semibold text-[#8a8f98]">02</div>
             <h3 className="text-base font-medium text-white tracking-tight">
-              Phòng thách đấu
+              Coding · 120′
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Sau giờ làm bài, mỗi phòng được xem code của nhau trong 15 phút. Tìm input làm code đối thủ sai để được <b className="text-slate-200">+100 điểm</b>.
+              Làm bài độc lập, chấm Pretests. Điểm giảm dần theo phút, sàn 30% điểm gốc.
             </p>
           </div>
 
-          <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-3 hover:border-[#34343a] transition group">
-            <div className="font-mono text-xs font-bold text-[#8a8f98]">03</div>
+          <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-3">
+            <div className="font-mono text-xs font-semibold text-[#8a8f98]">03</div>
             <h3 className="text-base font-medium text-white tracking-tight">
-              Chống gian lận mã nguồn
+              Hack · 15′
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              So khớp cây cú pháp để phát hiện bài sao chép dù đã đổi tên biến hay xóa chú thích. Bài vi phạm bị hủy kết quả.
+              Cùng phòng xem code của nhau, tung input bẻ khóa: thành công +100, thất bại −50.
             </p>
           </div>
+
+          <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-3">
+            <div className="font-mono text-xs font-semibold text-[#8a8f98]">04</div>
+            <h3 className="text-base font-medium text-white tracking-tight">
+              System Test + Elo
+            </h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Chấm lại toàn bộ test ẩn. Rớt là mất điểm bài đó, chốt bảng xếp hạng và cập nhật Elo.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. FAQ — NỘI QUY */}
+      <section id="faq" className="py-16 px-6 max-w-3xl mx-auto scroll-mt-16">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight">
+            Nội quy &amp; hỏi đáp
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            Tóm tắt từ Quy chế thi đấu và Chính sách chống gian lận của CLB FU-DEVER.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <details className="rounded-xl bg-[#0f1011] border border-[#23252a] px-5 py-4">
+            <summary className="cursor-pointer text-sm font-medium text-slate-200">
+              Thể thức 135 phút gồm những gì?
+            </summary>
+            <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+              Một vòng chuẩn kéo dài 2 giờ 15 phút: Coding 120 phút làm bài độc lập, chấm trên Pretests, tuyệt đối
+              không xem code người khác; Hack 15 phút không nộp bài mới; System Testing chấm lại toàn bộ test ẩn,
+              rớt là mất điểm bài đó.
+            </p>
+          </details>
+
+          <details className="rounded-xl bg-[#0f1011] border border-[#23252a] px-5 py-4">
+            <summary className="cursor-pointer text-sm font-medium text-slate-200">
+              Tài khoản thi đấu lấy ở đâu?
+            </summary>
+            <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+              Tài khoản do ban tổ chức CLB FU-DEVER cấp. Đăng nhập đúng tài khoản được cấp, không dùng chung,
+              không dùng nhiều tài khoản trong cùng một contest (smurfing bị coi là gian lận).
+            </p>
+          </details>
+
+          <details className="rounded-xl bg-[#0f1011] border border-[#23252a] px-5 py-4">
+            <summary className="cursor-pointer text-sm font-medium text-slate-200">
+              Hack là gì? (+100 / −50)
+            </summary>
+            <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+              Sau giờ làm bài, mỗi phòng 20–25 người được xem code đã Pretests Passed của nhau và nộp một input
+              chứng minh code đối thủ sai. Hack thành công (TLE, MLE, WA, RTE) được +100 điểm, bài đối thủ về 0;
+              hack thất bại bị −50 điểm. Input phải đúng giới hạn đề bài.
+            </p>
+          </details>
+
+          <details className="rounded-xl bg-[#0f1011] border border-[#23252a] px-5 py-4">
+            <summary className="cursor-pointer text-sm font-medium text-slate-200">
+              Chống gian lận thế nào?
+            </summary>
+            <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+              Cấm dùng AI tạo sinh, cấm trao đổi đề và code qua Discord, Messenger, Zalo, diễn đàn, cấm đa tài khoản
+              và tấn công máy chấm. Hậu kiểm so khớp cây cú pháp AST và Winnowing: dưới 60% hợp lệ, 60–80% thẩm tra
+              bổ sung, trên 80% gắn cờ đỏ và mời giải trình. Vi phạm bị hủy kết quả, trừ Elo, cấm thi, nặng thì cấm
+              vĩnh viễn và khai trừ khỏi CLB.
+            </p>
+          </details>
+
+          <details className="rounded-xl bg-[#0f1011] border border-[#23252a] px-5 py-4">
+            <summary className="cursor-pointer text-sm font-medium text-slate-200">
+              Liên hệ BTC ở đâu?
+            </summary>
+            <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+              Email club.dever@gmail.com. Thí sinh bị gắn cờ có 48 giờ gửi giải trình và tham gia phỏng vấn Code Defense
+              15 phút để khôi phục kết quả nếu chứng minh được quyền tác giả.
+            </p>
+          </details>
         </div>
       </section>
 
