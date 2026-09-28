@@ -31,7 +31,7 @@ service "api" {
     NODE_ENV            = "production"
     DEVER_JWT_SECRET    = secret.dever_jwt_secret
     DEVER_DATABASE_URL  = postgres.main.url
-    DEVER_CORS_ORIGIN   = "*"
+    DEVER_CORS_ORIGIN   = "https://${service.web.public_url}"
     DEVER_JUDGE_WORKERS = "2"
   }
 }
