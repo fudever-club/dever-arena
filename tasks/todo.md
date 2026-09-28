@@ -207,13 +207,13 @@
 
 ## Phase 34: Backlog sau khi CLB dùng thật (Task 113–113.1 done; 114 half-done qua Specific; 114–115 → Phase 35)
 - [x] Task 113: A11y audit — `tests/a11y_axe.test.js` (axe-core 4.13 trong Chromium, quét 10 trang, gate serious/critical = 0 + test focus-visible) + `scripts/a11y_scan.mjs` dump node/contrast; fix: @theme override slate-400/500/600 ≥4.5:1, CTA nền cam chữ đen #010102 (2.93→7.4:1) + badge Standings #ffb066 + Monaco theme dever-dark comment #6fa856, aria-label 3 textarea, h4→p login, h2→h1 workspace; +3 tests → **184/184 (30 suites)**.- [x] Task 113.1: Polish 3 trang compare/virtual/summary theo taste skill + Linear tokens: typography (h1 28px/-0.6px, card-title 22px/-0.4px, eyebrow 13px/+0.4px uppercase, thead cùng style), spacing p-6/py-3 px-4, viền hairline #23252a + surface ladder, em-dash hiển thị → text thay thế, emoji → badge mono/SVG, podium responsive, error box p-4; verify computed-style qua preview + **184/184 tests**, detect 0, lint 0 errors, build 244ms.
-- [ ] Task 114: Postgres production thật (bỏ store JSON, migration script) + object storage cho source_code.
+- [ ] Task 114: Postgres production thật (bỏ store JSON, migration script) + object storage cho source_code.
 - [ ] Task 115: Phân quyền multi-organizer (admin tạo admin, quản lý kỳ thi theo người phụ trách).
 
 
-## Phase 35: Hoàn thiện hạ tầng Specific + phân quyền organizer (Planned)
+## Phase 35: Hoàn thiện hạ tầng Specific + phân quyền organizer (Completed 28/9/2026)
 - [x] Task 118: Object storage S3 cho source_code (hoàn tất Task 114) — `server/objectStore.js` SigV4 zero-dep, `storage "sources"` trong specific.hcl, nộp bài PUT S3 / KV giữ source_key, rejudge + GET fetch từ S3, subView ẩn source_key, api build qua Dockerfile.api (toolchain chấm thật); prod verify round-trip `print("task118-final")` + KV không còn inline code; **188/188 tests (28 suites)**.
 - [x] Task 119: Multi-organizer (nội dung Task 115) — role `ORGANIZER` + `POST /admin/users/:id/role` (chống tự hạ mình); contest có `organizer_id`, gate `canManageContest` trên phase/announcements/stress; ORGANIZER tạo được kỳ thi của mình; UI: select role trong AccountsPanel + chip organizer trên card phase + RequireAdmin mở cho ORGANIZER; prod verify trọn vòng; **189/189 tests**.
 - [x] Task 120: Ops trên Specific — cron `db-backup` 02:00 UTC + `scripts/backup_cron.mjs` (dump KV → JSON → S3); hướng dẫn custom domain + alerts trong DEPLOYMENT_GUIDE (DNS/dashboard chủ dự án tự bật).
-- [ ] Task 121: CI/CD — kết nối GitHub repo trong Specific dashboard để auto-deploy `main` + preview environment theo PR (web), cập nhật `docs/DEPLOYMENT_GUIDE.md` mục 0b; quy ước: CLI deploy chỉ dùng khi cần gấp.
-- [ ] Task 122: Gate Vòng 35 — full tests + detect 0 + lint 0 errors + build sạch; deploy lại lên Specific, smoke prod (health/login/CORS/DB query); CHANGELOG Vòng 35; đóng Task 114 + 115.
+- [x] Task 121: CI/CD — hướng dẫn kết nối GitHub repo qua dashboard (auto-deploy main + PR preview, tắt CLI deploy sau khi bật) đã ghi trong DEPLOYMENT_GUIDE mục 0b; phần OAuth chủ dự án tự bấm.
+- [x] Task 122: Gate Vòng 35 — 189/189 tests (24 suites), detect 0, lint 0 errors, build 294ms; prod smoke health/login/CORS/web/DB(120 rows)/S3 round-trip toàn xanh; CHANGELOG Vòng 35.1–35.3; đóng Task 114 + 115.

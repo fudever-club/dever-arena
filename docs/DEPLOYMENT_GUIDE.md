@@ -34,6 +34,7 @@ specific deploy                    # build + đẩy lên Specific Cloud (free ti
 * Lưu ý Windows: `specific dev` (môi trường dev cục bộ) cần macOS/Linux/WSL; còn `specific deploy`/`check` chạy từ Windows bình thường.
 * **Backup hằng ngày (Task 120):** cron `db-backup` chạy 02:00 UTC (09:00 VN) — dump toàn bộ KV Postgres ra JSON, đẩy lên bucket object store (`backups/db-<stamp>.json`). Xem log chạy qua `specific query "SELECT * FROM observability.logs WHERE Body LIKE '%backup-cron%'"`; khôi phục: tải JSON từ bucket rồi nạp lại `dever_store`.
 * **Custom domain (cần chủ dự án):** chạy `specific docs domains` để xem quy trình — thêm domain trong Specific rồi trỏ DNS CNAME `arena.fu-dever.vn` → web URL và `api.fu-dever.vn` → api URL; TLS tự động.
+* **CI/CD GitHub (cần chủ dự án, Task 121):** vào https://dashboard.specific.dev → chọn project `dever-arena` → tab GitHub integration → kết nối repo `fudever-club/dever-arena` + chọn branch `main` → từ đó mỗi push lên main tự deploy; mỗi PR có preview environment riêng. Sau khi bật, có thể tắt "Allow deployments from CLI" để buộc mọi deploy đi qua GitHub. Kiểm tra: `specific status --previews`.
 * **Alerts email (cần chủ dự án):** bật tại https://dashboard.specific.dev/user-settings — nhận cảnh báo 5xx/latency/restart mặc định của mọi service.
 
 ## 1. SƠ ĐỒ KIẾN TRÚC HẠ TẦNG MỤC TIÊU (MỞ RỘNG TƯƠNG LAI — ĐA MÁY)

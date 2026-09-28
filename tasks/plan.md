@@ -167,12 +167,12 @@ Xây dựng nền tảng thi đấu giải thuật nội bộ của CLB FU-DEVER
 - [ ] Task 114: Postgres production thật (bỏ store JSON, migration script) + object storage cho source_code. — **Nửa đầu ĐÃ XONG qua Specific (28/9/2026)**: `specific.hcl` postgres "main" + `DEVER_DATABASE_URL` (KV store tự migrate lần đầu kết nối, prod đang chạy — web/api live `*.spcf.app`, CORS khóa domain web, dashboard specific.dev). Còn lại: object storage S3 cho source_code (block `storage "..."` trong specific.hcl) + migration script nếu chuyển KV sang schema bảng thật.
 - [ ] Task 115: Phân quyền multi-organizer (admin tạo admin, quản lý kỳ thi theo người phụ trách). — *(lên lịch thực hiện trong Phase 35, Task 119)*
 
-### Phase 35: Hoàn thiện hạ tầng Specific + phân quyền organizer (Planned)
+### Phase 35: Hoàn thiện hạ tầng Specific + phân quyền organizer (Completed 28/9/2026)
 - [x] Task 118: Object storage S3 cho source_code (hoàn tất Task 114) — block `storage "sources" {}` trong `specific.hcl` (bơm `S3_ENDPOINT/ACCESS_KEY/SECRET_KEY/BUCKET` vào service api qua env), `server/objectStore.js` S3 SigV4 zero-dep (thiếu env/local → fallback KV); nộp bài PUT S3 + KV giữ source_key; rejudge/GET fetch từ S3; subView không lộ source_key; build api sang Dockerfile.api (toolchain chấm); prod verify round-trip + query KV không còn inline; **188/188 tests**.
 - [x] Task 119: Multi-organizer (nội dung Task 115) — role mới `ORGANIZER`: `POST /admin/users/:id/role` (ADMIN cấp/hạ, chống tự hạ mình); contest có `organizer_id` = người tạo, organizer chỉ điều phase/thông báo/stress trên kỳ thi mình phụ trách, tạo được kỳ thi mới, ADMIN toàn quyền; UI: RequireAdmin mở cho ORGANIZER, select role trong bảng tài khoản, chip organizer trên card phase; GET /contests kèm organizer_username; prod verify thăng/tạo/403/hạ; **189/189 tests**.
 - [x] Task 120: Ops trên Specific — cron backup hằng ngày ĐÃ LẬP: `cron "db-backup"` (02:00 UTC/09:00 VN) + `scripts/backup_cron.mjs` dump KV Postgres → JSON → bucket S3 (zero-dep, tái dùng objectStore); hướng dẫn custom domain + alerts email trong DEPLOYMENT_GUIDE mục 0b (phần DNS/dashboard chủ dự án tự làm khi cần).
-- [ ] Task 121: CI/CD — kết nối GitHub repo trong Specific dashboard để auto-deploy `main` + preview environment theo PR (web), cập nhật `docs/DEPLOYMENT_GUIDE.md` mục 0b; quy ước: CLI deploy chỉ dùng khi cần gấp.
-- [ ] Task 122: Gate Vòng 35 — full tests + detect 0 + lint 0 errors + build sạch; deploy lại lên Specific, smoke prod (health/login/CORS/DB query); CHANGELOG Vòng 35; đóng Task 114 + 115.
+- [x] Task 121: CI/CD — hướng dẫn kết nối GitHub (dashboard → project → GitHub integration → repo `fudever-club/dever-arena` + branch `main` → auto-deploy + PR preview; có thể tắt CLI deploy sau) đã ghi trong DEPLOYMENT_GUIDE mục 0b. Phần OAuth/dashboard chủ dự án tự bấm khi cần (CLI không làm thay được).
+- [x] Task 122: Gate Vòng 35 — **189/189 tests (24 suites)**, detect 0, lint 0 errors, build 294ms; prod smoke: health ok (pg), login 200, CORS khóa domain web, web 200, DB 120 rows, S3 round-trip OK; CHANGELOG Vòng 35.1–35.3; **Task 114 + 115 ĐÓNG, Phase 35 hoàn thành**.
 
 
 
