@@ -482,3 +482,10 @@
 - **Cron backup (Task 120):** `cron "db-backup"` trong `specific.hcl` — 02:00 UTC (09:00 VN) hằng ngày; `scripts/backup_cron.mjs` (zero-dep) dump toàn bộ `dever_store`/`dever_meta` → JSON → PUT bucket S3 (`backups/db-<stamp>.json`, tái dùng SigV4 client); local không DB → thoát 0. Đã deploy, đợi lần chạy đầu lúc 02:00 UTC — xem qua `specific query` observability (`%backup-cron%`).
 - **CI/CD (Task 121):** hướng dẫn kết nối GitHub repo qua dashboard (auto-deploy `main` + preview theo PR, có thể tắt CLI deploy sau khi bật) trong `DEPLOYMENT_GUIDE.md` mục 0b — phần OAuth chủ dự án tự bấm.
 - **Gate Vòng 35 (Task 122):** **189/189 tests (24 suites)**, `detect.mjs` 0, eslint 0 errors (69 warnings), build 294ms. Prod smoke: `/api/health` ok (store pg), login 200, CORS khóa `https://web-elegant-horse.spcf.app`, web 200, DB 120 rows, S3 round-trip + KV không còn inline source. **Đóng Task 114 + 115; Phase 35 hoàn thành.**
+
+## Vòng 35.4: Quản trị dữ liệu thật + admin sửa kỳ thi — Task 123–124 (yêu cầu chủ dự án)
+
+- **Task 123 — dọn ghost/demo:** cờ `DEVER_SEED_DEMO` (prod đặt `=0` trong specific.hcl → DB mới chỉ seed duy nhất admin, không ghost user/contest/bài nộp ảo); route `POST /admin/reset-demo` (mode `demo` giữ kỳ thi+đề, mode `all` về trắng) + `DELETE /admin/users/:id` (cấm tự xóa + xóa `dever_admin`, dọn submissions/participants theo); UI "Vùng nguy hiểm" trong tab Cấp tài khoản với xác nhận 2 bước, nút Xóa từng user.
+- **Task 124 — admin sửa kỳ thi:** `PUT /admin/contests/:id` — title, start_time, duration_minutes (kẹp 5–600), is_rated, min/max_rating, organizer_id (ADMIN); gate `canManageContest` (organizer chỉ sửa kỳ thi của mình); UI `EditContestPanel` trên tab Điều khiển phase: chọn kỳ thi → sửa mọi trường → lưu tức thì.
+- **Vá gốc rễ pg store:** `flush()` trước đây chỉ UPSERT → row bị xóa khỏi memory sẽ "hồi sinh" sau restart. Giờ flush mirror DELETE (xóa row không còn trong memory). Prod verify: sau reset-demo, DB thật còn `users:1, contests:5, problems:5, testcases:5`, `submissions/participants: 0`.
+- OpenAPI 47 ops/41 paths. **193/193 tests (25 suites)**, detect 0, lint 0 errors, build 246ms.

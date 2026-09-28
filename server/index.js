@@ -99,18 +99,26 @@ function checkRateLimit(req, user) {
 }
 
 // ============================ SEED ============================
+// Task 123: dữ liệu demo (ghost users, bài nộp luyện tập, rating history) chỉ seed khi
+// DEVER_SEED_DEMO != '0'. Prod CLB dùng thật: đặt DEVER_SEED_DEMO=0 để khởi động sạch.
+const SEED_DEMO = process.env.DEVER_SEED_DEMO !== '0';
 function seed() {
   if (db.data.users.length > 0) return;
   const users = [
-    { id: 'u_hero', username: 'dever_hero', full_name: 'Nguyễn Anh Tuấn (K19)', role: 'PARTICIPANT', rating: 1742, max_rating: 1742, team: null, members: [], password: hashPassword('hero123'), rating_history: [] },
     { id: 'u_admin', username: 'dever_admin', full_name: 'Ban Chuyên Môn FU-DEVER', role: 'ADMIN', rating: 2450, max_rating: 2450, team: null, members: [], password: hashPassword('admin123'), rating_history: [] },
-    { id: 'u_c1', username: 'hacker_pro', full_name: 'Lê Hoàng Nam', role: 'PARTICIPANT', rating: 1680, max_rating: 1680, team: null, members: [], password: hashPassword('dever123'), rating_history: [] },
-    { id: 'u_c2', username: 'alice_ninja', full_name: 'Trần Thị Mai', role: 'PARTICIPANT', rating: 1540, max_rating: 1540, team: null, members: [], password: hashPassword('dever123'), rating_history: [] },
-    { id: 'u_c3', username: 'buggy_coder', full_name: 'Phạm Quốc Bảo', role: 'PARTICIPANT', rating: 1490, max_rating: 1490, team: null, members: [], password: hashPassword('dever123'), rating_history: [] },
-    { id: 'u_c4', username: 'newbie_fpt', full_name: 'Đặng Minh Khôi', role: 'PARTICIPANT', rating: 1180, max_rating: 1180, team: null, members: [], password: hashPassword('dever123'), rating_history: [] },
-    { id: 'u_c5', username: 'k20_veteran', full_name: 'Trần Văn Kiên', role: 'PARTICIPANT', rating: 1620, max_rating: 1620, team: null, members: [], password: hashPassword('dever123'), rating_history: [] },
+    // Task 123: các user dưới đây chỉ là DEMO — không seed khi DEVER_SEED_DEMO=0 (prod CLB dùng thật).
+    ...(SEED_DEMO ? [
+      { id: 'u_hero', username: 'dever_hero', full_name: 'Nguyễn Anh Tuấn (K19)', role: 'PARTICIPANT', rating: 1742, max_rating: 1742, team: null, members: [], password: hashPassword('hero123'), rating_history: [] },
+      { id: 'u_c1', username: 'hacker_pro', full_name: 'Lê Hoàng Nam', role: 'PARTICIPANT', rating: 1680, max_rating: 1680, team: null, members: [], password: hashPassword('dever123'), rating_history: [] },
+      { id: 'u_c2', username: 'alice_ninja', full_name: 'Trần Thị Mai', role: 'PARTICIPANT', rating: 1540, max_rating: 1540, team: null, members: [], password: hashPassword('dever123'), rating_history: [] },
+      { id: 'u_c3', username: 'buggy_coder', full_name: 'Phạm Quốc Bảo', role: 'PARTICIPANT', rating: 1490, max_rating: 1490, team: null, members: [], password: hashPassword('dever123'), rating_history: [] },
+      { id: 'u_c4', username: 'newbie_fpt', full_name: 'Đặng Minh Khôi', role: 'PARTICIPANT', rating: 1180, max_rating: 1180, team: null, members: [], password: hashPassword('dever123'), rating_history: [] },
+      { id: 'u_c5', username: 'k20_veteran', full_name: 'Trần Văn Kiên', role: 'PARTICIPANT', rating: 1620, max_rating: 1620, team: null, members: [], password: hashPassword('dever123'), rating_history: [] },
+    ] : []),
   ];
   users.forEach((u) => db.insert('users', u));
+  // Task 123: prod thật (DEVER_SEED_DEMO=0) → chỉ còn admin, không seed contest/đề/bài nộp demo.
+  if (!SEED_DEMO) return;
   // NOTE: rating_history demo + bài nộp luyện tập được seed ở cuối seed() (sau khi có `now`).
 
   const now = Date.now();
@@ -127,7 +135,7 @@ function seed() {
     db.insert('testcases', { id: `tc_${p.id}_sample`, problem_id: p.id, order_index: 0, stdin: p.sampleInput, expected_stdout: p.sampleOutput, is_sample: true });
   });
 
-  // Ghost submissions cho archive (virtual replay) — đã chấm sẵn
+  // Ghost submissions cho archive (virtual replay) — đã chấm sẵn (chỉ demo)
   const ghostAt = (min) => new Date(now - 7 * 86400000 + min * 60000).toISOString();
   const ghosts = [
     { user_id: 'u_c1', problem_id: 'p101', at: 10, pts: 480 }, { user_id: 'u_c1', problem_id: 'p102', at: 35, pts: 940 },
@@ -834,6 +842,84 @@ route('POST', '^/api/v1/admin/users$', async (req, res, url, m, user) => {
   void user;
   send(res, 201, { user: publicUser(created) });
 }, { auth: true, admin: true });
+// Task 123: xóa user (demo/ghost) — ADMIN only. Cấm xóa chính mình và user seed tối thiểu
+// u_admin (khóa quản trị cuối cùng). Bài nộp + đăng ký của user bị xóa theo (liêm chính dữ liệu).
+route('DELETE', '^/api/v1/admin/users/([^/]+)$', async (req, res, url, m, user) => {
+  const target = db.find('users', (x) => x.id === decodeURIComponent(m[1]));
+  if (!target) { send(res, 404, { error: 'NOT_FOUND' }); return; }
+  if (target.id === user.id) { send(res, 422, { error: 'SELF_DELETE', message: 'Không thể xóa chính mình.' }); return; }
+  if (target.username === 'dever_admin') { send(res, 422, { error: 'PROTECTED', message: 'Tài khoản dever_admin được bảo vệ.' }); return; }
+  db.data.submissions = db.data.submissions.filter((s) => s.user_id !== target.id);
+  db.data.participants = db.data.participants.filter((p) => p.user_id !== target.id);
+  db.data.users = db.data.users.filter((x) => x.id !== target.id);
+  db.save();
+  send(res, 200, { deleted: target.id, username: target.username });
+}, { auth: true, admin: true });
+
+// Task 123: dọn toàn bộ dữ liệu demo/ghost — giữ lại user gọi route này (ADMIN).
+// mode 'demo' (mặc định): giữ admin, giữ kỳ thi, xóa user khác + toàn bộ bài nộp + participants + announcements.
+// mode 'all': về trắng hoàn toàn — chỉ còn admin (xóa cả contests/problems/testcases).
+route('POST', '^/api/v1/admin/reset-demo$', async (req, res, url, m, user) => {
+  const mode = String((await readBody(req)).mode || 'demo');
+  const admin = user;
+  db.data.submissions = [];
+  db.data.participants = [];
+  db.data.announcements = [];
+  db.data.clarifications = [];
+  db.data.virtual_sessions = [];
+  db.data.users = [admin];
+  admin.rating_history = [];
+  if (mode === 'all') {
+    db.data.contests = [];
+    db.data.problems = [];
+    db.data.testcases = [];
+  }
+  db.save();
+  send(res, 200, {
+    ok: true,
+    mode,
+    kept_user: admin.username,
+    counts: {
+      users: db.data.users.length, contests: db.data.contests.length,
+      problems: db.data.problems.length, submissions: db.data.submissions.length,
+    },
+  });
+}, { auth: true, admin: true });
+
+// ---- Admin: cập nhật kỳ thi (Task 124) — title/slug/start/duration/rated/rating window/organizer ----
+route('PUT', '^/api/v1/admin/contests/([^/]+)$', async (req, res, url, m, user) => {
+  const c = db.find('contests', (x) => x.id === decodeURIComponent(m[1]));
+  if (!c) { send(res, 404, { error: 'CONTEST_NOT_FOUND' }); return; }
+  if (!canManageContest(user, c.id)) { send(res, 403, { error: 'FORBIDDEN', message: 'Bạn không phụ trách kỳ thi này.' }); return; }
+  const body = await readBody(req);
+  const patch = {};
+  if (body.title !== undefined) {
+    const title = String(body.title).trim();
+    if (!title) { send(res, 422, { error: 'BAD_TITLE' }); return; }
+    patch.title = title;
+  }
+  if (body.start_time !== undefined) {
+    const start = new Date(body.start_time);
+    if (Number.isNaN(start.getTime())) { send(res, 422, { error: 'BAD_START_TIME' }); return; }
+    patch.start_time = start.toISOString();
+  }
+  if (body.duration_minutes !== undefined) {
+    const dur = Math.max(5, Math.min(600, Number(body.duration_minutes) || 120));
+    patch.duration_minutes = dur;
+  }
+  if (body.is_rated !== undefined) patch.is_rated = Boolean(body.is_rated);
+  if (body.min_rating !== undefined) patch.min_rating = body.min_rating === null || body.min_rating === '' ? null : Number(body.min_rating);
+  if (body.max_rating !== undefined) patch.max_rating = body.max_rating === null || body.max_rating === '' ? null : Number(body.max_rating);
+  if (body.organizer_id !== undefined && user.role === 'ADMIN') {
+    const org = body.organizer_id === null || body.organizer_id === '' ? null : String(body.organizer_id);
+    if (org && !db.find('users', (u) => u.id === org)) { send(res, 422, { error: 'BAD_ORGANIZER' }); return; }
+    patch.organizer_id = org;
+  }
+  db.update('contests', (x) => x.id === c.id, patch);
+  broadcast(c.id, 'EVENT_STANDINGS_UPDATE', { standings: computeStandings(c) });
+  send(res, 200, { contest: db.find('contests', (x) => x.id === c.id) });
+}, { auth: true });
+
 route('POST', '^/api/v1/admin/users/([^/]+)/password$', async (req, res, url, m) => {
   const u = db.find('users', (x) => x.id === decodeURIComponent(m[1]));
   if (!u) { send(res, 404, { error: 'NOT_FOUND' }); return; }

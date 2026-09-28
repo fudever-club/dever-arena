@@ -41,6 +41,10 @@ service "api" {
     S3_ACCESS_KEY       = storage.sources.access_key
     S3_SECRET_KEY       = storage.sources.secret_key
     S3_BUCKET           = storage.sources.bucket
+
+    # Task 123: data thật cho CLB — không seed ghost/demo users và bài nộp ảo.
+    # Bật lại demo (rồi deploy lại) bằng cách đổi thành "1".
+    DEVER_SEED_DEMO     = "0"
   }
 }
 

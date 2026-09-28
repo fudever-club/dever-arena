@@ -173,6 +173,8 @@ Xây dựng nền tảng thi đấu giải thuật nội bộ của CLB FU-DEVER
 - [x] Task 120: Ops trên Specific — cron backup hằng ngày ĐÃ LẬP: `cron "db-backup"` (02:00 UTC/09:00 VN) + `scripts/backup_cron.mjs` dump KV Postgres → JSON → bucket S3 (zero-dep, tái dùng objectStore); hướng dẫn custom domain + alerts email trong DEPLOYMENT_GUIDE mục 0b (phần DNS/dashboard chủ dự án tự làm khi cần).
 - [x] Task 121: CI/CD — hướng dẫn kết nối GitHub (dashboard → project → GitHub integration → repo `fudever-club/dever-arena` + branch `main` → auto-deploy + PR preview; có thể tắt CLI deploy sau) đã ghi trong DEPLOYMENT_GUIDE mục 0b. Phần OAuth/dashboard chủ dự án tự bấm khi cần (CLI không làm thay được).
 - [x] Task 122: Gate Vòng 35 — **189/189 tests (24 suites)**, detect 0, lint 0 errors, build 294ms; prod smoke: health ok (pg), login 200, CORS khóa domain web, web 200, DB 120 rows, S3 round-trip OK; CHANGELOG Vòng 35.1–35.3; **Task 114 + 115 ĐÓNG, Phase 35 hoàn thành**.
+- [x] Task 123: Quản trị dữ liệu thật (yêu cầu chủ dự án) — `DEVER_SEED_DEMO=0` trên prod (DB mới chỉ seed admin), `POST /admin/reset-demo` (demo/all) + `DELETE /admin/users/:id` (cấm tự xóa/dever_admin, dọn submissions+participants); UI "Vùng nguy hiểm" xác nhận 2 bước + nút Xóa user; **vá pg flush mirror DELETE** (chống hồi sinh dữ liệu sau restart); prod verify DB còn users:1, submissions:0.
+- [x] Task 124: Admin sửa kỳ thi — `PUT /admin/contests/:id` (title/start/duration 5–600/is_rated/min-max rating/organizer) + gate organizer; UI `EditContestPanel` (chọn kỳ thi, datetime-local, lưu tức thì). OpenAPI 47 ops/41 paths; **193/193 tests (25 suites)**.
 
 
 

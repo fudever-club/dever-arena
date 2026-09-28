@@ -70,6 +70,11 @@ export const api = {
   resetPassword: (id, password) => req(`/api/v1/admin/users/${encodeURIComponent(id)}/password`, { method: 'POST', body: { password }, auth: true }),
   // Task 119: phân quyền multi-organizer — ADMIN cấp/hạ PARTICIPANT/ORGANIZER/ADMIN.
   setUserRole: (id, role) => req(`/api/v1/admin/users/${encodeURIComponent(id)}/role`, { method: 'POST', body: { role }, auth: true }),
+  // Task 123: quản lý dữ liệu — xóa user, dọn dữ liệu demo/ghost.
+  deleteUser: (id) => req(`/api/v1/admin/users/${encodeURIComponent(id)}`, { method: 'DELETE', auth: true }),
+  resetDemo: (mode = 'demo') => req('/api/v1/admin/reset-demo', { method: 'POST', body: { mode }, auth: true }),
+  // Task 124: admin/organizer sửa thông tin kỳ thi đã tạo.
+  updateContest: (id, patch) => req(`/api/v1/admin/contests/${encodeURIComponent(id)}`, { method: 'PUT', body: patch, auth: true }),
   createSubmission: (payload) => req('/api/v1/submissions', { method: 'POST', body: payload, auth: true }),
   getSubmission: (id) => req(`/api/v1/submissions/${encodeURIComponent(id)}`, { auth: true }),
   // Task 105: stats per problem của tôi (solved/attempts từ bài nộp thật)

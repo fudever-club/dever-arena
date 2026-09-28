@@ -50,13 +50,22 @@ export async function createPgStore(pool, opts = {}) {
     dirty = false;
     try {
       for (const col of COLLECTIONS) {
+        const ids = [];
         for (const row of data[col]) {
-          const id = row.id ?? JSON.stringify(row).slice(0, 64);
+          const id = String(row.id ?? JSON.stringify(row).slice(0, 64));
+          ids.push(id);
           await pool.query(
             `INSERT INTO dever_store (collection, id, payload) VALUES ($1, $2, $3)
              ON CONFLICT (collection, id) DO UPDATE SET payload = EXCLUDED.payload`,
-            [col, String(id), row]
+            [col, id, row]
           );
+        }
+        // Mirror phép xóa: row đã bị bỏ khỏi memory (reset demo, xóa user…) phải
+        // biến mất khỏi Postgres luôn — nếu không sẽ "hồi sinh" sau mỗi restart.
+        if (ids.length > 0) {
+          await pool.query(`DELETE FROM dever_store WHERE collection = $1 AND NOT (id = ANY($2))`, [col, ids]);
+        } else {
+          await pool.query(`DELETE FROM dever_store WHERE collection = $1`, [col]);
         }
       }
       await pool.query(`INSERT INTO dever_meta (key, value) VALUES ('seq', $1)

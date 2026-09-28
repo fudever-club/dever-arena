@@ -618,6 +618,113 @@
         }
       }
     },
+    "/api/v1/admin/users/{param1}": {
+      "delete": {
+        "summary": "DELETE /api/v1/admin/users/{param1}",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN."
+      }
+    },
+    "/api/v1/admin/reset-demo": {
+      "post": {
+        "summary": "POST /api/v1/admin/reset-demo",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/contests/{param1}": {
+      "put": {
+        "summary": "PUT /api/v1/admin/contests/{param1}",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/users/{param1}/password": {
       "post": {
         "summary": "POST /api/v1/admin/users/{param1}/password",

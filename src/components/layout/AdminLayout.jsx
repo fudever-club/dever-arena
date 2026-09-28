@@ -875,6 +875,7 @@ export const AdminLayout = ({ children }) => {
           {activeTab === 'phase' && (
             <div className="space-y-6">
               <AdminSection eyebrow="Điều hành" title="Điều khiển tiến trình kỳ thi" desc="Mở kỳ thi, chuyển phase — đồng bộ tới tab thí sinh qua backend." />
+              <EditContestPanel />
               <CreateContestPanel />
               <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-4">
                 <div className="flex items-center justify-between">
@@ -1541,6 +1542,123 @@ export const AdminLayout = ({ children }) => {
 };
 
 /** Tạo kỳ thi mới (mở đăng ký REGISTRATION, admin gán đề sau). */
+/** Task 124: admin/organizer sửa thông tin kỳ thi đã tạo — tên, giờ bắt đầu, thời lượng, rated, cửa sổ rating. */
+const EditContestPanel = () => {
+  const [contests, setContests] = useState([]);
+  const [contestId, setContestId] = useState('');
+  const [form, setForm] = useState(null);
+  const [msg, setMsg] = useState('');
+  const [ok, setOk] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const inputCls = 'w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs placeholder-slate-500 outline-none focus:border-[#ff6600]';
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.getContests();
+        const list = Array.isArray(data?.contests) ? data.contests : [];
+        if (!cancelled) {
+          setContests(list);
+          setContestId((v) => v || (list[0]?.id ?? ''));
+        }
+      } catch { /* backend chưa chạy */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    const c = contests.find((x) => x.id === contestId);
+    if (!c) { setForm(null); return; }
+    setForm({
+      title: c.title || '',
+      start_local: toLocalInput(c.start_time),
+      duration_minutes: c.duration_minutes || 120,
+      is_rated: c.is_rated !== false,
+      min_rating: c.min_rating ?? '',
+      max_rating: c.max_rating ?? '',
+    });
+    setMsg(''); setOk(false);
+  }, [contestId, contests]);
+
+  // ISO → giá trị cho input datetime-local (giờ địa phương).
+  const toLocalInput = (iso) => {
+    try {
+      const d = new Date(iso);
+      return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    } catch { return ''; }
+  };
+
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const setBool = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value === 'true' }));
+
+  const handleSave = async (e) => {
+    e.preventDefault(); setMsg(''); setOk(false); setSaving(true);
+    try {
+      const patch = {
+        title: form.title.trim(),
+        start_time: form.start_local ? new Date(form.start_local).toISOString() : undefined,
+        duration_minutes: Number(form.duration_minutes) || undefined,
+        is_rated: form.is_rated,
+        min_rating: form.min_rating === '' ? null : Number(form.min_rating),
+        max_rating: form.max_rating === '' ? null : Number(form.max_rating),
+      };
+      const data = await api.updateContest(contestId, patch);
+      setOk(true);
+      setMsg(`Đã lưu thay đổi cho “${data.contest.title}”.`);
+      setContests((list) => list.map((c) => (c.id === contestId ? { ...c, ...data.contest } : c)));
+    } catch (err) {
+      setMsg(err?.message || 'Lưu thay đổi thất bại.');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-bold text-white">Sửa thông tin kỳ thi</h2>
+          <p className="text-xs text-slate-400 mt-0.5">Đổi tên, giờ bắt đầu, thời lượng, thể thức rated và cửa sổ rating — cập nhật tức thì cho thí sinh.</p>
+        </div>
+        <label className="flex items-center gap-2 text-xs text-slate-400">
+          Kỳ thi:
+          <select value={contestId} onChange={(e) => setContestId(e.target.value)} className="px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-white outline-none">
+            {contests.length === 0 && <option value="">(chưa có kỳ thi)</option>}
+            {contests.map((c) => (
+              <option key={c.id} value={c.id}>{c.title || c.slug || c.id} ({c.status})</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {form && (
+        <form onSubmit={handleSave} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <input className={inputCls} placeholder="Tên kỳ thi" value={form.title} onChange={set('title')} required />
+          <input className={inputCls} type="datetime-local" value={form.start_local} onChange={set('start_local')} title="Giờ bắt đầu" />
+          <input className={inputCls} type="number" min={5} max={600} value={form.duration_minutes} onChange={set('duration_minutes')} title="Thời lượng (phút, 5–600)" />
+          <select className={inputCls} value={String(form.is_rated)} onChange={setBool('is_rated')} title="Có tính Elo không">
+            <option value="true">Rated — tính Elo</option>
+            <option value="false">Unrated — không tính Elo</option>
+          </select>
+          <input className={inputCls} type="number" min={0} value={form.min_rating} onChange={set('min_rating')} placeholder="Rating tối thiểu (trống = không giới hạn)" />
+          <input className={inputCls} type="number" min={0} value={form.max_rating} onChange={set('max_rating')} placeholder="Rating tối đa (trống = không giới hạn)" />
+          <div className="sm:col-span-2 lg:col-span-3 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-bold text-xs transition disabled:opacity-50">
+              {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
+            </button>
+            {msg && (
+              <div className={`flex-1 p-2.5 rounded-lg border text-xs font-semibold ${ok ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/30 text-red-300'}`} role="status">
+                {msg}
+              </div>
+            )}
+          </div>
+        </form>
+      )}
+      {!form && contests.length === 0 && (
+        <p className="text-xs text-slate-400">Chưa có kỳ thi nào trên máy chủ — tạo mới bằng form bên dưới.</p>
+      )}
+    </div>
+  );
+};
+
 const CreateContestPanel = () => {
   const [form, setForm] = useState({ title: '', format: 'ICPC', start: '', duration: 135, minRating: '', maxRating: '' });
   const [msg, setMsg] = useState('');
@@ -1756,6 +1874,9 @@ const AccountsPanel = () => {
   const [backendUp, setBackendUp] = useState(true);
   const [resetId, setResetId] = useState(null);
   const [newPw, setNewPw] = useState('');
+  // Task 123: xác nhận 2 bước cho hành động phá dữ liệu.
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [confirmReset, setConfirmReset] = useState(null); // null | 'demo' | 'all'
 
   const load = async () => {
     try {
@@ -1790,6 +1911,36 @@ const AccountsPanel = () => {
       load();
     } catch (err) {
       setMsg(err?.message || 'Tạo tài khoản thất bại.');
+    }
+  };
+
+  // Task 123: xóa user (bài nộp + đăng ký dọn theo; server chặn tự xóa + xóa dever_admin).
+  const handleDeleteUser = async (u) => {
+    setMsg(''); setOk(false);
+    try {
+      await api.deleteUser(u.id);
+      setOk(true);
+      setMsg(`Đã xóa ${u.username} cùng bài nộp + đăng ký của họ.`);
+      setConfirmDeleteId(null);
+      load();
+    } catch (err) {
+      setMsg(err?.message || 'Xóa tài khoản thất bại.');
+      setConfirmDeleteId(null);
+    }
+  };
+
+  // Task 123: dọn dữ liệu demo/ghost — giữ lại chính admin đang đăng nhập.
+  const handleResetDemo = async (mode) => {
+    setMsg(''); setOk(false);
+    try {
+      const r = await api.resetDemo(mode);
+      setOk(true);
+      setMsg(`Đã dọn dữ liệu (${r.data.mode === 'all' ? 'về trắng hoàn toàn' : 'giữ lại kỳ thi'}). Còn ${r.data.counts.users} user, ${r.data.counts.submissions} bài nộp.`);
+      setConfirmReset(null);
+      load();
+    } catch (err) {
+      setMsg(err?.message || 'Dọn dữ liệu thất bại.');
+      setConfirmReset(null);
     }
   };
 
@@ -1903,7 +2054,7 @@ const AccountsPanel = () => {
                 </td>
                 <td className="py-2.5 px-4 font-mono text-orange-400">{u.rating}</td>
                 <td className="py-2.5 px-4 text-slate-400">{u.team ? `${u.team} (${(u.members || []).join(', ')})` : '—'}</td>
-                <td className="py-2.5 px-4 text-right">
+                <td className="py-2.5 px-4 text-right whitespace-nowrap">
                   {resetId === u.id ? (
                     <span className="inline-flex items-center gap-1.5">
                       <input
@@ -1922,11 +2073,52 @@ const AccountsPanel = () => {
                       Đặt lại
                     </button>
                   )}
+                  {u.username !== 'dever_admin' && (
+                    confirmDeleteId === u.id ? (
+                      <span className="inline-flex items-center gap-1.5 ml-2">
+                        <button onClick={() => handleDeleteUser(u)} className="px-2 py-1 rounded bg-red-600 hover:bg-red-500 text-white text-[11px] font-bold transition">Xóa hẳn</button>
+                        <button onClick={() => setConfirmDeleteId(null)} className="px-2 py-1 rounded bg-white/5 text-slate-400 text-[11px]">Hủy</button>
+                      </span>
+                    ) : (
+                      <button onClick={() => setConfirmDeleteId(u.id)} className="ml-2 px-2 py-1 rounded bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[11px] transition" title="Xóa user + bài nộp + đăng ký">
+                        Xóa
+                      </button>
+                    )
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Task 123: dọn dữ liệu demo/ghost — xác nhận 2 bước */}
+      <div className="p-4 rounded-lg bg-red-500/5 border border-red-500/20 space-y-2">
+        <h3 className="text-xs font-bold text-red-300">Vùng nguy hiểm — dọn dữ liệu demo</h3>
+        <p className="text-[11px] text-slate-400">
+          Xóa toàn bộ user demo/ghost, bài nộp ảo, đăng ký, thông báo. Chỉ giữ lại tài khoản admin đang đăng nhập.
+          Thao tác không thể hoàn tác — dữ liệu thật của thí sinh cũng sẽ mất.
+        </p>
+        {confirmReset === null ? (
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setConfirmReset('demo')} className="px-3 py-1.5 rounded bg-red-500/10 hover:bg-red-500/20 text-red-300 text-[11px] font-semibold transition">
+              Dọn users + bài nộp (giữ kỳ thi)
+            </button>
+            <button onClick={() => setConfirmReset('all')} className="px-3 py-1.5 rounded bg-red-600/20 hover:bg-red-600/30 text-red-300 text-[11px] font-semibold transition">
+              Về trắng hoàn toàn (xóa cả kỳ thi + đề)
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] text-red-300 font-semibold">
+              {confirmReset === 'all' ? 'Xóa CẢ kỳ thi và đề thi?' : 'Xóa toàn bộ users + bài nộp?'} Không thể hoàn tác.
+            </span>
+            <button onClick={() => handleResetDemo(confirmReset)} className="px-3 py-1.5 rounded bg-red-600 hover:bg-red-500 text-white text-[11px] font-bold transition">
+              Xác nhận xóa
+            </button>
+            <button onClick={() => setConfirmReset(null)} className="px-3 py-1.5 rounded bg-white/5 text-slate-400 text-[11px]">Hủy</button>
+          </div>
+        )}
       </div>
     </div>
   );

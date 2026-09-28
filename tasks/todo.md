@@ -217,3 +217,5 @@
 - [x] Task 120: Ops trên Specific — cron `db-backup` 02:00 UTC + `scripts/backup_cron.mjs` (dump KV → JSON → S3); hướng dẫn custom domain + alerts trong DEPLOYMENT_GUIDE (DNS/dashboard chủ dự án tự bật).
 - [x] Task 121: CI/CD — hướng dẫn kết nối GitHub repo qua dashboard (auto-deploy main + PR preview, tắt CLI deploy sau khi bật) đã ghi trong DEPLOYMENT_GUIDE mục 0b; phần OAuth chủ dự án tự bấm.
 - [x] Task 122: Gate Vòng 35 — 189/189 tests (24 suites), detect 0, lint 0 errors, build 294ms; prod smoke health/login/CORS/web/DB(120 rows)/S3 round-trip toàn xanh; CHANGELOG Vòng 35.1–35.3; đóng Task 114 + 115.
+- [x] Task 123: Quản trị dữ liệu thật — DEVER_SEED_DEMO=0 trên prod, POST /admin/reset-demo + DELETE /admin/users/:id, UI Vùng nguy hiểm 2 bước; vá pg flush mirror DELETE (chống hồi sinh dữ liệu); prod verify users:1, submissions:0.
+- [x] Task 124: Admin sửa kỳ thi — PUT /admin/contests/:id (title/start/duration/rated/rating window/organizer) + EditContestPanel UI; OpenAPI 47 ops/41 paths; 193/193 tests (25 suites).
