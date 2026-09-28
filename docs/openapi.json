@@ -522,6 +522,49 @@
         ]
       }
     },
+    "/api/v1/admin/users/{param1}/role": {
+      "post": {
+        "summary": "POST /api/v1/admin/users/{param1}/role",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/users": {
       "get": {
         "summary": "GET /api/v1/admin/users",
@@ -637,7 +680,6 @@
             "bearerAuth": []
           }
         ],
-        "description": "Yêu cầu quyền ADMIN.",
         "requestBody": {
           "required": false,
           "content": {
@@ -670,7 +712,6 @@
             "bearerAuth": []
           }
         ],
-        "description": "Yêu cầu quyền ADMIN.",
         "requestBody": {
           "required": false,
           "content": {
@@ -1193,7 +1234,6 @@
             "bearerAuth": []
           }
         ],
-        "description": "Yêu cầu quyền ADMIN.",
         "requestBody": {
           "required": false,
           "content": {

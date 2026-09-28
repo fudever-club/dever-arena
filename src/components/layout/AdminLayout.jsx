@@ -411,6 +411,20 @@ export const AdminLayout = ({ children }) => {
     problems = [], addProblem, updateProblem, deleteProblem, resetProblems, loadProblemsFromServer 
   } = useContest();
   const navigate = useNavigate();
+  // Task 119: người phụ trách kỳ thi trọng tâm (hiển thị chip "Organizer").
+  const [organizerLabel, setOrganizerLabel] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.getContests();
+        const list = Array.isArray(data?.contests) ? data.contests : [];
+        const main = list.find((c) => c.id === 'contest_dever_round1') || list[0] || null;
+        if (!cancelled) setOrganizerLabel(main?.organizer_username || '');
+      } catch { /* offline */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const handlePhaseChange = async (newPhase) => {
     const res = await changePhaseRemote(newPhase);
@@ -864,15 +878,19 @@ export const AdminLayout = ({ children }) => {
               <CreateContestPanel />
               <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-4">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-base font-bold text-white">Điều khiển tiến trình kỳ thi</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">
+                  <div>        <h2 className="text-base font-bold text-white">Điều khiển tiến trình kỳ thi</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
                       Chuyển phase sẽ đồng bộ tới các tab thí sinh đang mở qua backend
                     </p>
                   </div>
                   <span className="px-3 py-1 rounded bg-[#ff6600]/10 text-[#ff6600] border border-[#ff6600]/30 font-bold text-xs">
                     Pha hiện tại: {phase}
                   </span>
+                  {organizerLabel && (
+                    <span className="px-3 py-1 rounded bg-white/5 text-slate-300 border border-[#23252a] font-medium text-xs" title="Người phụ trách kỳ thi này">
+                      Organizer: {organizerLabel}
+                    </span>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
@@ -1775,6 +1793,21 @@ const AccountsPanel = () => {
     }
   };
 
+  // Task 119: cấp/hạ quyền PARTICIPANT/ORGANIZER/ADMIN (guard phía server chống tự hạ mình).
+  const handleRoleChange = async (u, role) => {
+    if (role === u.role) return;
+    setMsg(''); setOk(false);
+    try {
+      await api.setUserRole(u.id, role);
+      setUsers((list) => list.map((x) => (x.id === u.id ? { ...x, role } : x)));
+      setOk(true);
+      setMsg(`${u.username} giờ là ${role}.` + (role === 'ORGANIZER' ? ' Organizer có thể tạo và điều khiển kỳ thi của mình.' : ''));
+    } catch (err) {
+      setMsg(err?.message || 'Đổi vai trò thất bại.');
+      load();
+    }
+  };
+
   const handleResetPw = async (u) => {
     if (resetId !== u.id) {
       setResetId(u.id);
@@ -1852,7 +1885,22 @@ const AccountsPanel = () => {
               <tr key={u.id} className="hover:bg-white/5">
                 <td className="py-2.5 px-4 font-mono font-bold text-white">{u.username}</td>
                 <td className="py-2.5 px-4 text-slate-300">{u.full_name}</td>
-                <td className="py-2.5 px-4 text-slate-400">{u.role}</td>
+                <td className="py-2.5 px-4">
+                  {u.role === 'ADMIN' ? (
+                    <span className="text-red-400 font-bold">ADMIN</span>
+                  ) : (
+                    <select
+                      value={u.role}
+                      onChange={(e) => handleRoleChange(u, e.target.value)}
+                      aria-label={`Vai trò của ${u.username}`}
+                      className="px-2 py-1 rounded bg-white/5 border border-white/10 text-slate-300 text-[11px] outline-none focus:border-[#ff6600]"
+                    >
+                      <option value="PARTICIPANT">PARTICIPANT</option>
+                      <option value="ORGANIZER">ORGANIZER</option>
+                      <option value="ADMIN">ADMIN</option>
+                    </select>
+                  )}
+                </td>
                 <td className="py-2.5 px-4 font-mono text-orange-400">{u.rating}</td>
                 <td className="py-2.5 px-4 text-slate-400">{u.team ? `${u.team} (${(u.members || []).join(', ')})` : '—'}</td>
                 <td className="py-2.5 px-4 text-right">

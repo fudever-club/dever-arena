@@ -549,7 +549,13 @@ route('GET', '^/api/v1/compare$', async (req, res, url) => {
 
 // ---- Contests ----
 route('GET', '^/api/v1/contests$', async (req, res) => {
-  send(res, 200, { contests: db.data.contests });
+  // Task 119: kèm username của organizer để UI hiển thị người phụ trách.
+  const contests = db.data.contests.map((c) => {
+    if (!c.organizer_id) return c;
+    const owner = db.find('users', (u) => u.id === c.organizer_id);
+    return owner ? { ...c, organizer_username: owner.username } : c;
+  });
+  send(res, 200, { contests });
 });
 route('GET', '^/api/v1/contests/([^/]+)$', async (req, res, url, m) => {
   const c = findContest(decodeURIComponent(m[1]));
@@ -782,6 +788,30 @@ route('GET', '^/api/v1/submissions$', async (req, res, url, m, user) => {
   });
 }, { auth: true });
 
+// ---- Task 119: multi-organizer ----
+// ORGANIZER quản lý kỳ thi mình phụ trách (tạo/đề/phase/thông báo); ADMIN toàn quyền.
+function canManageContest(user, contestId) {
+  if (!user) return false;
+  if (user.role === 'ADMIN') return true;
+  if (user.role !== 'ORGANIZER') return false;
+  const c = db.find('contests', (x) => x.id === contestId);
+  return Boolean(c && c.organizer_id === user.id);
+}
+const MANAGER_ROLES = ['ADMIN', 'ORGANIZER'];
+route('POST', '^/api/v1/admin/users/([^/]+)/role$', async (req, res, url, m, user) => {
+  const target = db.find('users', (x) => x.id === decodeURIComponent(m[1]));
+  if (!target) { send(res, 404, { error: 'NOT_FOUND' }); return; }
+  const role = String((await readBody(req)).role || '').toUpperCase();
+  if (!['PARTICIPANT', 'ORGANIZER', 'ADMIN'].includes(role)) {
+    send(res, 422, { error: 'BAD_ROLE', message: 'Role phải là PARTICIPANT/ORGANIZER/ADMIN.' }); return;
+  }
+  if (target.id === user.id && role !== 'ADMIN') {
+    send(res, 422, { error: 'SELF_DEMOTE', message: 'Không thể tự hạ quyền của chính mình khỏi ADMIN.' }); return;
+  }
+  db.update('users', (x) => x.id === target.id, { role });
+  send(res, 200, { user: publicUser(db.find('users', (x) => x.id === target.id)) });
+}, { auth: true, admin: true });
+
 // ---- Admin: users (admin cấp tài khoản cá nhân / đội thi) ----
 route('GET', '^/api/v1/admin/users$', async (req, res) => {
   send(res, 200, { users: db.data.users.map(publicUser) });
@@ -819,6 +849,7 @@ route('POST', '^/api/v1/admin/phase$', async (req, res, url, m, user) => {
   const c = db.find('contests', (x) => x.id === contest_id);
   if (!c) { send(res, 404, { error: 'CONTEST_NOT_FOUND' }); return; }
   if (!PHASE_ORDER.includes(phase)) { send(res, 422, { error: 'BAD_PHASE' }); return; }
+  if (!canManageContest(user, c.id)) { send(res, 403, { error: 'FORBIDDEN', message: 'Bạn không phụ trách kỳ thi này.' }); return; }
   const cur = PHASE_ORDER.indexOf(c.status);
   const nxt = PHASE_ORDER.indexOf(phase);
   if (nxt !== cur + 1 && !(cur === 0 && nxt === 1)) {
@@ -832,10 +863,11 @@ route('POST', '^/api/v1/admin/phase$', async (req, res, url, m, user) => {
   broadcast(c.id, 'EVENT_PHASE_CHANGED', { phase });
   broadcast(c.id, 'EVENT_STANDINGS_UPDATE', { standings: computeStandings(c) });
   send(res, 200, { contest_id: c.id, phase });
-}, { auth: true, admin: true });
+}, { auth: true });
 
-// ---- Admin: contests (tạo kỳ thi mới) ----
-route('POST', '^/api/v1/admin/contests$', async (req, res) => {
+// ---- Admin/organizer: contests (tạo kỳ thi mới — Task 119: ORGANIZER tạo được kỳ thi của mình) ----
+route('POST', '^/api/v1/admin/contests$', async (req, res, url, m, user) => {
+  if (!MANAGER_ROLES.includes(user.role)) { send(res, 403, { error: 'FORBIDDEN', message: 'Chỉ ADMIN/ORGANIZER.' }); return; }
   const body = await readBody(req);
   const title = String(body.title || '').trim();
   if (!title) { send(res, 422, { error: 'BAD_TITLE', message: 'Thiếu tên kỳ thi.' }); return; }
@@ -857,9 +889,10 @@ route('POST', '^/api/v1/admin/contests$', async (req, res) => {
     is_rated: body.is_rated !== false,
     min_rating: body.min_rating ?? null,
     max_rating: body.max_rating ?? null,
+    organizer_id: user.id,
   });
   send(res, 201, { contest: created });
-}, { auth: true, admin: true });
+}, { auth: true });
 
 // ---- Admin: rejudge (chấm lại 1 bài nộp) ----
 route('POST', '^/api/v1/admin/rejudge$', async (req, res) => {
@@ -984,7 +1017,7 @@ route('DELETE', '^/api/v1/admin/problems/([^/]+)$', async (req, res, url, m) => 
 // ============================ POLYGON: STRESS + TESTCASES + WORKFLOW ============================
 // Stress test chuẩn Polygon: chạy model vs brute-force trên cùng bộ test seeded,
 // lệch nhau là FAIL. Kèm gợi ý time limit = max(1s, 2x thời gian model chậm nhất).
-route('POST', '^/api/v1/admin/stress$', async (req, res) => {
+route('POST', '^/api/v1/admin/stress$', async (req, res, url, m, user) => {
   const body = await readBody(req);
   const language = String(body.language || 'python');
   const model_source = String(body.model_source || '');
@@ -999,6 +1032,8 @@ route('POST', '^/api/v1/admin/stress$', async (req, res) => {
   const checker = body.checker === 'float' ? 'float' : 'exact';
   const epsilon = Number(body.epsilon) || 1e-6;
   const suite = generateSuite({ count, seed, ...rules });
+  const problemCtx = body.problem_id ? db.find('problems', (x) => x.id === body.problem_id) : null;
+  if (!canManageContest(user, problemCtx?.contest_id)) { send(res, 403, { error: 'FORBIDDEN', message: 'Bạn không phụ trách kỳ thi của đề này.' }); return; }
 
   let modelMaxMs = 0;
   let passed = 0;
@@ -1188,6 +1223,8 @@ route('POST', '^/api/v1/admin/announcements$', async (req, res, url, m, user) =>
   const c = db.find('contests', (x) => x.id === contest_id);
   if (!c) { send(res, 404, { error: 'CONTEST_NOT_FOUND', message: 'Contest không tồn tại.' }); return; }
   void url; void m;
+  // Task 119: chỉ ADMIN hoặc organizer phụ trách kỳ thi này được đăng thông báo.
+  if (!canManageContest(user, c.id)) { send(res, 403, { error: 'FORBIDDEN', message: 'Bạn không phụ trách kỳ thi này.' }); return; }
   const msg = String(message || '').trim();
   if (!msg) { send(res, 422, { error: 'EMPTY_MESSAGE', message: 'Thông báo không được để trống.' }); return; }
   const ann = db.insert('announcements', {
@@ -1195,7 +1232,7 @@ route('POST', '^/api/v1/admin/announcements$', async (req, res, url, m, user) =>
   });
   broadcast(c.id, 'EVENT_ANNOUNCEMENT', { announcement: ann });
   send(res, 201, { announcement: ann });
-}, { auth: true, admin: true });
+}, { auth: true });
 route('GET', '^/api/v1/announcements$', async (req, res, url, m, user) => {
   const contest_id = url.searchParams.get('contest_id') || '';
   void req; void m; void user;

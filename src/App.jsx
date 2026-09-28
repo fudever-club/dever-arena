@@ -34,10 +34,10 @@ const RequireAuth = () => {
   return <Outlet />;
 };
 
-// Chặn non-ADMIN khỏi khu quản trị (AdminLayout cũng tự guard phía trong).
+// Chặn non-ADMIN/ORGANIZER khỏi khu quản trị (Task 119: organizer vào được, backend vẫn gate theo kỳ thi).
 const RequireAdmin = () => {
   const { user } = useAuth();
-  if (!user || user.role !== 'ADMIN') {
+  if (!user || !['ADMIN', 'ORGANIZER'].includes(user.role)) {
     return <Navigate to="/login" replace state={{ from: '/admin' }} />;
   }
   return <Outlet />;

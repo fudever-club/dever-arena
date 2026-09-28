@@ -469,3 +469,10 @@
 - **`server/objectStore.js` (mới):** S3 SigV4 client thuần Node crypto — zero dependency ngoài core (ADR-003). Tự vô hiệu khi thiếu env (local/test luôn fallback KV/JSON như cũ); chỉ active ở production (`NODE_ENV=production` + đủ 4 env). Keys `submissions/<subId>.txt`.
 - **Luồng source_code:** nộp bài → `PUT` S3, KV chỉ giữ `source_key` (+ fallback inline khi lỗi tạm hoặc chưa bật); rejudge/GET-by-id/GET-list fetch từ S3 khi được phép xem; `subView` không bao giờ lộ `source_key`, `has_source` đúng cho cả bài lưu S3.
 - **Verify prod:** submit thật → `dever_store` có `source_key`, không còn inline code (query `specific query --db main`); GET trả lại nguyên văn `print("task118-final")`; log PUT 200 (sửa lỗi 403 SignatureDoesNotMatch: S3 phải encode từng segment, giữ nguyên `/` trên canonical path). `npm test` **188/188 (28 suites)**, `specific check` hợp lệ (2 builds + postgres + storage).
+
+## Vòng 35.2: Multi-organizer — Task 119 (Phase 35)
+
+- **Role mới `ORGANIZER`**: `POST /api/v1/admin/users/:id/role` (ADMIN-only) cấp/hạ PARTICIPANT/ORGANIZER/ADMIN; guard chống tự hạ mình khỏi ADMIN (`SELF_DEMOTE`), role lạ → 422.
+- **Quyền theo kỳ thi**: contest có `organizer_id` = người tạo; ORGANIZER chỉ tạo được 1 kỳ thi của mình và điều phase/thông báo trên kỳ thi đó (`canManageContest`); ADMIN toàn quyền. Route áp gate: `admin/phase`, `admin/announcements`, `admin/stress` (theo contest của đề), `admin/contests` (tạo — mở cho ORGANIZER).
+- **UI**: `RequireAdmin` cho phép ORGANIZER vào khu quản trị; AccountsPanel có select đổi role ngay trong bảng tài khoản (ADMIN hiển thị nhãn đỏ, không tự đổi); card Điều khiển phase hiển thị chip "Organizer: <username>" (server inject `organizer_username` vào GET /contests).
+- **Verify prod**: thăng hero ORGANIZER → tạo kỳ thi thành công (`organizer_id` đúng) → điều phase kỳ thi mình OK → bị 403 trên round1 → hạ về PARTICIPANT. OpenAPI 44 ops/38 paths. **189/189 tests (25 suites)**, detect 0, lint:js 0 errors, build 243ms.

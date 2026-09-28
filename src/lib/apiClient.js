@@ -68,6 +68,8 @@ export const api = {
   listUsers: () => req('/api/v1/admin/users', { auth: true }),
   createUser: (payload) => req('/api/v1/admin/users', { method: 'POST', body: payload, auth: true }),
   resetPassword: (id, password) => req(`/api/v1/admin/users/${encodeURIComponent(id)}/password`, { method: 'POST', body: { password }, auth: true }),
+  // Task 119: phân quyền multi-organizer — ADMIN cấp/hạ PARTICIPANT/ORGANIZER/ADMIN.
+  setUserRole: (id, role) => req(`/api/v1/admin/users/${encodeURIComponent(id)}/role`, { method: 'POST', body: { role }, auth: true }),
   createSubmission: (payload) => req('/api/v1/submissions', { method: 'POST', body: payload, auth: true }),
   getSubmission: (id) => req(`/api/v1/submissions/${encodeURIComponent(id)}`, { auth: true }),
   // Task 105: stats per problem của tôi (solved/attempts từ bài nộp thật)

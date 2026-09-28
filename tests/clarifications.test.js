@@ -196,3 +196,60 @@ test('announce broadcast SSE EVENT_ANNOUNCEMENT', async () => {
   assert.ok(buf.includes('EVENT_ANNOUNCEMENT'), `thiếu EVENT_ANNOUNCEMENT trong SSE: ${buf.slice(0, 500)}`);
   assert.ok(buf.includes(msg));
 });
+
+test('Task 119: multi-organizer — cấp quyền, gate theo kỳ thi, chống tự hạ mình', async () => {
+  // ADMIN thăng hero lên ORGANIZER
+  const heroId = 'u_hero';
+  const promote = await call(`/api/v1/admin/users/${heroId}/role`, 'POST', { role: 'ORGANIZER' }, adminToken);
+  assert.equal(promote.status, 200);
+  assert.equal(promote.data.user.role, 'ORGANIZER');
+
+  // HERO (giờ là ORGANIZER) tạo kỳ thi → organizer_id = chính mình
+  const created = await call('/api/v1/admin/contests', 'POST', {
+    title: 'Round Organizer Test', contest_format: 'ICPC', duration_minutes: 30,
+  }, heroToken);
+  assert.equal(created.status, 201);
+  const cid = created.data.contest.id;
+  assert.equal(created.data.contest.organizer_id, heroId);
+
+  // GET /contests kèm organizer_username
+  const list = await call('/api/v1/contests');
+  const shown = list.data.contests.find((c) => c.id === cid);
+  assert.equal(shown.organizer_username, 'dever_hero');
+
+  // ORGANIZER điều phase kỳ thi CỦA MÌNH được
+  const go = await call('/api/v1/admin/phase', 'POST', { contest_id: cid, phase: 'CODING' }, heroToken);
+  assert.equal(go.status, 200);
+
+  // ORGANIZER bị chặn điều phase kỳ thi của người khác (round1 của admin seed)
+  const other = await call('/api/v1/admin/phase', 'POST', { contest_id: 'contest_dever_round1', phase: 'FINISHED' }, heroToken);
+  assert.equal(other.status, 403);
+
+  // PARTICIPANT không được tạo kỳ thi
+  const judgeLogin = await call('/api/v1/auth/login', 'POST', { username: 'hacker_pro', password: 'dever123' });
+  const judgeTok = judgeLogin.data.accessToken || judgeLogin.data.token;
+  const forbidden = await call('/api/v1/admin/contests', 'POST', { title: 'Lậu' }, judgeTok);
+  assert.equal(forbidden.status, 403);
+
+  // PARTICIPANT không được đăng thông báo (vẫn 403 như cũ)
+  const annForbidden = await call('/api/v1/admin/announcements', 'POST', { contest_id: cid, message: 'lậu' }, judgeTok);
+  assert.equal(annForbidden.status, 403);
+
+  // ORGANIZER đăng thông báo kỳ thi của mình → 201
+  const annOk = await call('/api/v1/admin/announcements', 'POST', { contest_id: cid, message: 'Từ organizer' }, heroToken);
+  assert.equal(annOk.status, 201);
+
+  // ADMIN hạ hero về PARTICIPANT
+  const demote = await call(`/api/v1/admin/users/${heroId}/role`, 'POST', { role: 'PARTICIPANT' }, adminToken);
+  assert.equal(demote.status, 200);
+  assert.equal(demote.data.user.role, 'PARTICIPANT');
+
+  // ADMIN không thể tự hạ chính mình
+  const selfDemote = await call('/api/v1/admin/users/u_admin/role', 'POST', { role: 'ORGANIZER' }, adminToken);
+  assert.equal(selfDemote.status, 422);
+  assert.equal(selfDemote.data.error, 'SELF_DEMOTE');
+
+  // Role lạ bị từ chối
+  const badRole = await call(`/api/v1/admin/users/${heroId}/role`, 'POST', { role: 'SUPERGOD' }, adminToken);
+  assert.equal(badRole.status, 422);
+});
