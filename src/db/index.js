@@ -5,8 +5,8 @@
  */
 
 const DB_NAME = 'dever_arena';
-const DB_VERSION = 4;
-const STORES = ['users','contests','problems','testcases','submissions','hack_events','discussions','clans','contest_participants','analytics','virtual_sessions'];
+const DB_VERSION = 5; // v5: bỏ store hack_events (gỡ Hack Phase — ADR-005)
+const STORES = ['users','contests','problems','testcases','submissions','discussions','clans','contest_participants','analytics','virtual_sessions'];
 
 // helper: promisify IDB
 function openDB() {
@@ -22,6 +22,10 @@ function openDB() {
           db.createObjectStore(s, { keyPath: 'id' });
         }
       }
+      // Migration v4 → v5: hack_events đã bị gỡ (không còn Hack Phase)
+      if (db.objectStoreNames.contains('hack_events')) {
+        db.deleteObjectStore('hack_events');
+      }
       // indexes
       try {
         const ps = req.transaction.objectStore('problems');
@@ -34,10 +38,6 @@ function openDB() {
       try {
         const ss = req.transaction.objectStore('submissions');
         if (!ss.indexNames.contains('contest_id')) ss.createIndex('contest_id', 'contest_id', { unique: false });
-      } catch {}
-      try {
-        const hs = req.transaction.objectStore('hack_events');
-        if (!hs.indexNames.contains('contest_id')) hs.createIndex('contest_id', 'contest_id', { unique: false });
       } catch {}
       try {
         const cp = req.transaction.objectStore('contest_participants');

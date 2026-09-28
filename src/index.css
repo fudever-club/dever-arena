@@ -1,6 +1,36 @@
 @import "tailwindcss";
 @import "katex/dist/katex.min.css";
 
+/* Task 113 a11y: override palette Tailwind về mức đạt WCAG AA trên nền tối.
+   - slate-500/600 (muted labels) → #9ba3ae (≥4.5:1 trên canvas/surface)
+   - slate-400 → #a8b1bd, slate-300 → #c2c9d2 (đậm hơn gốc, vẫn đúng tông)
+   - accent #ff6600 giữ brand; text trên nền cam đổi sang #010102 (contrast 7.4:1)
+   - orange-400 giữ cho số liệu nổi bật nhưng ở brightness đủ (text-orange-400 gốc #ff9d33 đã đủ 8.5:1) */
+@theme {
+  --color-slate-600: #9ba3ae;
+  --color-slate-500: #9ba3ae;
+  --color-slate-400: #a8b1bd;
+  --color-slate-300: #c2c9d2;
+}
+
+/* Đè utilities theo opacity quá mờ (orange-400/70, red-400/70, slate-400/70...) — dùng bản đủ tương phản */
+.text-slate-500, .text-slate-600 { color: #9ba3ae !important; }
+.text-slate-400 { color: #a8b1bd !important; }
+.text-orange-400\/70 { color: #ffb066 !important; }
+.text-red-400\/70 { color: #f87171 !important; }
+/* ink-tertiary #62666d (3.6:1) → #8a8f98 (4.7:1 trên canvas) */
+.text-\[\#62666d\] { color: #8a8f98 !important; }
+
+/* Nút CTA nền cam: chữ canvas gần-đen thay trắng (2.93:1 → 7.4:1) */
+.bg-\[\#ff6600\] {
+  color: #010102 !important;
+  font-weight: 700;
+}
+.bg-\[\#ff6600\] * { color: inherit !important; }
+
+/* Đếm số liệu cam trên nền tối giữ nguyên nhưng đậm hơn */
+.text-\[\#ff6600\] { font-weight: 700; }
+
 /* DEVER Arena — Linear DESIGN.md tokens (DESIGN.md root, dever-ui-craft skill).
    Canvas gần-đen + surface ladder 4 bậc + hairline borders.
    Accent duy nhất: cam FPT #ff6600 (thay lavender Linear, giữ brand CLB). */
@@ -116,4 +146,11 @@ body {
 /* Workspace panes: mobile 1 cột full-width (thắng inline style split desktop) */
 @media (max-width: 1023px) {
   .ws-pane { width: 100% !important; }
+}
+
+/* Task 112 — Print stylesheet cho trang tổng kết: nền trắng, ẩn chrome, giữ bảng */
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff !important; }
+  .print\:bg-white { background-color: #fff !important; }
 }

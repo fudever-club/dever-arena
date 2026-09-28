@@ -1,13 +1,13 @@
 /**
  * DEVER Arena — Mock REST API layer (maps docs/API_SPECIFICATION.md)
  * Uses IndexedDB wrapper `db` for persistence. No real network.
- * Endpoints covered: auth/login, contests, problems, submissions, hacks, standings
+ * Endpoints covered: auth/login, contests, problems, submissions, standings
  *
  * Contract: Mỗi method là 1:1 với REST endpoint — sau này thay body bằng `fetch`
  * mà không đổi chữ ký hàm. JSDoc ghi rõ endpoint để grep/replace tự động.
  */
 import { db } from './index.js';
-import { calculateProblemScore, calculateHackScore } from '../core/scoring.js';
+import { calculateProblemScore } from '../core/scoring.js';
 import { createVirtualSession, getVirtualElapsedMinutes, calculateVirtualStandings } from '../core/virtualContest.js';
 
 // helper uuid
@@ -119,14 +119,13 @@ export const api = {
 
   /**
    * Đăng ký tham gia contest (legacy) — mock cho `POST /api/v1/contests/{slug}/register`
-   * Real: `fetch('/api/v1/contests/'+slug+'/register', {method:'POST', headers:{...getAuthHeaders(),'Content-Type':'application/json'}, body:JSON.stringify({userId, roomId})})`
+   * Real: `fetch('/api/v1/contests/'+slug+'/register', {method:'POST', headers:{...getAuthHeaders(),'Content-Type':'application/json'}, body:JSON.stringify({userId})})`
    * @endpoint POST /api/v1/contests/{slug}/register
    * @param {string} slugOrId - contest id hoặc slug
    * @param {string} userId
-   * @param {string|null} [roomId]
    * @returns {Promise<object>} contest_participants record
    */
-  async registerForContest(slugOrId, userId, roomId = null) {
+  async registerForContest(slugOrId, userId) {
     const contest = await resolveContest(slugOrId);
     if (!userId) throw new Error('userId required');
 
@@ -145,17 +144,7 @@ export const api = {
     // check existing
     const existing = await db.get('contest_participants', id);
     if (existing) return existing;
-    // auto assign room if not given: distribute by count
-    let finalRoom = roomId;
-    if (!finalRoom) {
-      const parts = await db.query('contest_participants', p => p.contest_id === contest.id);
-      const roomCounts = {};
-      for (const p of parts) roomCounts[p.room_id] = (roomCounts[p.room_id] || 0) + 1;
-      // pick least loaded
-      const rooms = ['Room #1','Room #2','Room #3','Room #4'];
-      finalRoom = rooms.sort((a,b) => (roomCounts[a]||0)-(roomCounts[b]||0))[0];
-    }
-    const rec = { id, contest_id: contest.id, user_id: userId, room_id: finalRoom, registered_at: new Date().toISOString() };
+    const rec = { id, contest_id: contest.id, user_id: userId, registered_at: new Date().toISOString() };
     await db.put('contest_participants', rec);
     return rec;
   },
@@ -163,18 +152,17 @@ export const api = {
   /**
    * Đăng ký tham gia contest (contract mới) — mock cho `POST /api/v1/contests/{contestId}/register`
    * Alias chuẩn hoá của registerForContest với tên tham số đúng spec `contestId`
-   * Real: `fetch('/api/v1/contests/'+contestId+'/register', {method:'POST', headers:{...getAuthHeaders(),'Content-Type':'application/json'}, body:JSON.stringify({user_id:userId, room_id:roomId})})`
+   * Real: `fetch('/api/v1/contests/'+contestId+'/register', {method:'POST', headers:{...getAuthHeaders(),'Content-Type':'application/json'}, body:JSON.stringify({user_id:userId})})`
    * @endpoint POST /api/v1/contests/{slug}/register
    * @param {string} contestId - contest id hoặc slug (alias contestId thay vì slugOrId)
    * @param {string} userId
-   * @param {string|null} [roomId]
    * @returns {Promise<object>} contest_participants record
    */
-  async registerContest(contestId, userId, roomId = null) {
+  async registerContest(contestId, userId) {
     if (!contestId) throw new Error('contestId required');
     if (!userId) throw new Error('userId required');
     // Delegate to canonical registerForContest để giữ single source of truth
-    return this.registerForContest(contestId, userId, roomId);
+    return this.registerForContest(contestId, userId);
   },
 
   /**
@@ -198,23 +186,6 @@ export const api = {
     return db.query('contest_participants', p => p.contest_id === targetId);
   },
 
-  /**
-   * Lấy room và submissions đã pass pretest — mock cho `GET /api/v1/contests/{slug}/rooms/{roomId}`
-   * Real: `fetch('/api/v1/contests/'+slug+'/rooms/'+roomId, {headers: getAuthHeaders()})`
-   * @endpoint GET /api/v1/contests/{slug}/rooms/{roomId}
-   * @param {string} contestSlugOrId
-   * @param {string} roomId
-   * @returns {Promise<{contest: object, room_id: string, members: object[], submissions: object[]}>}
-   */
-  async getRoom(contestSlugOrId, roomId) {
-    const contest = await resolveContest(contestSlugOrId);
-    const participants = await db.query('contest_participants', p => p.contest_id === contest.id && p.room_id === roomId);
-    const submissions = await db.query('submissions', s => s.contest_id === contest.id && s.verdict !== 'PENDING');
-    // filter submissions to those who passed pretest (AC and not hacked) in this room
-    const userIdsInRoom = new Set(participants.map(p => p.user_id));
-    const roomSubs = submissions.filter(s => userIdsInRoom.has(s.user_id) && s.verdict === 'AC' && !s.is_hacked);
-    return { contest, room_id: roomId, members: participants, submissions: roomSubs };
-  },
 
   /**
    * Lấy danh sách bài — mock cho `GET /api/v1/problems` (hỗ trợ filter tag/min_rating/max_rating/search/contest_id)
@@ -296,14 +267,14 @@ export const api = {
     } catch {}
     // count wrongAttempts before this AC for same user+problem (WA in this contest)
     const prevSubs = await db.query('submissions', s => s.contest_id === contest.id && s.user_id === user_id && s.problem_id === problem_id);
-    const wrongAttempts = prevSubs.filter(s => s.verdict !== 'AC' && s.verdict !== 'HACKED').length;
+    const wrongAttempts = prevSubs.filter(s => s.verdict !== 'AC').length;
     // simplistic verdict simulation: if code contains 'Wrong' keyword -> WA else AC
     const isWA = source_code.includes('__WA__') || source_code.includes('WA_TRIGGER');
     const verdict = isWA ? 'WA' : 'AC';
     const points_awarded = verdict === 'AC' ? calculateProblemScore(problem.base_points, elapsedMinutes, wrongAttempts) : 0;
     const sub = {
       id: 'sub_' + uuid(),
-      user_id: userIdOrHackFix(user_id),
+      user_id,
       problem_id,
       contest_id: contest.id,
       language: finalLang,
@@ -312,10 +283,8 @@ export const api = {
       execution_time_ms: verdict === 'AC' ? 45 : 18,
       memory_used_kb: 2450,
       points_awarded,
-      is_hacked: false,
       submitted_at: new Date().toISOString()
     };
-    // hack: ensure user_id stays as passed
     sub.user_id = user_id;
     await db.put('submissions', sub);
     return sub;
@@ -349,76 +318,6 @@ export const api = {
     return all.sort((a,b) => new Date(b.submitted_at) - new Date(a.submitted_at));
   },
 
-  /**
-   * Thực hiện hack — mock cho `POST /api/v1/hacks/execute`
-   * Real: `fetch('/api/v1/hacks/execute', {method:'POST', headers:{...getAuthHeaders(),'Content-Type':'application/json'}, body:JSON.stringify({contest_id,hacker_id,target_submission_id,test_payload})})`
-   * @endpoint POST /api/v1/hacks/execute
-   * @param {{contest_id: string, hacker_id?: string, target_submission_id: string, test_payload?: string, input_payload?: string}} payload
-   * @returns {Promise<{success: boolean, verdict: string, points_earned: number, penalty: number, points_delta: number, is_successful: boolean, hack: object}>}
-   */
-  async executeHack({ contest_id, hacker_id = 'user_me', target_submission_id, test_payload, input_payload } = {}) {
-    const payload = test_payload ?? input_payload;
-    if (!contest_id) throw new Error('contest_id required');
-    if (!target_submission_id) throw new Error('target_submission_id required');
-    if (payload === undefined || payload === null || String(payload).trim().length === 0) throw new Error('test_payload/input_payload required');
-    const payloadStr = String(payload);
-    if (payloadStr.length > 50000) throw new Error('payload too large');
-    const contest = await resolveContest(contest_id);
-    const target = await db.get('submissions', target_submission_id);
-    if (!target) throw new Error('Target submission not found');
-    if (target.contest_id !== contest.id) throw new Error('Target submission does not belong to contest');
-    if (target.is_hacked) throw new Error('Target already hacked');
-
-    // vulnerability heuristic
-    const source = target.source_code || '';
-    // vulnerable if uses int without long long / __int128 and has O(N^2) pattern or int total
-    const hasIntTotal = source.includes('int total') || source.includes('int ans') || source.includes('vector<int>');
-    const usesLongLong = source.includes('long long') || source.includes('__int128') || source.includes('int64');
-    const isVulnerable = hasIntTotal && !usesLongLong;
-    // also consider user c3/rookie as vulnerable legacy
-    const isLegacyVulnUser = target.user_id === 'c3' || target.user_id === 'rookie_fresher_k21' || target.problem_id === 'p102' && isVulnerable;
-    // trigger heuristic: large payload or contains big numbers (matches js/app.js logic)
-    const isBigTest = payloadStr.length > 8 || payloadStr.includes('1000') || payloadStr.includes('200000') || payloadStr.includes('1000000') || payloadStr.includes('100000');
-    // explicit override: payload contains SUCCESS marker
-    let is_successful;
-    if (payloadStr.includes('__HACK_SUCCESS__')) is_successful = true;
-    else if (payloadStr.includes('__HACK_FAIL__')) is_successful = false;
-    else {
-      // if target is vulnerable and big test => success, else fail
-      // For generic safety: if not vulnerable, even big test fails (code correctly handles overflow)
-      is_successful = isLegacyVulnUser ? isBigTest : false;
-      // If not legacy but vulnerable flag still true, use isBigTest && isVulnerable
-      if (!isLegacyVulnUser && isVulnerable) is_successful = isBigTest;
-    }
-
-    const points_delta = is_successful ? 100 : -50;
-    const hackEvent = {
-      id: 'hack_' + uuid(),
-      contest_id: contest.id,
-      hacker_id,
-      target_submission_id,
-      input_payload: payloadStr.slice(0, 50000),
-      is_successful,
-      points_delta,
-      executed_at: new Date().toISOString()
-    };
-    await db.put('hack_events', hackEvent);
-    if (is_successful) {
-      target.is_hacked = true;
-      target.verdict = 'HACKED';
-      // keep points_awarded for audit but standings will exclude hacked
-      await db.put('submissions', target);
-    }
-    return {
-      success: is_successful,
-      verdict: is_successful ? 'SUCCESSFUL_HACK' : 'UNSUCCESSFUL_HACK',
-      points_earned: is_successful ? 100 : 0,
-      penalty: is_successful ? 0 : -50,
-      points_delta,
-      is_successful,
-      hack: hackEvent
-    };
-  },
 
   /**
    * Lấy bảng xếp hạng — mock cho `GET /api/v1/contests/{slug}/standings`
@@ -438,32 +337,19 @@ export const api = {
   async getStandings(contestIdOrSlug, opts = {}) {
     const contest = await resolveContest(contestIdOrSlug);
     const submissions = await db.query('submissions', s => s.contest_id === contest.id);
-    const hacks = await db.query('hack_events', h => h.contest_id === contest.id);
     const users = await db.getAll('users');
     const userMap = new Map(users.map(u => [u.id, u]));
-    // participants for room/clan filtering
     let participants = [];
     try { participants = await db.getAll('contest_participants'); } catch {}
     const partByUser = new Map(participants.filter(p=>p.contest_id===contest.id).map(p=>[p.user_id, p]));
 
-    // precompute hack scores per hacker
-    const hackScoreMap = new Map(); // hacker_id -> {success,fail,totalDelta}
-    for (const h of hacks) {
-      const cur = hackScoreMap.get(h.hacker_id) || { success:0, fail:0, total:0 };
-      if (h.is_successful) cur.success++; else cur.fail++;
-      cur.total = cur.success * 100 - cur.fail * 50;
-      hackScoreMap.set(h.hacker_id, cur);
-    }
-
-    // Build standings for all relevant users (participants + submitters + hackers + all users if small)
-    // For deterministic output include all users that are in contest_participants OR have submissions/hacks.
+    // Build standings for all relevant users (participants + submitters)
     // If contest_participants empty, fallback to all users.
     let candidateIds = new Set();
     if (partByUser.size > 0) {
       for (const uid of partByUser.keys()) candidateIds.add(uid);
     }
     for (const s of submissions) candidateIds.add(s.user_id);
-    for (const h of hacks) candidateIds.add(h.hacker_id);
     if (candidateIds.size === 0) {
       for (const u of users) candidateIds.add(u.id);
     }
@@ -472,13 +358,11 @@ export const api = {
     for (const uid of candidateIds) {
       const user = userMap.get(uid);
       if (!user) continue;
-      // sum points from non-hacked AC submissions
-      const userSubs = submissions.filter(s => s.user_id === uid && !s.is_hacked && s.verdict === 'AC');
+      // sum points from AC submissions
+      const userSubs = submissions.filter(s => s.user_id === uid && s.verdict === 'AC');
       let probScore = 0;
       for (const s of userSubs) probScore += (s.points_awarded || 0);
-      const hack = hackScoreMap.get(uid);
-      const hackScore = hack ? hack.total : 0;
-      const total_score = probScore + hackScore;
+      const total_score = probScore;
       standings.push({
         user_id: uid,
         username: user.username,
@@ -486,12 +370,8 @@ export const api = {
         total_score,
         totalScore: total_score,
         problem_score: probScore,
-        hack_score: hackScore,
-        hack_success: hack?.success || 0,
-        hack_fail: hack?.fail || 0,
         submissions: userSubs,
-        clan_id: user.clan_id,
-        room_id: partByUser.get(uid)?.room_id || null
+        clan_id: user.clan_id
       });
     }
 
@@ -508,14 +388,8 @@ export const api = {
       standings[i].new_rank = rank;
     }
 
-    // filters — hỗ trợ alias mới (room, page, pageSize) + legacy (room_id, limit)
-    let filtered = standings;
-    const roomFilter = opts.room ?? opts.room_id ?? opts.roomId ?? null;
-    if (roomFilter) {
-      filtered = filtered.filter(s => s.room_id === roomFilter);
-    }
-
     // pagination — hỗ trợ page/pageSize (mới) + page/limit (legacy), mặc định pageSize 20
+    let filtered = standings;
     const hasPage = opts.page !== undefined && opts.page !== null && opts.page !== '';
     const hasPageSize = opts.pageSize !== undefined && opts.pageSize !== null && opts.pageSize !== '';
     const hasLimit = opts.limit !== undefined && opts.limit !== null && opts.limit !== '';
@@ -595,8 +469,5 @@ export const api = {
     };
   },
 };
-
-// small helper to normalize userId param name collisions
-function userIdOrHackFix(uid) { return uid; }
 
 export default api;

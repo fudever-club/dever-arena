@@ -71,10 +71,10 @@ const StressPanel = ({ problems, notify, refresh }) => {
     try {
       let ok = 0;
       for (const o of result.outputs) {
-        await api.saveTestcase({ problem_id: targetId, stdin: o.stdin, expected_stdout: o.expected_stdout, is_pretest: true, strategy: o.strategy });
+        await api.saveTestcase({ problem_id: targetId, stdin: o.stdin, expected_stdout: o.expected_stdout, strategy: o.strategy });
         ok++;
       }
-      notify?.(`Đã lưu ${ok} test vào pretests (đáp án từ brute-force).`);
+      notify?.(`Đã lưu ${ok} test vào bộ test chấm (đáp án từ brute-force).`);
     } catch (e) {
       notify?.({ type: 'error', message: e?.message || 'Lưu test thất bại.' });
     } finally {
@@ -155,7 +155,7 @@ const StressPanel = ({ problems, notify, refresh }) => {
                 Áp dụng time limit
               </button>
               <button onClick={saveTests} disabled={!targetId || saving} className="px-3 py-2 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-medium disabled:opacity-50">
-                {saving ? 'Đang lưu...' : `Lưu ${result.outputs.length} test vào pretests`}
+                {saving ? 'Đang lưu...' : `Lưu ${result.outputs.length} test vào bộ test chấm`}
               </button>
             </div>
           )}
@@ -180,11 +180,11 @@ const WorkflowBadge = ({ status }) => {  const s = status || 'DRAFT';
   );
 };
 
-/** Dashboard tổng quan: phase hiện tại + số contests/problems/submissions/hacks + shortcuts. */
+/** Dashboard tổng quan: phase hiện tại + số contests/problems/submissions + shortcuts. */
 const OverviewPanel = ({ phase, onJump }) => {
   const [loading, setLoading] = useState(true);
   const [contestTitle, setContestTitle] = useState('');
-  const [stats, setStats] = useState({ contests: 0, problems: 0, submissions: 0, hacks: 0, participants: 0 });
+  const [stats, setStats] = useState({ contests: 0, problems: 0, submissions: 0, accepted: 0, participants: 0 });
 
   useEffect(() => {
     let cancelled = false;
@@ -206,7 +206,7 @@ const OverviewPanel = ({ phase, onJump }) => {
           contests: contests.length,
           problems: (pData?.problems || []).length,
           submissions: subs.length,
-          hacks: subs.filter((s) => s.verdict === 'HACKED' || s.is_hacked).length,
+          accepted: subs.filter((s) => s.verdict === 'AC').length,
           participants: (stData?.standings || []).length,
         });
       } catch { /* giữ số 0 khi offline */ }
@@ -220,14 +220,13 @@ const OverviewPanel = ({ phase, onJump }) => {
     ['Kỳ thi', String(stats.contests)],
     ['Đề thi', String(stats.problems)],
     ['Bài nộp', String(stats.submissions)],
-    ['Hack thành công', String(stats.hacks)],
+    ['Accepted', String(stats.accepted)],
     ['Thí sinh', String(stats.participants)],
   ];
   const shortcuts = [
     ['phase', 'Điều khiển phase'],
     ['polygon', 'Soạn đề thi'],
     ['telemetry', 'Giám sát máy chấm'],
-    ['rooms', 'Phòng hack'],
     ['anticheat', 'Soát gian lận AST'],
     ['accounts', 'Cấp tài khoản'],
   ];
@@ -265,13 +264,13 @@ const OverviewPanel = ({ phase, onJump }) => {
   );
 };
 
-/** CRUD testcase (pretests/system) cho đề đang chọn. Sample do server giữ (409 khi xóa). */
+/** CRUD testcase cho đề đang chọn. Sample do server giữ (409 khi xóa). */
 const TestcasePanel = ({ problems, notify }) => {
   const [problemId, setProblemId] = useState('');
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
-  const [form, setForm] = useState({ stdin: '', expected_stdout: '', is_pretest: true, strategy: 'manual' });
+  const [form, setForm] = useState({ stdin: '', expected_stdout: '', strategy: 'manual' });
   const [saving, setSaving] = useState(false);
 
   const activeId = problemId || (problems?.[0]?.id ?? '');
@@ -309,10 +308,9 @@ const TestcasePanel = ({ problems, notify }) => {
         problem_id: activeId,
         stdin: form.stdin,
         expected_stdout: form.expected_stdout,
-        is_pretest: !!form.is_pretest,
         strategy: form.strategy.trim() || 'manual',
       });
-      setForm({ stdin: '', expected_stdout: '', is_pretest: true, strategy: 'manual' });
+      setForm({ stdin: '', expected_stdout: '', strategy: 'manual' });
       await load(activeId);
       notify?.('Đã lưu testcase.');
     } catch (err) {
@@ -343,8 +341,8 @@ const TestcasePanel = ({ problems, notify }) => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="text-[10px] font-semibold tracking-widest text-[#62666d] uppercase mb-1">Polygon · Testcase</div>
-          <h3 className="text-sm font-bold text-white">Pretests / System tests của đề đang chọn</h3>
-          <p className="text-[11px] text-slate-400 mt-0.5">Hiện strategy + is_pretest. Test mẫu (is_sample) không xóa lẻ.</p>
+          <h3 className="text-sm font-bold text-white">Bộ test chấm của đề đang chọn</h3>
+          <p className="text-[11px] text-slate-400 mt-0.5">Mọi test đều dùng chấm full-suite. Test mẫu (is_sample) không xóa lẻ.</p>
         </div>
         <select value={activeId} onChange={(e) => setProblemId(e.target.value)} className="px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-white text-xs outline-none">
           {(problems || []).map((p) => (<option key={p.id} value={p.id}>{p.code} · {p.title}</option>))}
@@ -360,7 +358,6 @@ const TestcasePanel = ({ problems, notify }) => {
               <tr>
                 <th className="py-2 px-3">Testcase</th>
                 <th className="py-2 px-3">Strategy</th>
-                <th className="py-2 px-3">Pretest?</th>
                 <th className="py-2 px-3">Sample?</th>
                 <th className="py-2 px-3 text-right">Xóa</th>
               </tr>
@@ -373,7 +370,6 @@ const TestcasePanel = ({ problems, notify }) => {
                 <tr key={t.id}>
                   <td className="py-2 px-3 text-slate-300">{t.id.slice(0, 16)}… <span className="text-slate-500">#{t.order_index ?? '-'}</span></td>
                   <td className="py-2 px-3 text-slate-200">{t.strategy || 'manual'}</td>
-                  <td className="py-2 px-3 text-slate-200">{t.is_pretest ? 'pretest' : 'system'}</td>
                   <td className="py-2 px-3 text-slate-400">{t.is_sample ? 'sample' : '—'}</td>
                   <td className="py-2 px-3 text-right">
                     <button
@@ -396,10 +392,6 @@ const TestcasePanel = ({ problems, notify }) => {
           className={`${inputCls} resize-none`} />
         <textarea value={form.expected_stdout} onChange={(e) => setForm((f) => ({ ...f, expected_stdout: e.target.value }))} rows={3} placeholder="expected_stdout (có thể trống)"
           className={`${inputCls} resize-none`} />
-        <label className="flex items-center gap-2 text-slate-300">
-          <input type="checkbox" checked={form.is_pretest} onChange={(e) => setForm((f) => ({ ...f, is_pretest: e.target.checked }))} />
-          Pretest (bỏ tick = system test)
-        </label>
         <div className="flex items-center gap-2">
           <input value={form.strategy} onChange={(e) => setForm((f) => ({ ...f, strategy: e.target.value }))} placeholder="strategy (vd: edge-min, random)"
             className={inputCls} />
@@ -426,7 +418,7 @@ export const AdminLayout = ({ children }) => {
     else setAdminNotice('');
   };
 
-  const [activeTab, setActiveTab] = useState('overview'); // overview | phase | anticheat | polygon | telemetry | rooms | accounts
+  const [activeTab, setActiveTab] = useState('overview'); // overview | phase | anticheat | polygon | telemetry | accounts
 
   // Polygon Problem Studio States
   const [polygonView, setPolygonView] = useState('list'); // 'list' | 'editor'
@@ -772,17 +764,6 @@ export const AdminLayout = ({ children }) => {
           </button>
 
           <button
-            onClick={() => setActiveTab('rooms')}
-            className={`w-full px-3 py-2.5 rounded-lg font-semibold transition text-left ${
-              activeTab === 'rooms'
-                ? 'bg-[#141516] text-white border border-[#34343a]'
-                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
-            }`}
-          >
-            5. Thí sinh và phòng hack
-          </button>
-
-          <button
             onClick={() => setActiveTab('accounts')}
             className={`w-full px-3 py-2.5 rounded-lg font-semibold transition text-left ${
               activeTab === 'accounts'
@@ -790,7 +771,7 @@ export const AdminLayout = ({ children }) => {
                 : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
             }`}
           >
-            6. Cấp tài khoản
+            5. Cấp tài khoản
           </button>
         </nav>
 
@@ -894,10 +875,21 @@ export const AdminLayout = ({ children }) => {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  <div className={`p-4 rounded-xl border transition ${phase === 'REGISTRATION' ? 'bg-emerald-500/10 border-emerald-500/40' : 'bg-white/5 border-white/10'}`}>
+                    <h4 className="text-xs font-bold text-emerald-400 mb-1">1. Registration</h4>
+                    <p className="text-[11px] text-slate-400 mb-3">Mở đăng ký, thí sinh vào danh sách trước giờ thi.</p>
+                    <button
+                      onClick={() => handlePhaseChange('REGISTRATION')}
+                      className="w-full py-2 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#34343a] text-emerald-400 font-medium text-xs transition"
+                    >
+                      Đang mở đăng ký
+                    </button>
+                  </div>
+
                   <div className={`p-4 rounded-xl border transition ${phase === 'CODING' ? 'bg-emerald-500/10 border-emerald-500/40' : 'bg-white/5 border-white/10'}`}>
-                    <h4 className="text-xs font-bold text-emerald-400 mb-1">1. Coding Phase (120')</h4>
-                    <p className="text-[11px] text-slate-400 mb-3">Mở nộp bài, chấm Pretests, khóa xem code đối thủ.</p>
+                    <h4 className="text-xs font-bold text-emerald-400 mb-1">2. Coding Phase (120')</h4>
+                    <p className="text-[11px] text-slate-400 mb-3">Mở nộp bài, chấm full-suite trả verdict cuối, khóa xem code đối thủ.</p>
                     <button
                       onClick={() => handlePhaseChange('CODING')}
                       className="w-full py-2 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#34343a] text-emerald-400 font-medium text-xs transition"
@@ -906,31 +898,9 @@ export const AdminLayout = ({ children }) => {
                     </button>
                   </div>
 
-                  <div className={`p-4 rounded-xl border transition ${phase === 'HACK_PHASE' ? 'bg-orange-500/10 border-orange-500/40' : 'bg-white/5 border-white/10'}`}>
-                    <h4 className="text-xs font-bold text-[#ff6600] mb-1">2. Hack Phase (15')</h4>
-                    <p className="text-[11px] text-slate-400 mb-3">Mở code trong Room 25 người, cho phép bẻ khóa.</p>
-                    <button
-                      onClick={() => handlePhaseChange('HACK_PHASE')}
-                      className="w-full py-2 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-bold text-xs transition"
-                    >
-                      Kích Hoạt HACK
-                    </button>
-                  </div>
-
-                  <div className={`p-4 rounded-xl border transition ${phase === 'SYSTEM_TESTING' ? 'bg-yellow-500/10 border-yellow-500/40' : 'bg-white/5 border-white/10'}`}>
-                    <h4 className="text-xs font-bold text-yellow-400 mb-1">3. System Testing</h4>
-                    <p className="text-[11px] text-slate-400 mb-3">Chạy 45 test ẩn, chốt điểm chung cuộc.</p>
-                    <button
-                      onClick={() => handlePhaseChange('SYSTEM_TESTING')}
-                      className="w-full py-2 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#34343a] text-yellow-400 font-medium text-xs transition"
-                    >
-                      Chạy System Test
-                    </button>
-                  </div>
-
                   <div className={`p-4 rounded-xl border transition ${phase === 'FINISHED' ? 'bg-white/5 border-[#34343a]' : 'bg-white/5 border-white/10'}`}>
-                    <h4 className="text-xs font-bold text-[#8a8f98] mb-1">4. Finished (Rating)</h4>
-                    <p className="text-[11px] text-slate-400 mb-3">Đóng giải, tính toán cập nhật Elo 7 bậc.</p>
+                    <h4 className="text-xs font-bold text-[#8a8f98] mb-1">3. Finished (Rating)</h4>
+                    <p className="text-[11px] text-slate-400 mb-3">Đóng giải, mở editorial, tính toán cập nhật Elo 7 bậc.</p>
                     <button
                       onClick={() => handlePhaseChange('FINISHED')}
                       className="w-full py-2 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#34343a] text-slate-200 font-medium text-xs transition"
@@ -1536,14 +1506,7 @@ export const AdminLayout = ({ children }) => {
             </div>
           )}
 
-          {/* TAB 5: ROOMS */}
-          {activeTab === 'rooms' && (
-            <div className="space-y-6">
-              <AdminSection eyebrow="Thí sinh" title="Phòng thi và Hack Room" desc="Room 25 người, theo dõi hack theo từng phòng." />
-              <RoomsPanel />
-            </div>
-          )}
-
+          {/* TAB 5: ACCOUNTS */}
           {activeTab === 'accounts' && (
             <div className="space-y-6">
               <AdminSection eyebrow="Tài khoản" title="Cấp tài khoản" desc="Tạo và reset tài khoản cá nhân, đội thi — không đăng ký công khai." />
@@ -1561,7 +1524,7 @@ export const AdminLayout = ({ children }) => {
 
 /** Tạo kỳ thi mới (mở đăng ký REGISTRATION, admin gán đề sau). */
 const CreateContestPanel = () => {
-  const [form, setForm] = useState({ title: '', format: 'CODEFORCES', start: '', duration: 135, minRating: '', maxRating: '' });
+  const [form, setForm] = useState({ title: '', format: 'ICPC', start: '', duration: 135, minRating: '', maxRating: '' });
   const [msg, setMsg] = useState('');
   const [ok, setOk] = useState(false);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -1580,7 +1543,7 @@ const CreateContestPanel = () => {
       });
       setOk(true);
       setMsg(`Đã tạo kỳ thi “${data.contest.title}”, đang mở đăng ký. Gán đề bằng tab Soạn đề.`);
-      setForm({ title: '', format: 'CODEFORCES', start: '', duration: 135, minRating: '', maxRating: '' });
+      setForm({ title: '', format: 'ICPC', start: '', duration: 135, minRating: '', maxRating: '' });
     } catch (err) {
       setMsg(err?.message || 'Tạo kỳ thi thất bại.');
     }
@@ -1597,7 +1560,7 @@ const CreateContestPanel = () => {
       <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <input className={inputCls} placeholder="Tên kỳ thi (vd: DEVER Round #3)" value={form.title} onChange={set('title')} required />
         <select className={inputCls} value={form.format} onChange={set('format')}>
-          <option value="CODEFORCES">Codeforces (điểm giảm theo giờ + hack)</option>
+          <option value="CODEFORCES">Codeforces (điểm giảm theo phút làm bài)</option>
           <option value="ICPC">ICPC (số bài + phạt giờ)</option>
           <option value="IOI">IOI (điểm subtask)</option>
         </select>
@@ -1689,7 +1652,6 @@ const TelemetryPanel = () => {
         ['Quá giờ / lỗi chạy', String((stats.byVerdict.TLE || 0) + (stats.byVerdict.RTE || 0))],
         ['Lỗi biên dịch', String(stats.byVerdict.CE || 0)],
         ['Rớt system test', String(stats.byVerdict.FST || 0)],
-        ['Bị hack', String(stats.byVerdict.HACKED || 0)],
         ['Thí sinh', String(stats.participants)],
       ]
     : [];
@@ -1763,116 +1725,6 @@ const TelemetryPanel = () => {
         </div>
         </>
       )}
-    </div>
-  );
-};
-
-/** Phòng thi thật từ API (nhóm theo room_id). Hiện sức chứa + lọc hack theo room. */
-const RoomsPanel = () => {
-  const ROOM_CAPACITY = 25;
-  const [rooms, setRooms] = useState(null);
-  const [hacks, setHacks] = useState([]);
-  const [roomFilter, setRoomFilter] = useState('all');
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [st, subs] = await Promise.all([
-          api.getStandings('dever-round-1-div3'),
-          api.listSubmissions('contest_dever_round1').catch(() => ({ submissions: [] })),
-        ]);
-        if (cancelled) return;
-        const userRoom = {};
-        const groups = {};
-        (st.standings || []).forEach((r) => {
-          const id = r.room_id || 'Chưa xếp phòng';
-          userRoom[r.user_id || r.username] = id;
-          if (r.username) userRoom[r.username] = id;
-          if (!groups[id]) groups[id] = { id, members: [], ratings: [] };
-          groups[id].members.push(r.username);
-          groups[id].ratings.push(r.rating);
-        });
-        const allSubs = subs.submissions || [];
-        const hacked = allSubs
-          .filter((s) => s.verdict === 'HACKED' || s.is_hacked)
-          .map((s) => ({ ...s, room_id: userRoom[s.user_id] || userRoom[s.username] || 'Chưa xếp phòng' }));
-        Object.values(groups).forEach((g) => {
-          g.hackCount = hacked.filter((h) => h.room_id === g.id).length;
-        });
-        setRooms(Object.values(groups));
-        setHacks(hacked);
-      } catch { /* giữ null */ }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  const visibleHacks = roomFilter === 'all' ? hacks : hacks.filter((h) => h.room_id === roomFilter);
-
-  return (
-    <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-4">
-      <h2 className="text-base font-bold text-white">Phân phối phòng thi</h2>
-      <p className="text-xs text-slate-400">Mỗi phòng sức chứa tối đa {ROOM_CAPACITY} thí sinh. Phòng dùng để bẻ khóa bài nhau trong Hack Phase.</p>
-      {!rooms ? (
-        <p className="text-xs text-slate-400">Chưa kết nối được máy chủ (npm run server).</p>
-      ) : rooms.length === 0 ? (
-        <p className="text-xs text-slate-400">Chưa có thí sinh đăng ký.</p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {rooms.map((room) => (
-            <div key={room.id} className="p-3 rounded-lg bg-black/40 border border-white/5 text-xs">
-              <div className="flex items-center justify-between font-bold text-white mb-1">
-                <span>{room.id}</span>
-                <span className="text-slate-200 font-mono">Sức chứa {room.members.length}/{ROOM_CAPACITY}</span>
-              </div>
-              <span className="text-[11px] text-slate-500 block">{room.members.join(', ')}</span>
-              <span className="text-[11px] text-slate-400 block mt-1 font-mono">{room.hackCount || 0} bài bị hack</span>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="pt-2">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-          <h3 className="text-xs font-bold text-slate-300">Hack theo phòng ({visibleHacks.length})</h3>
-          <label className="flex items-center gap-2 text-xs text-slate-400">
-            Lọc theo phòng:
-            <select
-              value={roomFilter}
-              onChange={(e) => setRoomFilter(e.target.value)}
-              className="px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-white outline-none"
-            >
-              <option value="all">Tất cả phòng</option>
-              {(rooms || []).map((r) => (
-                <option key={r.id} value={r.id}>{r.id} ({r.members.length}/{ROOM_CAPACITY})</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        {visibleHacks.length === 0 ? (
-          <p className="text-[11px] text-slate-500">Chưa có bài bị hack{roomFilter === 'all' ? '.' : ' trong phòng này.'}</p>
-        ) : (
-          <div className="bg-black/40 border border-white/5 rounded-xl overflow-hidden">
-            <table className="w-full text-left text-[11px]">
-              <thead className="text-slate-500 uppercase tracking-wider">
-                <tr>
-                  <th className="py-2 px-3">Bài nộp</th>
-                  <th className="py-2 px-3">Phòng</th>
-                  <th className="py-2 px-3 text-right">Điểm</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5 font-mono">
-                {visibleHacks.slice(0, 30).map((h) => (
-                  <tr key={h.id}>
-                    <td className="py-2 px-3 text-slate-300">{String(h.id).slice(0, 14)}…</td>
-                    <td className="py-2 px-3 text-slate-200">{h.room_id}</td>
-                    <td className="py-2 px-3 text-right text-slate-300">{h.points_awarded}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
     </div>
   );
 };

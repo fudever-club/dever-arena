@@ -13,7 +13,7 @@ import {
 } from '../src/core/auth.js';
 
 async function resetSeed() {
-  for (const t of ['users','contests','problems','submissions','hack_events','discussions','clans','testcases','contest_participants','analytics','virtual_sessions']) {
+  for (const t of ['users','contests','problems','submissions','discussions','clans','testcases','contest_participants','analytics','virtual_sessions']) {
     await db.clear(t);
   }
   await ensureSeeded(seedDatabase);
@@ -61,10 +61,9 @@ describe('Crew-G Contract — api.registerContest & api.getContestParticipants (
   it('registerContest ghi contest_participants với id = contestId:userId', async () => {
     const newUserId = 'user_test_register_1';
     await db.put('users', { id: newUserId, username: 'test_reg_1', email: 't1@fpt.edu.vn', password_hash:'mock', full_name:'Test 1', clan_id:null, rating:1500, max_rating:1500, rank_tier:'Specialist', role:'PARTICIPANT' });
-    const rec = await api.registerContest('contest_dever_round1', newUserId, 'Room #2');
+    const rec = await api.registerContest('contest_dever_round1', newUserId);
     assert.equal(rec.contest_id, 'contest_dever_round1');
     assert.equal(rec.user_id, newUserId);
-    assert.equal(rec.room_id, 'Room #2');
     assert.equal(rec.id, 'contest_dever_round1:'+newUserId);
     // verify persisted
     const fromDb = await db.get('contest_participants', rec.id);
@@ -81,20 +80,18 @@ describe('Crew-G Contract — api.registerContest & api.getContestParticipants (
     await db.put('users', { id: uid, username: 'slug_test', email:'s@fpt.edu.vn', password_hash:'mock', full_name:'Slug', clan_id:null, rating:1500, max_rating:1500, rank_tier:'Specialist', role:'PARTICIPANT'});
     const rec = await api.registerContest('dever-round-1-div3', uid);
     assert.equal(rec.contest_id, 'contest_dever_round1');
-    assert.ok(rec.room_id.startsWith('Room #'));
+    assert.ok(!('room_id' in rec), 'không còn phân phòng (ADR-005)');
     await db.delete('contest_participants', rec.id);
     await db.delete('users', uid);
   });
 
-  it('registerContest tự động gán Room khi không truyền roomId và idempotent khi đăng ký lại', async () => {
+  it('registerContest idempotent khi đăng ký lại', async () => {
     const uid = 'user_autoroom_test';
     await db.put('users', { id: uid, username:'autoroom', email:'a@fpt.edu.vn', password_hash:'mock', full_name:'Auto', clan_id:null, rating:1500, max_rating:1500, rank_tier:'Specialist', role:'PARTICIPANT'});
     const first = await api.registerContest('contest_dever_round1', uid);
-    assert.ok(first.room_id, 'should auto assign room');
-    const second = await api.registerContest('contest_dever_round1', uid, 'Room #3');
-    // idempotent: trả về cùng record, không đổi room
+    const second = await api.registerContest('contest_dever_round1', uid);
+    // idempotent: trả về cùng record
     assert.equal(second.id, first.id);
-    assert.equal(second.room_id, first.room_id, 'second call should not override room when already exists');
     await db.delete('contest_participants', first.id);
     await db.delete('users', uid);
   });
@@ -126,11 +123,10 @@ describe('Crew-G Contract — api.registerContest & api.getContestParticipants (
   it('registerContest tương thích với registerForContest (cùng storage)', async () => {
     const uid = 'user_compat_test';
     await db.put('users', { id: uid, username:'compat', email:'c@fpt.edu.vn', password_hash:'mock', full_name:'Compat', clan_id:null, rating:1500, max_rating:1500, rank_tier:'Specialist', role:'PARTICIPANT'});
-    const viaNew = await api.registerContest('contest_dever_round1', uid, 'Room #1');
+    const viaNew = await api.registerContest('contest_dever_round1', uid);
     // old method should find existing
     const viaOld = await api.registerForContest('contest_dever_round1', uid);
     assert.equal(viaOld.id, viaNew.id);
-    assert.equal(viaOld.room_id, viaNew.room_id);
     await db.delete('contest_participants', viaNew.id);
     await db.delete('users', uid);
   });

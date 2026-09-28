@@ -173,6 +173,7 @@ export const LandingPage = () => {
               rows={8}
               value={sandboxCode}
               onChange={(e) => setSandboxCode(e.target.value)}
+              aria-label="Mã nguồn chạy thử trong sandbox"
               className="w-full bg-transparent font-mono text-xs text-slate-200 focus:outline-none resize-none leading-relaxed"
               spellCheck="false"
             />
@@ -294,7 +295,7 @@ export const LandingPage = () => {
             Luật chơi 4 bước
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-xl mx-auto">
-            Đăng ký → Coding 120 phút → Hack 15 phút → System Test + Elo. Tổng 135 phút một vòng thi chuẩn.
+            Đăng ký → Coding 120 phút → Freeze cuối giờ → Chốt kết quả + Elo. Đúng nhịp thi đấu quốc tế.
           </p>
         </div>
 
@@ -315,27 +316,27 @@ export const LandingPage = () => {
               Coding · 120′
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Làm bài độc lập, chấm Pretests. Điểm giảm dần theo phút, sàn 30% điểm gốc.
+              Làm bài độc lập, nộp bài được chấm trên toàn bộ test — verdict trả về là kết quả cuối cùng.
             </p>
           </div>
 
           <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-3">
             <div className="font-mono text-xs font-semibold text-[#8a8f98]">03</div>
             <h3 className="text-base font-medium text-white tracking-tight">
-              Hack · 15′
+              Freeze cuối giờ
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Cùng phòng xem code của nhau, tung input bẻ khóa: thành công +100, thất bại −50.
+              30 phút cuối bảng điểm đóng băng: các bài nộp mới chỉ hiện dấu hỏi, giữ kịch tính đến giờ G.
             </p>
           </div>
 
           <div className="p-6 rounded-xl bg-[#0f1011] border border-[#23252a] space-y-3">
             <div className="font-mono text-xs font-semibold text-[#8a8f98]">04</div>
             <h3 className="text-base font-medium text-white tracking-tight">
-              System Test + Elo
+              Chốt + Elo
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Chấm lại toàn bộ test ẩn. Rớt là mất điểm bài đó, chốt bảng xếp hạng và cập nhật Elo.
+              Hết giờ chốt bảng xếp hạng, mở editorial để upsolving và cập nhật Elo cho các kỳ thi Rated.
             </p>
           </div>
         </div>
@@ -355,12 +356,12 @@ export const LandingPage = () => {
         <div className="space-y-3">
           <details className="rounded-xl bg-[#0f1011] border border-[#23252a] px-5 py-4">
             <summary className="cursor-pointer text-sm font-medium text-slate-200">
-              Thể thức 135 phút gồm những gì?
+              Thể thức thi gồm những gì?
             </summary>
             <p className="mt-2 text-xs text-slate-400 leading-relaxed">
-              Một vòng chuẩn kéo dài 2 giờ 15 phút: Coding 120 phút làm bài độc lập, chấm trên Pretests, tuyệt đối
-              không xem code người khác; Hack 15 phút không nộp bài mới; System Testing chấm lại toàn bộ test ẩn,
-              rớt là mất điểm bài đó.
+              Một vòng chuẩn: Coding 120 phút làm bài độc lập — bài nộp được chấm trên toàn bộ test và verdict trả về
+              là kết quả cuối cùng, tuyệt đối không xem code người khác trong lúc thi; 30 phút cuối bảng điểm đóng
+              băng theo chuẩn ICPC; hết giờ chốt kết quả, mở editorial và cập nhật Elo với kỳ thi Rated.
             </p>
           </details>
 
@@ -376,12 +377,11 @@ export const LandingPage = () => {
 
           <details className="rounded-xl bg-[#0f1011] border border-[#23252a] px-5 py-4">
             <summary className="cursor-pointer text-sm font-medium text-slate-200">
-              Hack là gì? (+100 / −50)
+              Có được hỏi đề không?
             </summary>
             <p className="mt-2 text-xs text-slate-400 leading-relaxed">
-              Sau giờ làm bài, mỗi phòng 20–25 người được xem code đã Pretests Passed của nhau và nộp một input
-              chứng minh code đối thủ sai. Hack thành công (TLE, MLE, WA, RTE) được +100 điểm, bài đối thủ về 0;
-              hack thất bại bị −50 điểm. Input phải đúng giới hạn đề bài.
+              Có. Trong giờ thi bạn gửi câu hỏi cho ban giám khảo ngay trong đấu trường; câu trả lời của giám khảo
+              được công bố công khai cho toàn bộ thí sinh — đúng chuẩn hỏi đáp ICPC.
             </p>
           </details>
 

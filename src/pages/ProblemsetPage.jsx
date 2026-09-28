@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../lib/apiClient';
+import { api, getToken } from '../lib/apiClient';
 import { PROBLEMS_DB } from '../data/problems.js';
 
 const PAGE_SIZE = 20;
@@ -36,6 +36,8 @@ export const ProblemsetPage = () => {
   const [maxRating, setMaxRating] = useState('');
   const [sortKey, setSortKey] = useState('code');
   const [sortDir, setSortDir] = useState('asc');
+  const [statusFilter, setStatusFilter] = useState('ALL'); // Task 105: ALL | SOLVED | ATTEMPTED | UNSOLVED
+  const [myStats, setMyStats] = useState({});
   const [page, setPage] = useState(0);
 
   useEffect(() => {
@@ -72,6 +74,19 @@ export const ProblemsetPage = () => {
     return () => { cancelled = true; };
   }, [debouncedSearch]);
 
+  // Task 105: stats cá nhân per problem (solved/attempts) từ bài nộp thật — im lặng khi demo local.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!getToken()) return;
+      try {
+        const d = await api.getPracticeStats();
+        if (!cancelled) setMyStats(d.stats || {});
+      } catch { /* backend chưa chạy */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const availableTags = useMemo(() => {
     const set = new Set();
     problems.forEach((p) => (p.tags || []).forEach((t) => set.add(t)));
@@ -86,6 +101,13 @@ export const ProblemsetPage = () => {
       const s = scoreOf(p);
       if (min !== null && !Number.isNaN(min) && s < min) return false;
       if (max !== null && !Number.isNaN(max) && s > max) return false;
+      // Task 105: lọc theo trạng thái cá nhân (solved/attempted từ bài nộp thật)
+      if (statusFilter !== 'ALL') {
+        const st = myStats[p.id];
+        if (statusFilter === 'SOLVED' && !(st?.solved)) return false;
+        if (statusFilter === 'ATTEMPTED' && !(st && !st.solved)) return false;
+        if (statusFilter === 'UNSOLVED' && st?.solved) return false;
+      }
       return true;
     });
     list = [...list].sort((a, b) => {
@@ -95,7 +117,7 @@ export const ProblemsetPage = () => {
       return sortDir === 'desc' ? -cmp : cmp;
     });
     return list;
-  }, [problems, tagFilter, minRating, maxRating, sortKey, sortDir]);
+  }, [problems, tagFilter, minRating, maxRating, sortKey, sortDir, statusFilter, myStats]);
 
   const pageCount = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
@@ -147,6 +169,17 @@ export const ProblemsetPage = () => {
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
+            aria-label="Lọc theo trạng thái của tôi"
+            className="px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-slate-200 outline-none lg:w-48"
+          >
+            <option value="ALL">Tất cả trạng thái</option>
+            <option value="SOLVED">Đã solved</option>
+            <option value="ATTEMPTED">Đang thử (chưa AC)</option>
+            <option value="UNSOLVED">Chưa làm</option>
+          </select>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 text-xs">
           <div className="flex items-center gap-2">
@@ -173,9 +206,9 @@ export const ProblemsetPage = () => {
               className="w-28 px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-white placeholder-slate-500 outline-none"
             />
           </div>
-          {(tagFilter || minRating !== '' || maxRating !== '' || search) && (
+          {(statusFilter !== 'ALL' || tagFilter || minRating !== '' || maxRating !== '' || search) && (
             <button
-              onClick={() => { setSearch(''); setTagFilter(''); setMinRating(''); setMaxRating(''); setPage(0); }}
+              onClick={() => { setSearch(''); setTagFilter(''); setMinRating(''); setMaxRating(''); setStatusFilter('ALL'); setPage(0); }}
               className="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-medium transition sm:ml-auto"
             >
               Xóa bộ lọc
@@ -201,6 +234,7 @@ export const ProblemsetPage = () => {
               </th>
               <th className="py-3 px-4">Tên</th>
               <th className="py-3 px-4">Tags</th>
+              <th className="py-3 px-4 w-24 text-center">Trạng thái</th>
               <th className="py-3 px-4 w-32 text-right">
                 <button onClick={() => toggleSort('rating')} className="hover:text-white transition" aria-label="Sắp xếp theo điểm">
                   Điểm{sortMark('rating')}
@@ -209,13 +243,13 @@ export const ProblemsetPage = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {loading ? (
+            {            loading ? (
               <tr>
-                <td colSpan={4} className="py-8 px-4 text-center text-slate-500">Đang tải danh sách bài...</td>
+                <td colSpan={5} className="py-8 px-4 text-center text-slate-500">Đang tải danh sách bài...</td>
               </tr>
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={4} className="py-8 px-4 text-center text-slate-500">Không tìm thấy bài nào khớp bộ lọc.</td>
+                <td colSpan={5} className="py-8 px-4 text-center text-slate-500">Không tìm thấy bài nào khớp bộ lọc.</td>
               </tr>
             ) : (
               paged.map((p) => (
@@ -236,6 +270,22 @@ export const ProblemsetPage = () => {
                         </span>
                       ))}
                     </span>
+                  </td>
+                  <td className="py-3.5 px-4 text-center">
+                    {(() => {
+                      const st = myStats[p.id];
+                      if (!st) return <span className="text-slate-600 text-[11px]">—</span>;
+                      if (st.solved) return (
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono font-bold" title={`AC lần thử thứ ${st.ac_attempt}`}>
+                          ✓ Solved
+                        </span>
+                      );
+                      return (
+                        <span className="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-mono font-bold" title={`${st.attempts} lần thử, verdict cuối ${st.last_verdict}`}>
+                          ⟳ {st.attempts} lần
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="py-3.5 px-4 text-right font-mono font-semibold text-slate-200">{scoreOf(p)}đ</td>
                 </tr>

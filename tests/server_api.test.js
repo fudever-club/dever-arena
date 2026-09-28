@@ -1,5 +1,5 @@
 /**
- * DEVER Arena — Server API lifecycle tests (backend thật: REST + JWT + judge + hack + Elo).
+ * DEVER Arena — Server API lifecycle tests (backend thật: REST + JWT + judge + Elo).
  * Chạy server trên port ngẫu nhiên với DB file tạm riêng biệt.
  */
 import test, { before, after } from 'node:test';
@@ -19,9 +19,7 @@ let server;
 let base;
 let heroToken;
 let adminToken;
-let hackerToken;
-let victimSubId;
-let victimHardcodedId;
+let judgeUserToken;
 
 async function call(path, method = 'GET', body = null, token = null) {
   const res = await fetch(`${base}${path}`, {
@@ -74,18 +72,18 @@ test('login JWT thật: đúng pass 200, sai pass 401', async () => {
 
   const admin = await call('/api/v1/auth/login', 'POST', { username: 'dever_admin', password: 'admin123' });
   adminToken = admin.data.accessToken;
-  const hacker = await call('/api/v1/auth/login', 'POST', { username: 'hacker_pro', password: 'dever123' });
-  hackerToken = hacker.data.accessToken;
+  const judgeUser = await call('/api/v1/auth/login', 'POST', { username: 'hacker_pro', password: 'dever123' });
+  judgeUserToken = judgeUser.data.accessToken;
 });
 
-test('division gate: hero 1742 bị chặn Div.1, vào được Div.2 + xếp Room', async () => {
+test('division gate: hero 1742 bị chặn Div.1, vào được Div.2', async () => {
   const div1 = await call('/api/v1/contests/dever-round-2-div1/register', 'POST', {}, heroToken);
   assert.equal(div1.status, 403);
   assert.equal(div1.data.error, 'RATING_INELIGIBLE');
 
   const div2 = await call('/api/v1/contests/dever-round-2-div2/register', 'POST', {}, heroToken);
   assert.equal(div2.status, 201);
-  assert.ok(div2.data.participant.room_id.startsWith('Room #'));
+  assert.ok(div2.data.participant.user_id);
 });
 
 test('judge thật: python đúng AC có điểm, sai WA 0đ, cpp 422 trung thực', async () => {
@@ -99,10 +97,9 @@ test('judge thật: python đúng AC có điểm, sai WA 0đ, cpp 422 trung th�
     contest_id: 'contest_dever_round1', problem_id: 'p102', language: 'python', source_code: good,
   }, heroToken);
   assert.equal(ac.status, 201);
-  assert.equal(ac.data.pretests_passed, true);
+  assert.equal(ac.data.verdict, 'AC');
   assert.equal(ac.data.submission.verdict, 'AC');
   assert.ok(ac.data.submission.points_awarded > 0);
-  victimSubId = ac.data.submission.id;
 
   const bad = await call('/api/v1/submissions', 'POST', {
     contest_id: 'contest_dever_round1', problem_id: 'p102', language: 'python', source_code: 'print(0)',
@@ -145,79 +142,44 @@ test('judge thật: python đúng AC có điểm, sai WA 0đ, cpp 422 trung th�
     assert.ok(java.data.submission.points_awarded > 0);
   }
 
-  // Victim hardcode: qua sample (11) → AC, nhưng sai với mọi payload khác
+  // Victim hardcode: qua sample (11) → AC, nhưng sai với mọi input khác — verdict cuối là AC full-suite
   const hard = await call('/api/v1/submissions', 'POST', {
     contest_id: 'contest_dever_round1', problem_id: 'p102', language: 'python', source_code: 'print(11)',
   }, heroToken);
   assert.equal(hard.data.submission.verdict, 'AC');
-  victimHardcodedId = hard.data.submission.id;
 });
 
-test('standings phản ánh điểm thật', async () => {
+test('standings phản ánh điểm thật (ICPC mặc định: solved + penalty)', async () => {
   const st = await call('/api/v1/contests/dever-round-1-div3/standings');
   assert.equal(st.status, 200);
+  assert.equal(st.data.format, 'ICPC');
   const hero = st.data.standings.find((r) => r.username === 'dever_hero');
-  assert.ok(hero.total > 0);
+  assert.ok(hero);
+  assert.ok(hero.solved >= 1, 'hero phải có ít nhất 1 bài AC');
+  assert.ok(typeof hero.penalty === 'number');
+
+  // Format CODEFORCES ép qua ?format=CF: total > 0
+  const cf = await call('/api/v1/contests/dever-round-1-div3/standings?format=CODEFORCES');
+  assert.equal(cf.status, 200);
+  const heroCf = cf.data.standings.find((r) => r.username === 'dever_hero');
+  assert.ok(heroCf.total > 0);
 });
 
-test('phase machine: sang HACK_PHASE thì cấm nộp bài', async () => {
-  const go = await call('/api/v1/admin/phase', 'POST', { contest_id: 'contest_dever_round1', phase: 'HACK_PHASE' }, adminToken);
-  assert.equal(go.status, 200);
+test('phase machine: 3 phase, không còn HACK_PHASE/SYSTEM_TESTING', async () => {
+  // Phase cũ không còn hợp lệ
+  const old = await call('/api/v1/admin/phase', 'POST', { contest_id: 'contest_dever_round1', phase: 'HACK_PHASE' }, adminToken);
+  assert.equal(old.status, 422);
+  assert.equal(old.data.error, 'BAD_PHASE');
 
+  // Vẫn đang CODING: nhảy thẳng FINISHED bị cấm? Không — trong 3 phase, CODING → FINISHED là hợp lệ.
+  // Kiểm tra nộp bài vẫn chạy tốt trong CODING:
   const sub = await call('/api/v1/submissions', 'POST', {
     contest_id: 'contest_dever_round1', problem_id: 'p101', language: 'python', source_code: 'print(1)',
   }, heroToken);
-  assert.equal(sub.status, 409);
-
-  const jump = await call('/api/v1/admin/phase', 'POST', { contest_id: 'contest_dever_round1', phase: 'FINISHED' }, adminToken);
-  assert.equal(jump.status, 409);
-  assert.equal(jump.data.error, 'ILLEGAL_TRANSITION');
+  assert.equal(sub.status, 201);
 });
 
-test('hack thật bằng oracle: đúng +100, sai -50, tự hack 403', async () => {
-  // Payload bẻ được: victim hardcode? victim là code đúng → payload khác sample cho KQ khác oracle? Không:
-  // victim đúng cho mọi input → hack đúng sample-input (11 == 11) phải THẤT BẠI.
-  const fail = await call('/api/v1/hacks/execute', 'POST', {
-    contest_id: 'contest_dever_round1', target_submission_id: victimSubId, test_payload: '3\n1 2 3\n',
-  }, hackerToken);
-  assert.equal(fail.status, 200);
-  assert.equal(fail.data.success, false);
-  assert.equal(fail.data.points_delta, -50);
-
-  // Nộp victim lỗi tràn (hardcode) để hack thành công: dùng tài khoản hacker? Không — victim phải là người khác.
-  // Dùng hero tự hack bài mình → phải 403 SELF_HACK.
-  const self = await call('/api/v1/hacks/execute', 'POST', {
-    contest_id: 'contest_dever_round1', target_submission_id: victimSubId, test_payload: '3\n1 2 3\n',
-  }, heroToken);
-  assert.equal(self.status, 403);
-  assert.equal(self.data.error, 'SELF_HACK');
-
-  // Hack thành công: victim hardcode print(11), payload '3 4 5 6' → oracle 74 ≠ 11
-  const win = await call('/api/v1/hacks/execute', 'POST', {
-    contest_id: 'contest_dever_round1', target_submission_id: victimHardcodedId, test_payload: '3\n4 5 6\n',
-  }, hackerToken);
-  assert.equal(win.status, 200);
-  assert.equal(win.data.success, true);
-  assert.equal(win.data.points_delta, 100);
-
-  // Victim đã chết: hack lại phải 404
-  const dead = await call('/api/v1/hacks/execute', 'POST', {
-    contest_id: 'contest_dever_round1', target_submission_id: victimHardcodedId, test_payload: '3\n4 5 6\n',
-  }, hackerToken);
-  assert.equal(dead.status, 404);
-});
-
-test('hack thành công trên victim hardcode (+100)', async () => {
-  // hacker_pro nộp bản đúng p101 để có mặt? Không cần — chỉ cần victim.
-  // Tạo victim mới: quay về CODING không được (tuần tự) → dùng submission WA? Không.
-  // Dùng trực tiếp: hero đã có submission AC đúng → hack payload lạ vẫn cho KQ đúng → fail.
-  // Vì vậy test success dùng oracle trực tiếp qua room khác? Bỏ qua — kiểm tra sự kiện hack đã ghi:
-  const list = await call('/api/v1/submissions?contest_id=contest_dever_round1', 'GET', null, adminToken);
-  assert.equal(list.status, 200);
-  assert.ok(list.data.submissions.length >= 2);
-});
-
-test('rejudge: admin chấm lại bài nộp, điểm tính lại trung thực', async () => {
+test('chấm lại (rejudge) dùng full-suite: verdict cuối, không FST', async () => {
   const list = await call('/api/v1/submissions?contest_id=contest_dever_round1', 'GET', null, adminToken);
   const wa = list.data.submissions.find((s) => s.verdict === 'WA');
   assert.ok(wa);
@@ -231,9 +193,7 @@ test('rejudge: admin chấm lại bài nộp, điểm tính lại trung thực',
   assert.equal(forbidden.status, 403);
 });
 
-test('system test + finish: chốt Elo, mở editorial', async () => {
-  const sys = await call('/api/v1/admin/phase', 'POST', { contest_id: 'contest_dever_round1', phase: 'SYSTEM_TESTING' }, adminToken);
-  assert.equal(sys.status, 200);
+test('finish trực tiếp từ CODING: chốt Elo, mở editorial', async () => {
   const fin = await call('/api/v1/admin/phase', 'POST', { contest_id: 'contest_dever_round1', phase: 'FINISHED' }, adminToken);
   assert.equal(fin.status, 200);
 
@@ -257,7 +217,7 @@ test('admin cấp tài khoản + virtual ghost replay từ backend', async () =>
   const dup = await call('/api/v1/admin/users', 'POST', { username: 'team_dragon', password: 'khac123' }, adminToken);
   assert.equal(dup.status, 409);
 
-  const forbidden = await call('/api/v1/admin/users', 'POST', { username: 'hack_acct', password: 'hhhhhh' }, heroToken);
+  const forbidden = await call('/api/v1/admin/users', 'POST', { username: 'user_acct_2', password: 'hhhhhh' }, heroToken);
   assert.equal(forbidden.status, 403);
 
   const list = await call('/api/v1/admin/users', 'GET', null, adminToken);
@@ -432,8 +392,9 @@ test('ICPC auto-format: contest ICPC trả bảng solved/penalty mặc định',
   assert.ok(hero.penalty >= 0);
 });
 
-test('standings frozen che bai sau moc + format ICPC', async () => {
-  const frozen = await call('/api/v1/contests/dever-round-1-div3/standings?frozen=1&freeze_minute=0');
+test('standings frozen che bai sau moc (format CF) + format ICPC', async () => {
+  // Freeze chỉ áp cho bảng CODEFORCES (điểm decay); bảng ICPC dùng solved/penalty
+  const frozen = await call('/api/v1/contests/dever-round-1-div3/standings?frozen=1&freeze_minute=0&format=CODEFORCES');
   assert.equal(frozen.status, 200);
   assert.ok(frozen.data.frozen);
   assert.equal(frozen.data.frozen.freezeMinute, 0);
@@ -448,4 +409,68 @@ test('standings frozen che bai sau moc + format ICPC', async () => {
   assert.ok(icpc.data.standings.length > 0);
   const top = icpc.data.standings[0];
   assert.ok(typeof top.solved === 'number' && typeof top.penalty === 'number' && typeof top.rank === 'number');
+});
+
+test('profile aggregate: stats/heatmap/verdicts/tags/languages/per_contest từ DB thật', async () => {
+  const p = await call('/api/v1/users/dever_hero/profile', 'GET', null, heroToken);
+  assert.equal(p.status, 200);
+  assert.equal(p.data.user.username, 'dever_hero');
+
+  const { stats, rating_history, heatmap, verdicts, tags, languages, per_contest, recent_submissions } = p.data;
+  assert.ok(stats.submissions >= 1, 'hero phải có ít nhất bài nộp từ test trước');
+  assert.ok(stats.solved >= 1);
+  assert.ok(stats.acceptance_rate >= 0 && stats.acceptance_rate <= 100);
+  assert.ok(Array.isArray(rating_history) && rating_history.length >= 1, 'rating_history seed phải có');
+
+  // Heatmap: 182 ô, mỗi ô {date, count >= 0}
+  assert.equal(heatmap.length, 182);
+  for (const cell of heatmap) {
+    assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(cell.date));
+    assert.ok(cell.count >= 0);
+  }
+  assert.ok(heatmap.some((c) => c.count > 0), 'phải có ngày có nộp bài (seed practice)');
+
+  // Verdict map chỉ chứa verdict chuẩn
+  for (const key of Object.keys(verdicts)) {
+    assert.ok(['AC', 'WA', 'TLE', 'RE', 'CE', 'MLE', 'PENDING'].includes(key), `verdict lạ: ${key}`);
+  }
+
+  // Tags: solved <= attempted, có data từ đề seed
+  assert.ok(tags.length >= 1);
+  for (const t of tags) {
+    assert.ok(t.solved <= t.attempted);
+    assert.ok(t.attempted >= 1);
+  }
+
+  // Languages + recent không lộ source code
+  assert.ok(languages.length >= 1);
+  assert.ok(recent_submissions.length >= 1);
+  for (const s of recent_submissions) {
+    assert.equal(s.source_code, undefined, 'source_code không được lộ qua profile');
+  }
+
+  // per_contest: hero đã đăng ký round1
+  const round1 = per_contest.find((c) => c.contest_id === 'contest_dever_round1');
+  assert.ok(round1, 'phải có entry round1');
+  assert.equal(round1.registered, true);
+  assert.ok(typeof round1.solved === 'number');
+});
+
+test('profile: user không tồn tại trả 404, user mới chưa nộp trả stats 0 + heatmap rỗng hợp lệ', async () => {
+  const nf = await call('/api/v1/users/khong_ton_tai/profile', 'GET', null, heroToken);
+  assert.equal(nf.status, 404);
+
+  // Tạo user mới, chưa nộp bài nào
+  const created = await call('/api/v1/admin/users', 'POST', {
+    username: 'fresh_coder', password: 'fresh123', full_name: 'Người Mới',
+  }, adminToken);
+  assert.equal(created.status, 201);
+  const fresh = await call('/api/v1/users/fresh_coder/profile', 'GET', null, heroToken);
+  assert.equal(fresh.status, 200);
+  assert.equal(fresh.data.stats.submissions, 0);
+  assert.equal(fresh.data.stats.solved, 0);
+  assert.equal(fresh.data.stats.best_rank, null);
+  assert.equal(fresh.data.heatmap.length, 182);
+  assert.ok(fresh.data.heatmap.every((c) => c.count === 0));
+  assert.equal(fresh.data.recent_submissions.length, 0);
 });

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useContest } from '../context/ContestContext';
 import { api, getToken } from '../lib/apiClient';
+import { Link } from 'react-router-dom';
 
 const INITIAL_STANDINGS = [
   {
@@ -12,7 +13,6 @@ const INITIAL_STANDINGS = [
     team: null,
     rating: 1742,
     role: 'PARTICIPANT',
-    hackScore: 100,
     problems: {
       A: { points: 480, status: 'AC', attempts: 1 },
       B: { points: 940, status: 'AC', attempts: 1 },
@@ -29,7 +29,6 @@ const INITIAL_STANDINGS = [
     team: null,
     rating: 1680,
     role: 'PARTICIPANT',
-    hackScore: -50,
     problems: {
       A: { points: 460, status: 'AC', attempts: 1 },
       B: { points: 910, status: 'AC', attempts: 2 },
@@ -46,7 +45,6 @@ const INITIAL_STANDINGS = [
     team: null,
     rating: 1540,
     role: 'PARTICIPANT',
-    hackScore: 0,
     problems: {
       A: { points: 490, status: 'AC', attempts: 1 },
       B: { points: 0, status: 'FROZEN', attempts: 1 }, // Pending reveal
@@ -63,10 +61,9 @@ const INITIAL_STANDINGS = [
     team: null,
     rating: 1490,
     role: 'PARTICIPANT',
-    hackScore: 100,
     problems: {
       A: { points: 440, status: 'AC', attempts: 2 },
-      B: { points: 0, status: 'HACKED', attempts: 1 }, // Hacked by dever_hero
+      B: { points: 0, status: 'WA', attempts: 1 },
       C: { points: 0, status: 'UNATTEMPTED', attempts: 0 },
       D: { points: 0, status: 'UNATTEMPTED', attempts: 0 },
       E: { points: 0, status: 'UNATTEMPTED', attempts: 0 }
@@ -80,7 +77,6 @@ const INITIAL_STANDINGS = [
     team: null,
     rating: 1180,
     role: 'PARTICIPANT',
-    hackScore: 0,
     problems: {
       A: { points: 0, status: 'FROZEN', attempts: 4 }, // Pending reveal
       B: { points: 0, status: 'WA', attempts: 3 },
@@ -97,7 +93,6 @@ export const StandingsPage = () => {
 
   const [standings, setStandings] = useState(INITIAL_STANDINGS);
   const [searchTerm, setSearchTerm] = useState('');
-  const [roomFilter, setRoomFilter] = useState('');
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 20;
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
@@ -142,8 +137,6 @@ export const StandingsPage = () => {
     team: r.team || null,
     rating: r.rating,
     role: 'PARTICIPANT',
-    room_id: r.room_id || '',
-    hackScore: r.hackDelta || 0,
     problems: r.problems || {},
     solved: r.solved ?? null,
     penalty: r.penalty ?? null,
@@ -199,7 +192,7 @@ export const StandingsPage = () => {
 
   // Helper to compute total points
   const calculateTotal = (participant) => {
-    let sum = participant.hackScore || 0;
+    let sum = 0;
     Object.values(participant.problems).forEach((p) => {
       if (p.status === 'AC') sum += p.points;
     });
@@ -300,11 +293,9 @@ export const StandingsPage = () => {
 
   const filteredStandings = standings.filter((coder) => {
     const matchesName = coder.username.toLowerCase().includes(searchTerm.toLowerCase()) || coder.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRoom = !roomFilter || (coder.room_id || '') === roomFilter;
     const matchesFriend = !friendsOnly || friends.includes(coder.username);
-    return matchesName && matchesRoom && matchesFriend;
+    return matchesName && matchesFriend;
   });
-  const rooms = [...new Set(standings.map((c) => c.room_id).filter(Boolean))].sort();
   const pageCount = Math.max(1, Math.ceil(filteredStandings.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
   const pagedStandings = filteredStandings.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
@@ -333,13 +324,12 @@ export const StandingsPage = () => {
     if (!prob) return '';
     if (prob.status === 'AC') return String(prob.points);
     if (prob.status === 'FROZEN') return '?';
-    if (prob.status === 'HACKED') return 'HACKED';
     if (prob.status === 'WA') return `-${prob.attempts ?? 0}`;
     return '';
   };
 
   const handleExportCsv = () => {
-    const header = ['rank', 'username', 'rating', 'total', 'solved', 'hack', ...problemCodes];
+    const header = ['rank', 'username', 'rating', 'total', 'solved', ...problemCodes];
     const lines = [header.join(',')];
     filteredStandings.forEach((coder) => {
       const row = [
@@ -348,7 +338,6 @@ export const StandingsPage = () => {
         coder.rating ?? '',
         calculateTotal(coder),
         solvedCountOf(coder),
-        coder.hackScore ?? 0,
         ...problemCodes.map((code) => problemCellToCsv((coder.problems || {})[code])),
       ].map(escapeCsvCell).join(',');
       lines.push(row);
@@ -391,13 +380,6 @@ export const StandingsPage = () => {
       return (
         <span className="px-2 py-0.5 rounded bg-yellow-500/20 border border-yellow-500/40 text-yellow-300 font-mono font-bold">
           ? ({prob.attempts})
-        </span>
-      );
-    }
-    if (prob.status === 'HACKED') {
-      return (
-        <span className="px-2 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-slate-500 line-through font-mono">
-          Bị Hack
         </span>
       );
     }
@@ -478,7 +460,7 @@ export const StandingsPage = () => {
         </div>
       )}
 
-      {/* 2. Search + Room filter */}
+      {/* 2. Search filter */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
         <div className="w-full sm:w-72">
           <input
@@ -505,17 +487,6 @@ export const StandingsPage = () => {
           >
             Xuất CSV
           </button>
-          {rooms.length > 0 && (
-            <select
-              value={roomFilter}
-              onChange={(e) => { setRoomFilter(e.target.value); setPage(0); }}
-              className="px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-slate-200 outline-none"
-              aria-label="Lọc theo phòng thi"
-            >
-              <option value="">Tất cả các phòng</option>
-              {rooms.map((r) => (<option key={r} value={r}>{r}</option>))}
-            </select>
-          )}
         </div>
       </div>
 
@@ -535,7 +506,6 @@ export const StandingsPage = () => {
                 <>
                   <th className="py-3 px-3 w-28 text-right">Tổng điểm</th>
                   <th className="py-3 px-3 w-20 text-center">Giải được</th>
-                  <th className="py-3 px-3 w-20 text-center">Hack</th>
                   {problemCodes.map((code) => (
                     <th key={code} className="py-3 px-3 text-center">Bài {code}</th>
                   ))}
@@ -566,16 +536,16 @@ export const StandingsPage = () => {
                       >
                         {isFriend ? '★' : '☆'}
                       </button>
-                      <span className={`font-bold text-sm hover:underline cursor-pointer ${rankColor(coder.rating)}`}>
+                      <Link to={`/profile/${coder.username}`} className={`font-bold text-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6600]/60 rounded-sm ${rankColor(coder.rating)}`}>
                         {coder.username}
-                      </span>
+                      </Link>
                       {isCurrentUser && (
-                        <span className="px-1.5 py-0.2 rounded bg-orange-500/20 text-[#ff6600] font-bold text-[10px]">
+                        <span className="px-1.5 py-0.2 rounded bg-orange-500/20 text-[#ffb066] font-bold text-[10px]">
                           Bạn
                         </span>
                       )}
                     </div>
-                    <span className="text-[11px] text-slate-500 block">{coder.team ? `Đội ${coder.team}` : coder.name}{coder.room_id ? ` • ${coder.room_id}` : ''}</span>
+                    <span className="text-[11px] text-slate-500 block">{coder.team ? `Đội ${coder.team}` : coder.name}</span>
                   </td>
                   {boardFormat === 'ICPC' && dataSource !== 'demo' ? (
                     <>
@@ -593,15 +563,6 @@ export const StandingsPage = () => {
                   </td>
                   <td className="py-3.5 px-3 text-center font-mono font-bold text-sm text-emerald-400">
                     {solvedCountOf(coder)}
-                  </td>
-                  <td className="py-3.5 px-3 text-center font-mono font-bold">
-                    {coder.hackScore > 0 ? (
-                      <span className="text-emerald-400">+{coder.hackScore}</span>
-                    ) : coder.hackScore < 0 ? (
-                      <span className="text-red-400">{coder.hackScore}</span>
-                    ) : (
-                      <span className="text-slate-600">0</span>
-                    )}
                   </td>
                   {problemCodes.map((code) => (
                     <td key={code} className="py-3.5 px-3 text-center">{getProblemBadge(coder.problems[code], code)}</td>

@@ -15,10 +15,10 @@ import { CONTEST_PHASES } from '../src/core/contestStateMachine.js';
 describe('DEVER Arena Platform Quality & Ticker Suite', () => {
 
   test('Contest countdown & progress percentage calculation', () => {
-    const totalSec = 135 * 60; // 8100s
+    const totalSec = 120 * 60; // 7200s — thời lượng chuẩn 120 phút
 
-    // Case 1: Start (8100s remaining)
-    const elapsed0 = totalSec - 8100;
+    // Case 1: Start (7200s remaining)
+    const elapsed0 = totalSec - 7200;
     const pct0 = (elapsed0 / totalSec) * 100;
     assert.equal(pct0, 0);
 
@@ -26,13 +26,13 @@ describe('DEVER Arena Platform Quality & Ticker Suite', () => {
     const curSec = 4712;
     const elapsedMid = totalSec - curSec;
     const pctMid = (elapsedMid / totalSec) * 100;
-    assert.equal(pctMid.toFixed(1), '41.8');
+    assert.equal(pctMid.toFixed(1), '34.6');
 
-    // Case 3: Hack phase boundary (900s remaining ~ 15:00)
-    const hackSec = 900;
-    const elapsedHack = totalSec - hackSec;
-    const pctHack = (elapsedHack / totalSec) * 100;
-    assert.equal(pctHack.toFixed(1), '88.9');
+    // Case 3: Freeze boundary (1800s remaining ~ 30:00 cuối — chuẩn ICPC)
+    const freezeSec = 1800;
+    const elapsedFreeze = totalSec - freezeSec;
+    const pctFreeze = (elapsedFreeze / totalSec) * 100;
+    assert.equal(pctFreeze.toFixed(1), '75.0');
 
     // Case 4: Finished (0s remaining)
     const elapsedEnd = totalSec - 0;
@@ -77,20 +77,22 @@ describe('DEVER Arena Platform Quality & Ticker Suite', () => {
     assert.equal(compareOutputs('-184729104', '11'), false);
   });
 
-  test('Contest phase enum and storage invariant', () => {
+  test('Contest phase enum and storage invariant (3 phase — ADR-005)', () => {
     const validPhases = [
       CONTEST_PHASES.REGISTRATION,
       CONTEST_PHASES.CODING,
-      CONTEST_PHASES.HACK_PHASE,
-      CONTEST_PHASES.SYSTEM_TESTING,
       CONTEST_PHASES.FINISHED
     ];
 
+    assert.equal(validPhases.length, 3);
     assert.equal(validPhases.includes('CODING'), true);
-    assert.equal(validPhases.includes('HACK_PHASE'), true);
-    assert.equal(validPhases.includes('SYSTEM_TESTING'), true);
     assert.equal(validPhases.includes('FINISHED'), true);
     assert.equal(validPhases.includes('INVALID_PHASE'), false);
+    // Đảm bảo Hack Phase & System Testing đã bị gỡ khỏi enum
+    assert.equal(validPhases.includes('HACK_PHASE'), false);
+    assert.equal(validPhases.includes('SYSTEM_TESTING'), false);
+    assert.equal(CONTEST_PHASES.HACK_PHASE, undefined);
+    assert.equal(CONTEST_PHASES.SYSTEM_TESTING, undefined);
   });
 
   test('SPA shell contract: app.html (root div, lang vi, title, favicon, fonts)', () => {
@@ -128,15 +130,14 @@ describe('DEVER Arena Platform Quality & Ticker Suite', () => {
     }
   });
 
-  test('Core routes contract: src/App.jsx has CF loop routes and no /clans', () => {
+  test('Core routes contract: src/App.jsx has core routes and no /clans or /hack-room', () => {
     const appJsx = readFileSync('src/App.jsx', 'utf8');
 
-    for (const route of ['path="/"', 'path="/arena"', 'path="/login"', 'path="/problem/:id"', 'path="/standings"', 'path="/hack-room"', 'path="/admin"', 'path="/problemset"', 'path="/profile"']) {
+    for (const route of ['path="/"', 'path="/arena"', 'path="/login"', 'path="/problem/:id"', 'path="/standings"', 'path="/admin"', 'path="/problemset"', 'path="/profile"']) {
       assert.ok(appJsx.includes(route), `src/App.jsx phải có route ${route}`);
     }
     assert.ok(!appJsx.includes('ClansPage') && !appJsx.includes('"/clans"') && !appJsx.includes("'/clans'"), 'src/App.jsx không còn route /clans');
+    assert.ok(!appJsx.includes('HackRoomPage') && !appJsx.includes('/hack-room'), 'src/App.jsx không còn route /hack-room (ADR-005)');
   });
-
-});
 
 });

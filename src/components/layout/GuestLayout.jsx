@@ -35,7 +35,7 @@ export const GuestLayout = () => {
           <span>© 2026 DEVER Arena • CLB FU-DEVER • Tài khoản thi đấu do ban tổ chức cấp</span>
           <div className="flex items-center gap-4">
             <a href="/#faq" className="hover:text-slate-300 transition">Nội quy</a>
-            <span>Thể thức Codeforces • Hack Room • Elo</span>
+            <span>Thể thức ICPC • Freeze • Elo</span>
             <span>club.dever@gmail.com</span>
             <a href="https://github.com/fudever-club" target="_blank" rel="noreferrer" className="hover:text-slate-300 transition">GitHub</a>
           </div>

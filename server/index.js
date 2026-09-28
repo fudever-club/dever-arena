@@ -1,7 +1,7 @@
 /**
  * DEVER Arena — Backend API thật (Node thuần, zero dependency).
  * Thực thi đúng API_SPECIFICATION: REST + SSE, JWT auth, judge chạy code thật,
- * phase machine + room 25 + hack +100/-50 + system test + Elo — tái dùng src/core & src/engine.
+ * vòng đời 3 phase chuẩn quốc tế (REGISTRATION→CODING→FINISHED) + chấm full-suite + Elo — tái dùng src/core & src/engine.
  *
  * Chạy: npm run server  (PORT mặc định 8787)
  */
@@ -9,9 +9,9 @@ import { createServer } from 'node:http';
 import { hashPassword, signToken, bearerUser } from './auth.js';
 import { normalizeLanguage, languageReady } from './judge.js';
 import { judgeQueue, shutdownJudge } from './queue.js';
-import { ORACLES } from './oracles.js';
 import { PROBLEMS_DB } from '../src/data/problems.js';
-import { calculateProblemScore, calculateHackScore } from '../src/core/scoring.js';
+import { createScheduler } from './scheduler.js';
+import { calculateProblemScore } from '../src/core/scoring.js';
 import { calculateContestRatingChanges, getRatingTier } from '../src/core/rating.js';
 import { CONTEST_PHASES } from '../src/core/contestStateMachine.js';
 import { createVirtualSession, getVirtualElapsedMinutes } from '../src/core/virtualContest.js';
@@ -76,7 +76,6 @@ const RATE_BUCKETS = new Map();
 const RATE_RULES = [
   { match: (m, p) => m === 'POST' && p === '/api/v1/auth/login', limit: 60, windowMs: 60000, scope: 'ip' },
   { match: (m, p) => m === 'POST' && p === '/api/v1/submissions', limit: 30, windowMs: 60000, scope: 'user' },
-  { match: (m, p) => m === 'POST' && p === '/api/v1/hacks/execute', limit: 30, windowMs: 60000, scope: 'user' },
 ];
 function rateKey(req, rule, user) {
   const ip = req.socket?.remoteAddress || 'unknown';
@@ -111,19 +110,20 @@ function seed() {
     { id: 'u_c5', username: 'k20_veteran', full_name: 'Trần Văn Kiên', role: 'PARTICIPANT', rating: 1620, max_rating: 1620, team: null, members: [], password: hashPassword('dever123'), rating_history: [] },
   ];
   users.forEach((u) => db.insert('users', u));
+  // NOTE: rating_history demo + bài nộp luyện tập được seed ở cuối seed() (sau khi có `now`).
 
   const now = Date.now();
   const contests = [
-    { id: 'contest_dever_round1', title: 'DEVER Round #1 (Div. 3)', slug: 'dever-round-1-div3', contest_format: 'CODEFORCES', start_time: new Date(now - 38 * 60000).toISOString(), duration_minutes: 135, hack_duration_minutes: 15, status: 'CODING', is_rated: true, min_rating: null, max_rating: 1599 },
-    { id: 'contest_dever_archive', title: 'DEVER Round #0 (Archive)', slug: 'dever-round-0-archive', contest_format: 'CODEFORCES', start_time: new Date(now - 7 * 86400000).toISOString(), duration_minutes: 120, hack_duration_minutes: 15, status: 'FINISHED', is_rated: true, min_rating: null, max_rating: null },
-    { id: 'contest_dever_round2_div1', title: 'DEVER Round #2 (Div. 1)', slug: 'dever-round-2-div1', contest_format: 'CODEFORCES', start_time: new Date(now + 2 * 86400000).toISOString(), duration_minutes: 120, hack_duration_minutes: 15, status: 'REGISTRATION', is_rated: true, min_rating: 1900, max_rating: null },
-    { id: 'contest_dever_round2_div2', title: 'DEVER Round #2 (Div. 2)', slug: 'dever-round-2-div2', contest_format: 'CODEFORCES', start_time: new Date(now + 2 * 86400000).toISOString(), duration_minutes: 120, hack_duration_minutes: 15, status: 'REGISTRATION', is_rated: true, min_rating: null, max_rating: 1899 },
+    { id: 'contest_dever_round1', title: 'DEVER Round #1 (Div. 3)', slug: 'dever-round-1-div3', contest_format: 'ICPC', start_time: new Date(now - 38 * 60000).toISOString(), duration_minutes: 120, status: 'CODING', is_rated: true, min_rating: null, max_rating: 1599 },
+    { id: 'contest_dever_archive', title: 'DEVER Round #0 (Archive)', slug: 'dever-round-0-archive', contest_format: 'ICPC', start_time: new Date(now - 7 * 86400000).toISOString(), duration_minutes: 120, status: 'FINISHED', is_rated: true, min_rating: null, max_rating: null },
+    { id: 'contest_dever_round2_div1', title: 'DEVER Round #2 (Div. 1)', slug: 'dever-round-2-div1', contest_format: 'ICPC', start_time: new Date(now + 2 * 86400000).toISOString(), duration_minutes: 120, status: 'REGISTRATION', is_rated: true, min_rating: 1900, max_rating: null },
+    { id: 'contest_dever_round2_div2', title: 'DEVER Round #2 (Div. 2)', slug: 'dever-round-2-div2', contest_format: 'ICPC', start_time: new Date(now + 2 * 86400000).toISOString(), duration_minutes: 120, status: 'REGISTRATION', is_rated: true, min_rating: null, max_rating: 1899 },
   ];
   contests.forEach((c) => db.insert('contests', c));
 
   PROBLEMS_DB.forEach((p) => {
     db.insert('problems', { ...p, contest_id: 'contest_dever_round1', base_points: p.rating || 1000 });
-    db.insert('testcases', { id: `tc_${p.id}_sample`, problem_id: p.id, order_index: 0, stdin: p.sampleInput, expected_stdout: p.sampleOutput, is_sample: true, is_pretest: true });
+    db.insert('testcases', { id: `tc_${p.id}_sample`, problem_id: p.id, order_index: 0, stdin: p.sampleInput, expected_stdout: p.sampleOutput, is_sample: true });
   });
 
   // Ghost submissions cho archive (virtual replay) — đã chấm sẵn
@@ -136,12 +136,59 @@ function seed() {
   ghosts.forEach((g, i) => db.insert('submissions', {
     id: `sub_ghost_${i}`, user_id: g.user_id, problem_id: g.problem_id, contest_id: 'contest_dever_archive',
     language: 'python', source_code: '# ghost submission (archive)', verdict: 'AC', points_awarded: g.pts,
-    is_hacked: false, time_ms: 20, submitted_at: ghostAt(g.at),
+    time_ms: 20, submitted_at: ghostAt(g.at),
   }));
 
   // Hero tham gia round1
-  db.insert('participants', { contest_id: 'contest_dever_round1', user_id: 'u_hero', room_id: 'Room #1', registered_at: new Date(now - 38 * 60000).toISOString() });
-  ['u_c1', 'u_c2', 'u_c3'].forEach((uid) => db.insert('participants', { contest_id: 'contest_dever_round1', user_id: uid, room_id: 'Room #1', registered_at: new Date(now - 38 * 60000).toISOString() }));
+  db.insert('participants', { contest_id: 'contest_dever_round1', user_id: 'u_hero', registered_at: new Date(now - 38 * 60000).toISOString() });
+  ['u_c1', 'u_c2', 'u_c3'].forEach((uid) => db.insert('participants', { contest_id: 'contest_dever_round1', user_id: uid, registered_at: new Date(now - 38 * 60000).toISOString() }));
+  // Rating history demo — dãy deterministic kết thúc đúng rating hiện tại (không random mỗi lần seed).
+  const RATING_SEQ = {
+    u_hero: [1320, 1455, 1602, 1742],
+    u_c1: [1402, 1519, 1580, 1680],
+    u_c2: [1310, 1401, 1488, 1540],
+    u_c3: [1245, 1338, 1402, 1490],
+    u_c4: [1080, 1125, 1180],
+    u_c5: [1440, 1502, 1556, 1620],
+  };
+  Object.entries(RATING_SEQ).forEach(([uid, seq]) => {
+    const u = db.find('users', (x) => x.id === uid);
+    if (!u) return;
+    u.rating_history = seq.map((value, i) => {
+      const old = i === 0 ? Math.max(0, value - 130) : seq[i - 1];
+      return { contest_id: 'contest_dever_archive', old, new: value, delta: value - old, at: new Date(now - (seq.length - i) * 12 * 86400000).toISOString() };
+    });
+  });
+
+  // Bài nộp luyện tập (contest_id = null) — LCG seeded 42 để dữ liệu nhất quán giữa các lần seed.
+  const PRACTICE = [
+    { uid: 'u_hero', n: 26 }, { uid: 'u_c1', n: 14 }, { uid: 'u_c2', n: 12 },
+    { uid: 'u_c3', n: 10 }, { uid: 'u_c4', n: 8 }, { uid: 'u_c5', n: 11 },
+  ];
+  const pids = PROBLEMS_DB.map((p) => p.id);
+  const langs = ['python', 'cpp20', 'java', 'js'];
+  const VERDICT_POOL = ['AC', 'AC', 'AC', 'AC', 'AC', 'WA', 'WA', 'TLE', 'RE', 'CE'];
+  let lcg = 42;
+  const rand = () => { lcg = (lcg * 1103515245 + 12345) % 2147483648; return lcg / 2147483648; };
+  let pseq = 0;
+  PRACTICE.forEach(({ uid, n }) => {
+    for (let i = 0; i < n; i++) {
+      pseq += 1;
+      db.insert('submissions', {
+        id: `sub_practice_${pseq}`,
+        user_id: uid,
+        problem_id: pids[Math.floor(rand() * pids.length)],
+        contest_id: null,
+        language: langs[Math.floor(rand() * langs.length)],
+        source_code: '# practice submission (seed)',
+        verdict: VERDICT_POOL[Math.floor(rand() * VERDICT_POOL.length)],
+        points_awarded: 0,
+        time_ms: Math.floor(rand() * 700) + 12,
+        submitted_at: new Date(now - Math.floor(rand() * 70) * 86400000 - (Math.floor(rand() * 14) + 7) * 3600000).toISOString(),
+      });
+    }
+  });
+
   db.save();
   console.log('[seed] database khởi tạo xong');
 }
@@ -185,62 +232,65 @@ function publicUser(u) {
 function problemTests(problemId) {
   return db.filter('testcases', (t) => t.problem_id === problemId).sort((a, b) => a.order_index - b.order_index);
 }
-function pretestsOf(problemId) {
-  return problemTests(problemId).filter((t) => t.is_pretest).map((t) => ({ stdin: t.stdin, expected: t.expected_stdout }));
-}
-async function fullSuiteOf(problemId, contestId) {
-  const suite = [...pretestsOf(problemId)];
-  const okHacks = db.filter('hacks', (h) => h.contest_id === contestId && h.is_successful && h.problem_id === problemId);
-  for (const h of okHacks) {
-    const oracleSrc = ORACLES[problemId];
-    if (!oracleSrc) continue;
-    const o = await judgeQueue.executeOne({ language: 'python', source: oracleSrc, stdin: h.input_payload, timeLimitMs: 2000 });
-    if (o.verdict === 'OK') suite.push({ stdin: h.input_payload, expected: o.stdout });
-  }
-  return suite;
+// Chuẩn quốc tế: chấm trên TOÀN BỘ test suite ngay khi nộp — verdict trả về là verdict cuối cùng
+// (không chia pretest/system test; không ghép hack payload vào suite — ADR-005).
+function judgeSuiteOf(problemId) {
+  return problemTests(problemId).map((t) => ({ stdin: t.stdin, expected: t.expected_stdout }));
 }
 
 function computeStandings(contest) {
   const parts = db.filter('participants', (p) => p.contest_id === contest.id);
-  const hacks = db.filter('hacks', (h) => h.contest_id === contest.id);
   const t0 = new Date(contest.start_time).getTime();
   const minuteOf = (iso) => Math.max(0, Math.floor((new Date(iso).getTime() - t0) / 60000));
   const rows = parts.map((p) => {
     const user = db.find('users', (u) => u.id === p.user_id);
     if (!user) return null;
-    const subs = db.filter('submissions', (s) => s.contest_id === contest.id && s.user_id === p.user_id)
+    const subs = db.filter('submissions', (s) => s.contest_id === contest.id && s.user_id === p.user_id && !s.is_upsolve)
       .sort((a, b) => new Date(a.submitted_at) - new Date(b.submitted_at));
     const perProblem = {};
     let problemScore = 0;
     const probs = db.filter('problems', (pr) => pr.contest_id === contest.id);
     for (const prob of probs) {
       const ps = subs.filter((s) => s.problem_id === prob.id);
-      const ac = [...ps].reverse().find((s) => s.verdict === 'AC' && !s.is_hacked);
-      const hacked = ps.find((s) => s.is_hacked);
-      const fst = [...ps].reverse().find((s) => s.verdict === 'FST');
+      const ac = [...ps].reverse().find((s) => s.verdict === 'AC');
       if (ac) {
         perProblem[prob.code] = { points: ac.points_awarded, status: 'AC', attempts: ps.length, minute: minuteOf(ac.submitted_at) };
         problemScore += ac.points_awarded;
-      } else if (hacked) {
-        perProblem[prob.code] = { points: 0, status: 'HACKED', attempts: ps.length };
-      } else if (fst) {
-        perProblem[prob.code] = { points: 0, status: 'FST', attempts: ps.length };
       } else if (ps.length > 0) {
         perProblem[prob.code] = { points: 0, status: ps[ps.length - 1].verdict, attempts: ps.length };
       } else {
         perProblem[prob.code] = { points: 0, status: 'UNATTEMPTED', attempts: 0 };
       }
     }
-    const mine = hacks.filter((h) => h.hacker_id === p.user_id);
-    const hackDelta = calculateHackScore(mine.filter((h) => h.is_successful).length, mine.filter((h) => !h.is_successful).length);
-    return { user_id: user.id, username: user.username, team: user.team || null, rating: user.rating, room_id: p.room_id, total: problemScore + hackDelta, hackDelta, problems: perProblem };
+    return { user_id: user.id, username: user.username, team: user.team || null, rating: user.rating, total: problemScore, problems: perProblem };
   }).filter(Boolean).sort((a, b) => b.total - a.total);
   let rank = 0; let prev = null;
   rows.forEach((r, i) => { if (r.total !== prev) { rank = i + 1; prev = r.total; } r.rank = rank; });
   return rows;
 }
 
-const PHASE_ORDER = ['REGISTRATION', 'CODING', 'HACK_PHASE', 'SYSTEM_TESTING', 'FINISHED'];
+const PHASE_ORDER = ['REGISTRATION', 'CODING', 'FINISHED'];
+
+/**
+ * Chốt 1 kỳ thi: cộng Elo (nếu rated) rồi set FINISHED — dùng chung cho admin phase
+ * và auto-phase scheduler (Task 103) để hai đường đi luôn nhất quán.
+ */
+function finishContest(c) {
+  if (c.is_rated) {
+    const rows = computeStandings(c);
+    const changes = calculateContestRatingChanges(rows.map((r) => ({ id: r.user_id, name: r.username, oldRating: r.rating, points: r.total })));
+    for (const ch of changes) {
+      const u = db.find('users', (x) => x.id === ch.id);
+      if (!u) continue;
+      u.rating_history = u.rating_history || [];
+      u.rating_history.push({ contest_id: c.id, old: u.rating, new: ch.newRating, delta: ch.delta, at: new Date().toISOString() });
+      u.rating = ch.newRating;
+      u.max_rating = Math.max(u.max_rating || 0, ch.newRating);
+    }
+    db.save();
+  }
+  db.update('contests', (x) => x.id === c.id, { status: 'FINISHED' });
+}
 
 // ============================ OBSERVABILITY ============================
 const BOOT_TIME = Date.now();
@@ -304,6 +354,18 @@ async function handle(req, res) {
   send(res, 404, { error: 'NOT_FOUND', message: `Không có route ${req.method} ${url.pathname}` });
 }
 
+// ---- OpenAPI spec (Task 110): phục vụ docs/openapi.json cho dev CLB tự tích hợp ----
+import { readFileSync as _rf, existsSync as _es } from 'node:fs';
+import { dirname as _dn, join as _jn } from 'node:path';
+import { fileURLToPath as _fu } from 'node:url';
+const OPENAPI_PATH = _jn(_dn(_fu(import.meta.url)), '..', 'docs', 'openapi.json');
+route('GET', '^/api/v1/openapi\.json$', async (req, res) => {
+  if (!_es(OPENAPI_PATH)) { send(res, 404, { error: 'SPEC_NOT_FOUND', message: 'Chạy `npm run gen:openapi` để sinh spec.' }); return; }
+  const body = JSON.stringify(JSON.parse(_rf(OPENAPI_PATH, 'utf8')));
+  res.writeHead(200, { 'Content-Type': 'application/json', ...secureHeaders() });
+  res.end(body);
+});
+
 // ---- Health & readiness (public, rẻ, không auth) ----
 route('GET', '^/api/(v1/)?health$', async (req, res) => {
   send(res, 200, { status: 'ok', uptime_s: Math.floor((Date.now() - BOOT_TIME) / 1000), store: storeKind, time: new Date().toISOString() });
@@ -336,6 +398,154 @@ route('GET', '^/api/v1/users/([^/]+)$', async (req, res, url, m) => {
   send(res, 200, { user: publicUser(user), rating_history: user.rating_history || [] });
 }, { auth: true });
 
+// ---- User profile aggregate (skill: dever-profile-analytics) ----
+// Mọi số liệu aggregate từ DB thật; source code KHÔNG BAO GIỜ trả qua profile.
+// contest_id = null là bài nộp luyện tập ngoài kỳ thi (vẫn tính solved/heatmap).
+// Aggregate profile dùng chung cho route profile và /compare (Task 108) — một code path.
+function profileAggregate(user) {
+  const subs = db.filter('submissions', (s) => s.user_id === user.id)
+    .sort((a, b) => new Date(a.submitted_at) - new Date(b.submitted_at));
+
+  const verdicts = {};
+  const languages = {};
+  const solvedProblems = new Set();
+  let totalTimeMs = 0;
+  for (const s of subs) {
+    const v = String(s.verdict || 'PENDING').toUpperCase();
+    verdicts[v] = (verdicts[v] || 0) + 1;
+    const lang = String(s.language || 'unknown');
+    languages[lang] = (languages[lang] || 0) + 1;
+    totalTimeMs += Number(s.time_ms || 0);
+    if (v === 'AC') solvedProblems.add(s.problem_id);
+  }
+
+  // Tag strength: solved/attempted là số bài DISTINCT theo tag (không đếm lượt nộp).
+  const tagsMap = new Map();
+  for (const s of subs) {
+    const prob = db.find('problems', (pr) => pr.id === s.problem_id);
+    const probTags = prob && Array.isArray(prob.tags) ? prob.tags : [];
+    for (const t of probTags) {
+      if (!tagsMap.has(t)) tagsMap.set(t, { solved: new Set(), attempted: new Set() });
+      const e = tagsMap.get(t);
+      e.attempted.add(s.problem_id);
+      if (s.verdict === 'AC') e.solved.add(s.problem_id);
+    }
+  }
+  const tags = [...tagsMap.entries()]
+    .map(([tag, e]) => ({ tag, solved: e.solved.size, attempted: e.attempted.size }))
+    .sort((a, b) => b.solved - a.solved || b.attempted - a.attempted)
+    .slice(0, 12);
+
+  // Heatmap 26 tuần: ô = 1 ngày, count = số bài nộp ngày đó (từ submitted_at thật).
+  const counts = new Map();
+  for (const s of subs) {
+    const d = new Date(s.submitted_at);
+    d.setHours(0, 0, 0, 0);
+    const key = d.toISOString().slice(0, 10);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const heatmap = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  for (let i = 181; i >= 0; i--) {
+    const d = new Date(today.getTime() - i * 86400000);
+    const key = d.toISOString().slice(0, 10);
+    heatmap.push({ date: key, count: counts.get(key) || 0 });
+  }
+
+  // per_contest: mỗi kỳ thi đã đăng ký hoặc có nộp bài — rank lấy từ bảng standings thật.
+  const participatedIds = new Set(db.filter('participants', (p) => p.user_id === user.id).map((p) => p.contest_id));
+  const contestIds = new Set([...subs.map((s) => s.contest_id), ...participatedIds].filter(Boolean));
+  const per_contest = [...contestIds].map((cid) => {
+    const c = db.find('contests', (x) => x.id === cid);
+    if (!c) return null;
+    const csubs = subs.filter((s) => s.contest_id === cid);
+    const solvedIds = new Set(csubs.filter((s) => s.verdict === 'AC').map((s) => s.problem_id));
+    let total = 0;
+    for (const pid of solvedIds) {
+      const ac = [...csubs].reverse().find((s) => s.problem_id === pid && s.verdict === 'AC');
+      total += Number(ac?.points_awarded || 0);
+    }
+    let rank = null;
+    let entrants = null;
+    try {
+      const rows = computeStandings(c);
+      const me = rows.find((r) => r.user_id === user.id);
+      if (me) { rank = me.rank; entrants = rows.length; }
+    } catch { /* contest thiếu dữ liệu → rank ẩn */ }
+    return {
+      contest_id: cid, title: c.title, slug: c.slug, status: c.status,
+      contest_format: c.contest_format || 'ICPC', start_time: c.start_time,
+      submissions: csubs.length, solved: solvedIds.size, total,
+      registered: participatedIds.has(cid), rank, entrants,
+    };
+  }).filter(Boolean).sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
+
+  const ranks = per_contest.map((c) => c.rank).filter((r) => typeof r === 'number');
+  const stats = {
+    submissions: subs.length,
+    accepted: verdicts.AC || 0,
+    solved: solvedProblems.size,
+    acceptance_rate: subs.length ? Math.round(((verdicts.AC || 0) / subs.length) * 1000) / 10 : 0,
+    avg_time_ms: subs.length ? Math.round(totalTimeMs / subs.length) : 0,
+    contests_played: per_contest.length,
+    best_rank: ranks.length ? Math.min(...ranks) : null,
+  };
+
+  const recent = subs.slice(-20).reverse().map((s) => {
+    const prob = db.find('problems', (p) => p.id === s.problem_id);
+    const { source_code, ...pub } = s;
+    return { ...pub, problem_code: prob?.code || null, problem_title: prob?.title || null };
+  });
+
+  return {
+    stats,
+    rating_history: user.rating_history || [],
+    heatmap,
+    verdicts,
+    tags,
+    languages: Object.entries(languages).map(([language, count]) => ({ language, count })).sort((a, b) => b.count - a.count),
+    per_contest,
+    recent_submissions: recent,
+  };
+}
+
+route('GET', '^/api/v1/users/([^/]+)/profile$', async (req, res, url, m) => {
+  const user = db.find('users', (u) => u.username === decodeURIComponent(m[1]));
+  if (!user) { send(res, 404, { error: 'NOT_FOUND' }); return; }
+  // Public profile (Task 108): share URL cho khách — aggregate KHÔNG bao giờ chứa source_code.
+  send(res, 200, { user: publicUser(user), ...profileAggregate(user) });
+});
+
+// ---- So sánh 2 thí sinh (Task 108): stats + Elo + head-to-head theo rank thật ----
+route('GET', '^/api/v1/compare$', async (req, res, url) => {
+  const nameA = url.searchParams.get('a') || '';
+  const nameB = url.searchParams.get('b') || '';
+  const a = db.find('users', (u) => u.username === nameA);
+  const b = db.find('users', (u) => u.username === nameB);
+  if (!a || !b) { send(res, 404, { error: 'USER_NOT_FOUND', message: 'Thiếu hoặc sai tham số ?a=username&b=username.' }); return; }
+  if (a.id === b.id) { send(res, 422, { error: 'SAME_USER', message: 'Chọn 2 thí sinh khác nhau.' }); return; }
+  const pa = profileAggregate(a);
+  const pb = profileAggregate(b);
+  // Head-to-head: các kỳ thi CẢ HAI đều có rank thật trong standings.
+  const rankA = new Map(pa.per_contest.filter((c) => typeof c.rank === 'number').map((c) => [c.contest_id, c]));
+  const rankB = new Map(pb.per_contest.filter((c) => typeof c.rank === 'number').map((c) => [c.contest_id, c]));
+  const shared = [...rankA.keys()].filter((id) => rankB.has(id));
+  let wins_a = 0;
+  let wins_b = 0;
+  const contests = shared.map((id) => {
+    const ra = rankA.get(id).rank;
+    const rb = rankB.get(id).rank;
+    if (ra < rb) wins_a += 1; else if (rb < ra) wins_b += 1;
+    return { contest_id: id, title: rankA.get(id).title, rank_a: ra, rank_b: rb };
+  });
+  send(res, 200, {
+    a: { user: publicUser(a), stats: pa.stats, rating_history: pa.rating_history, verdicts: pa.verdicts, tags: pa.tags },
+    b: { user: publicUser(b), stats: pb.stats, rating_history: pb.rating_history, verdicts: pb.verdicts, tags: pb.tags },
+    head_to_head: { contests, wins_a, wins_b },
+  });
+});
+
 // ---- Contests ----
 route('GET', '^/api/v1/contests$', async (req, res) => {
   send(res, 200, { contests: db.data.contests });
@@ -358,23 +568,15 @@ route('POST', '^/api/v1/contests/([^/]+)/register$', async (req, res, url, m, us
   if (c.max_rating != null && user.rating > c.max_rating) { send(res, 403, { error: 'RATING_INELIGIBLE', message: `Chỉ dành cho rating ≤ ${c.max_rating}.` }); return; }
   const existed = db.find('participants', (p) => p.contest_id === c.id && p.user_id === user.id);
   if (existed) { send(res, 200, { participant: existed }); return; }
-  // Xếp phòng ít người nhất, tối đa 25/phòng
-  const parts = db.filter('participants', (p) => p.contest_id === c.id);
-  const rooms = {};
-  parts.forEach((p) => { rooms[p.room_id] = (rooms[p.room_id] || 0) + 1; });
-  let room = Object.entries(rooms).sort((a, b) => a[1] - b[1]).find(([, n]) => n < 25)?.[0];
-  if (!room) room = `Room #${Object.keys(rooms).length + 1}`;
-  const part = db.insert('participants', { contest_id: c.id, user_id: user.id, room_id: room, registered_at: new Date().toISOString() });
+  const part = db.insert('participants', { contest_id: c.id, user_id: user.id, registered_at: new Date().toISOString() });
   send(res, 201, { participant: part });
 }, { auth: true });
 route('GET', '^/api/v1/contests/([^/]+)/standings$', async (req, res, url, m) => {
   const c = findContest(decodeURIComponent(m[1]));
   if (!c) { send(res, 404, { error: 'CONTEST_NOT_FOUND' }); return; }
   const explicitFormat = url.searchParams.get('format');
-  const format = (explicitFormat || c.contest_format || 'CODEFORCES').toUpperCase();
+  const format = (explicitFormat || c.contest_format || 'ICPC').toUpperCase();
   let rows = computeStandings(c);
-  const room = url.searchParams.get('room_id');
-  if (room) rows = rows.filter((r) => r.room_id === room);
   let frozen = null;
   if (url.searchParams.get('frozen') === '1' && format === 'CODEFORCES') {
     const fm = url.searchParams.get('freeze_minute');
@@ -396,25 +598,6 @@ route('GET', '^/api/v1/contests/([^/]+)/standings$', async (req, res, url, m) =>
   const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 50)));
   send(res, 200, { contest_id: c.id, status: c.status, format: 'CODEFORCES', frozen, total: rows.length, standings: rows.slice((page - 1) * limit, page * limit) });
 });
-route('GET', '^/api/v1/contests/([^/]+)/rooms/([^/]+)$', async (req, res, url, m, user) => {
-  const c = findContest(decodeURIComponent(m[1]));
-  if (!c) { send(res, 404, { error: 'CONTEST_NOT_FOUND' }); return; }
-  const roomId = decodeURIComponent(m[2]);
-  const members = db.filter('participants', (p) => p.contest_id === c.id && p.room_id === roomId);
-  if (members.length === 0) { send(res, 404, { error: 'ROOM_NOT_FOUND' }); return; }
-  const canSeeAll = ['HACK_PHASE', 'SYSTEM_TESTING', 'FINISHED'].includes(c.status);
-  const rows = members.map((p) => {
-    const u = db.find('users', (x) => x.id === p.user_id);
-    const subs = db.filter('submissions', (s) => s.contest_id === c.id && s.user_id === p.user_id && s.verdict === 'AC' && !s.is_hacked)
-      .map((s) => {
-        const prob = db.find('problems', (pr) => pr.id === s.problem_id);
-        const showSource = canSeeAll || s.user_id === user.id;
-        return { id: s.id, problem_code: prob?.code, points: s.points_awarded, ...(showSource ? { source_code: s.source_code, language: s.language } : {}) };
-      });
-    return { user_id: u.id, username: u.username, rating: u.rating, submissions: canSeeAll || p.user_id === user.id ? subs : subs.map((s) => ({ ...s, source_code: undefined })) };
-  });
-  send(res, 200, { contest_id: c.id, room_id: roomId, status: c.status, code_visible: canSeeAll, members: rows });
-}, { auth: true });
 
 // ---- Virtual ----
 route('POST', '^/api/v1/contests/([^/]+)/virtual$', async (req, res, url, m, user) => {
@@ -461,6 +644,23 @@ route('GET', '^/api/v1/contests/([^/]+)/virtual$', async (req, res, url, m) => {
 }, { auth: true });
 
 // ---- Problems ----
+// ---- Kho bài luyện tập (Task 105): stats per problem cho user đang login ----
+// Trả về { solved, attempts, ac_attempt, last_verdict, solved_at, is_upsolve } theo problem_id từ BÀI NỘP THẬT
+// (gồm cả trong contest lẫn practice contest_id=null). Problem không có nộp → không nằm trong map.
+route('GET', '^/api/v1/practice/stats$', async (req, res, url, m, user) => {
+  const mine = db.filter('submissions', (s) => s.user_id === user.id);
+  const map = {};
+  for (const s of mine.sort((a, b) => new Date(a.submitted_at) - new Date(b.submitted_at))) {
+    const e = map[s.problem_id] || { solved: false, attempts: 0, ac_attempt: null, last_verdict: null, solved_at: null, is_upsolve: false };
+    e.attempts += 1;
+    e.last_verdict = s.verdict;
+    if (s.verdict === 'AC' && !e.solved) { e.solved = true; e.ac_attempt = e.attempts; e.solved_at = s.submitted_at; }
+    if (s.is_upsolve) e.is_upsolve = true;
+    map[s.problem_id] = e;
+  }
+  send(res, 200, { stats: map });
+}, { auth: true });
+
 route('GET', '^/api/v1/problems$', async (req, res, url) => {
   let list = [...db.data.problems];
   const tag = url.searchParams.get('tag');
@@ -487,12 +687,19 @@ route('GET', '^/api/v1/problems/([^/]+)$', async (req, res, url, m) => {
 });
 
 // ---- Submissions ----
+// Upsolve (Task 105): nộp sau khi contest FINISHED — chấm thật nhưng không tính điểm, không vào standings.
+function subView(s, { withSource = false } = {}) {
+  const { source_code, per_test, ...pub } = s;
+  return withSource ? { ...s } : { ...pub, has_source: Boolean(source_code) };
+}
+
 route('POST', '^/api/v1/submissions$', async (req, res, url, m, user) => {
   const { contest_id, problem_id, language, source_code } = await readBody(req);
   const c = db.find('contests', (x) => x.id === contest_id);
   const prob = db.find('problems', (x) => x.id === problem_id);
   if (!c || !prob) { send(res, 404, { error: 'NOT_FOUND' }); return; }
-  if (c.status !== 'CODING') { send(res, 409, { error: 'NOT_CODING_PHASE', message: 'Chỉ nộp bài trong Coding Phase.' }); return; }
+  const isUpsolve = c.status === 'FINISHED'; // Task 105: upsolving sau contest
+  if (c.status !== 'CODING' && !isUpsolve) { send(res, 409, { error: 'NOT_CODING_PHASE', message: 'Chỉ nộp bài trong Coding Phase (hoặc upsolve sau khi kết thúc).' }); return; }
   const part = db.find('participants', (p) => p.contest_id === c.id && p.user_id === user.id);
   if (!part) { send(res, 403, { error: 'NOT_REGISTERED' }); return; }
   if (!normalizeLanguage(language)) { send(res, 422, { error: 'UNSUPPORTED_LANGUAGE', message: `Ngôn ngữ ${language} không được hỗ trợ. Dùng: javascript, python, java, cpp.` }); return; }
@@ -500,25 +707,39 @@ route('POST', '^/api/v1/submissions$', async (req, res, url, m, user) => {
   if (notReady) { send(res, 422, { error: 'TOOLCHAIN_MISSING', message: notReady }); return; }
   const priorWA = db.filter('submissions', (s) => s.contest_id === c.id && s.user_id === user.id && s.problem_id === prob.id && s.verdict !== 'AC').length;
   const timeLimitMs = parseFloat(prob.timeLimit) * 1000 || 1000;
-  const judged = await judgeQueue.judgeTests({ language, source: source_code, tests: pretestsOf(prob.id), timeLimitMs });
+  // Chuẩn quốc tế: chấm full-suite ngay — verdict trả về là kết quả cuối cùng (ADR-005).
+  // Task 104: truyền memoryLimit của đề để ràng buộc heap/rlimit.
+  const judged = await judgeQueue.judgeTests({ language, source: source_code, tests: judgeSuiteOf(prob.id), timeLimitMs, memoryLimit: prob.memoryLimit || '256 MB' });
   if (judged.verdict === 'SKIP') { send(res, 422, { error: 'UNSUPPORTED_LANGUAGE', message: judged.message }); return; }
   const passed = judged.verdict === 'AC';
-  const pts = passed ? calculateProblemScore(prob.base_points || prob.rating || 1000, elapsedMinutes(c), priorWA) : 0;
+  // Upsolve: luôn 0 điểm; trong contest: công thức decay + penalty như cũ.
+  const pts = isUpsolve ? 0 : (passed ? calculateProblemScore(prob.base_points || prob.rating || 1000, elapsedMinutes(c), priorWA) : 0);
+  // Task 104: lưu per-test (verdict + time) để mở feedback sau FINISHED — KHÔNG lưu input/expected (chống lộ test).
+  const per_test = (judged.results || []).map((r) => ({ index: r.index, verdict: r.verdict, time_ms: r.timeMs || 0 }));
   const sub = db.insert('submissions', {
     id: db.nextId('sub'), user_id: user.id, problem_id: prob.id, contest_id: c.id,
     language: normalizeLanguage(language), source_code, verdict: passed ? 'AC' : judged.verdict,
-    points_awarded: pts, is_hacked: false, time_ms: judged.results[0]?.timeMs ?? null,
+    points_awarded: pts, time_ms: judged.results[0]?.timeMs ?? null,
     elapsed_min: elapsedMinutes(c), detail: judged.message, submitted_at: new Date().toISOString(),
+    is_upsolve: isUpsolve || undefined, per_test,
   });
-  broadcast(c.id, 'EVENT_STANDINGS_UPDATE', { standings: computeStandings(c) });
-  send(res, 201, { submission: { ...sub, source_code: undefined }, pretests_passed: passed });
+  if (!isUpsolve) broadcast(c.id, 'EVENT_STANDINGS_UPDATE', { standings: computeStandings(c) });
+  send(res, 201, { submission: subView(sub), verdict: judged.verdict, is_upsolve: isUpsolve, per_test });
 }, { auth: true });
 route('GET', '^/api/v1/submissions/([^/]+)$', async (req, res, url, m, user) => {
   const s = db.find('submissions', (x) => x.id === decodeURIComponent(m[1]));
   if (!s) { send(res, 404, { error: 'NOT_FOUND' }); return; }
-  const c = db.find('contests', (x) => x.id === s.contest_id);
-  const showSource = s.user_id === user.id || user.role === 'ADMIN' || (c && ['HACK_PHASE', 'FINISHED'].includes(c.status));
-  send(res, 200, { submission: showSource ? s : { ...s, source_code: undefined } });
+  const c = s.contest_id ? db.find('contests', (x) => x.id === s.contest_id) : null;
+  const isPractice = s.contest_id == null;
+  const isUpsolve = Boolean(s.is_upsolve);
+  // Feedback per-test (Task 104): chỉ mở khi contest FINISHED / upsolve / practice — không bao giờ kèm input/expected.
+  const revealPerTest = isPractice || isUpsolve || (c && c.status === 'FINISHED');
+  const showSource = s.user_id === user.id || user.role === 'ADMIN' || (c && c.status === 'FINISHED');
+  const firstFail = (s.per_test || []).findIndex((t) => t.verdict !== 'AC');
+  const base = subView(s, { withSource: showSource });
+  send(res, 200, {
+    submission: revealPerTest ? base : { ...base, per_test: undefined, per_test_hidden: true, failed_index: firstFail >= 0 ? firstFail : undefined },
+  });
 }, { auth: true });
 route('GET', '^/api/v1/submissions$', async (req, res, url, m, user) => {
   const cid = url.searchParams.get('contest_id');
@@ -527,57 +748,16 @@ route('GET', '^/api/v1/submissions$', async (req, res, url, m, user) => {
   if (cid) list = list.filter((s) => s.contest_id === cid);
   if (uid) list = list.filter((s) => s.user_id === uid);
   const c = cid ? db.find('contests', (x) => x.id === cid) : null;
-  const showSource = user.role === 'ADMIN' || (c && ['HACK_PHASE', 'FINISHED'].includes(c.status));
-  send(res, 200, { submissions: list.map((s) => (showSource || s.user_id === user.id) ? s : { ...s, source_code: undefined }) });
-}, { auth: true });
-
-// ---- Hacks ----
-route('POST', '^/api/v1/hacks/execute$', async (req, res, url, m, user) => {
-  const { contest_id, target_submission_id, test_payload } = await readBody(req);
-  const c = db.find('contests', (x) => x.id === contest_id);
-  if (!c) { send(res, 404, { error: 'CONTEST_NOT_FOUND' }); return; }
-  if (c.status !== 'HACK_PHASE') { send(res, 409, { error: 'NOT_HACK_PHASE', message: 'Chỉ hack trong Hack Phase.' }); return; }
-  const target = db.find('submissions', (s) => s.id === target_submission_id && s.contest_id === c.id);
-  if (!target || target.verdict !== 'AC' || target.is_hacked) { send(res, 404, { error: 'TARGET_NOT_FOUND', message: 'Bài mục tiêu không còn sống.' }); return; }
-  if (target.user_id === user.id) { send(res, 403, { error: 'SELF_HACK', message: 'Không tự hack bài mình.' }); return; }
-  const me = db.find('participants', (p) => p.contest_id === c.id && p.user_id === user.id);
-  const victim = db.find('participants', (p) => p.contest_id === c.id && p.user_id === target.user_id);
-  if (!me || !victim || me.room_id !== victim.room_id) { send(res, 403, { error: 'DIFFERENT_ROOM', message: 'Chỉ hack đối thủ cùng Room.' }); return; }
-  const payload = String(test_payload || '');
-  if (!payload || payload.length > 50 * 1024) { send(res, 422, { error: 'BAD_PAYLOAD', message: 'Payload rỗng hoặc vượt 50KB.' }); return; }
-  // Luật Polygon: chặn hack input bẩn bằng bounds CỦA ĐỀ của target submission.
-  const prob = db.find('problems', (p) => p.id === target.problem_id);
-  const hackCheck = validateInput(payload, boundsOf(prob));
-  if (!hackCheck.isValid) {
-    send(res, 422, { error: 'HACK_VALIDATOR_REJECT', message: hackCheck.error }); return;
-  }
-  // Gate format-only (giữ như lưới an toàn sau validator):
-  // đúng 1 ký tự xuống dòng ở cuối, không dư khoảng trắng cuối dòng.
-  if (!payload.endsWith('\n') || payload.endsWith('\n\n')) {
-    send(res, 422, { error: 'HACK_VALIDATOR_REJECT', message: 'Payload phải kết thúc bằng đúng một ký tự xuống dòng.' }); return;
-  }
-  const badLine = payload.split('\n').findIndex((ln) => ln.endsWith(' ') || ln.endsWith('\t'));
-  if (badLine >= 0) {
-    send(res, 422, { error: 'HACK_VALIDATOR_REJECT', message: `Dư khoảng trắng cuối dòng ${badLine + 1}.` }); return;
-  }
-  const timeLimitMs = parseFloat(prob?.timeLimit) * 1000 || 1000;
-  const victimRun = await judgeQueue.executeOne({ language: target.language, source: target.source_code, stdin: payload, timeLimitMs });
-  const oracleSrc = ORACLES[target.problem_id];
-  if (!oracleSrc) { send(res, 422, { error: 'NO_ORACLE', message: 'Bài này chưa có oracle chấm hack.' }); return; }
-  const oracleRun = await judgeQueue.executeOne({ language: 'python', source: oracleSrc, stdin: payload, timeLimitMs: 2000 });
-  if (oracleRun.verdict !== 'OK') { send(res, 422, { error: 'ORACLE_FAILED', message: 'Oracle không chạy được trên payload này.' }); return; }
-  const success = victimRun.verdict !== 'OK' || !compareOutputs(victimRun.stdout, oracleRun.stdout);
-  if (success) db.update('submissions', (s) => s.id === target.id, { is_hacked: true, verdict: 'HACKED', points_awarded: 0 });
-  const hacker = db.find('users', (u) => u.id === user.id);
-  const victimUser = db.find('users', (u) => u.id === target.user_id);
-  const ev = db.insert('hacks', {
-    id: db.nextId('hack'), contest_id: c.id, problem_id: target.problem_id, hacker_id: user.id,
-    target_submission_id: target.id, input_payload: payload, is_successful: success, points_delta: success ? 100 : -50,
-    victim_verdict: victimRun.verdict, executed_at: new Date().toISOString(),
+  const showSource = user.role === 'ADMIN' || (c && c.status === 'FINISHED');
+  const contestDone = !cid || (c && c.status === 'FINISHED');
+  send(res, 200, {
+    submissions: list.map((s) => {
+      const base = (showSource || s.user_id === user.id) ? subView(s, { withSource: true }) : subView(s);
+      // Khi contest còn CODING: ẩn per_test của người khác (chống dò test), giữ của chính mình.
+      if (!contestDone && s.user_id !== user.id && s.per_test) return { ...base, per_test: undefined, per_test_hidden: true };
+      return base;
+    }),
   });
-  broadcast(c.id, 'EVENT_HACK_BROADCAST', { hacker_name: hacker.username, victim_name: victimUser.username, problem_code: prob?.code, verdict: success ? 'SUCCESSFUL_HACK' : 'UNSUCCESSFUL_HACK', room_id: me.room_id });
-  broadcast(c.id, 'EVENT_STANDINGS_UPDATE', { standings: computeStandings(c) });
-  send(res, 200, { success, verdict: success ? 'SUCCESSFUL_HACK' : 'UNSUCCESSFUL_HACK', points_delta: ev.points_delta, victim_output: victimRun.stdout?.slice(0, 2000), victim_verdict: victimRun.verdict });
 }, { auth: true });
 
 // ---- Admin: users (admin cấp tài khoản cá nhân / đội thi) ----
@@ -620,37 +800,12 @@ route('POST', '^/api/v1/admin/phase$', async (req, res, url, m, user) => {
   const cur = PHASE_ORDER.indexOf(c.status);
   const nxt = PHASE_ORDER.indexOf(phase);
   if (nxt !== cur + 1 && !(cur === 0 && nxt === 1)) {
-    // Cho phép REGISTRATION->CODING trực tiếp; còn lại phải tuần tự
+    // Cho phép REGISTRATION->CODING trực tiếp; còn lại phải tuần tự (3 phase: ADR-005)
     if (!(c.status === 'REGISTRATION' && phase === 'CODING')) {
       send(res, 409, { error: 'ILLEGAL_TRANSITION', message: `Không thể chuyển ${c.status} → ${phase}.` }); return;
     }
   }
-  if (phase === 'SYSTEM_TESTING') {
-    // System Test thật: chấm lại toàn bộ bài sống trên full suite (qua worker pool)
-    const live = db.filter('submissions', (s) => s.contest_id === c.id && s.verdict === 'AC' && !s.is_hacked);
-    for (const s of live) {
-      const prob = db.find('problems', (p) => p.id === s.problem_id);
-      const suite = await fullSuiteOf(s.problem_id, c.id);
-      const timeLimitMs = parseFloat(prob?.timeLimit) * 1000 || 1000;
-      const r = await judgeQueue.judgeTests({ language: s.language, source: s.source_code, tests: suite, timeLimitMs });
-      if (r.verdict !== 'AC') {
-        db.update('submissions', (x) => x.id === s.id, { verdict: 'FST', points_awarded: 0, detail: `Failed on system test ${r.failedIndex + 1}: ${r.message}` });
-      }
-    }
-  }
-  if (phase === 'FINISHED' && c.is_rated) {
-    const rows = computeStandings(c);
-    const changes = calculateContestRatingChanges(rows.map((r) => ({ id: r.user_id, name: r.username, oldRating: r.rating, points: r.total })));
-    for (const ch of changes) {
-      const u = db.find('users', (x) => x.id === ch.id);
-      if (!u) continue;
-      u.rating_history = u.rating_history || [];
-      u.rating_history.push({ contest_id: c.id, old: u.rating, new: ch.newRating, delta: ch.delta, at: new Date().toISOString() });
-      u.rating = ch.newRating;
-      u.max_rating = Math.max(u.max_rating || 0, ch.newRating);
-    }
-    db.save();
-  }
+  if (phase === 'FINISHED') finishContest(c); // đã check is_rated bên trong
   db.update('contests', (x) => x.id === c.id, { status: phase });
   broadcast(c.id, 'EVENT_PHASE_CHANGED', { phase });
   broadcast(c.id, 'EVENT_STANDINGS_UPDATE', { standings: computeStandings(c) });
@@ -662,7 +817,7 @@ route('POST', '^/api/v1/admin/contests$', async (req, res) => {
   const body = await readBody(req);
   const title = String(body.title || '').trim();
   if (!title) { send(res, 422, { error: 'BAD_TITLE', message: 'Thiếu tên kỳ thi.' }); return; }
-  const format = String(body.contest_format || 'CODEFORCES').toUpperCase();
+  const format = String(body.contest_format || 'ICPC').toUpperCase();
   if (!['CODEFORCES', 'ICPC', 'IOI'].includes(format)) { send(res, 422, { error: 'BAD_FORMAT' }); return; }
   let slug = String(body.slug || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   if (!slug) slug = `contest-${Date.now().toString(36)}`;
@@ -675,8 +830,7 @@ route('POST', '^/api/v1/admin/contests$', async (req, res) => {
     slug,
     contest_format: format,
     start_time: start.toISOString(),
-    duration_minutes: Math.max(15, Number(body.duration_minutes) || 135),
-    hack_duration_minutes: Math.max(0, Number(body.hack_duration_minutes) || 15),
+    duration_minutes: Math.max(15, Number(body.duration_minutes) || 120),
     status: 'REGISTRATION',
     is_rated: body.is_rated !== false,
     min_rating: body.min_rating ?? null,
@@ -690,19 +844,18 @@ route('POST', '^/api/v1/admin/rejudge$', async (req, res) => {
   const { submission_id } = await readBody(req);
   const s = db.find('submissions', (x) => x.id === submission_id);
   if (!s) { send(res, 404, { error: 'NOT_FOUND' }); return; }
-  if (s.is_hacked) { send(res, 409, { error: 'HACKED', message: 'Bài đã bị hack, không chấm lại.' }); return; }
   const c = db.find('contests', (x) => x.id === s.contest_id);
   const prob = db.find('problems', (p) => p.id === s.problem_id);
   if (!c || !prob) { send(res, 404, { error: 'NOT_FOUND' }); return; }
-  const suite = ['SYSTEM_TESTING', 'FINISHED'].includes(c.status) ? await fullSuiteOf(s.problem_id, c.id) : pretestsOf(s.problem_id);
+  // Rejudge dùng đúng một code path với submit: full-suite, verdict cuối (ADR-005)
   const timeLimitMs = parseFloat(prob?.timeLimit) * 1000 || 1000;
-  const r = await judgeQueue.judgeTests({ language: s.language, source: s.source_code, tests: suite, timeLimitMs });
+  const r = await judgeQueue.judgeTests({ language: s.language, source: s.source_code, tests: judgeSuiteOf(s.problem_id), timeLimitMs });
   if (r.verdict === 'SKIP') { send(res, 422, { error: 'TOOLCHAIN_MISSING', message: r.message }); return; }
   const passed = r.verdict === 'AC';
   const priorWA = db.filter('submissions', (x) => x.contest_id === c.id && x.user_id === s.user_id && x.problem_id === s.problem_id && x.id !== s.id && x.verdict !== 'AC').length;
   const pts = passed ? calculateProblemScore(prob.base_points || prob.rating || 1000, s.elapsed_min ?? elapsedMinutes(c), priorWA) : 0;
   db.update('submissions', (x) => x.id === s.id, {
-    verdict: passed ? 'AC' : (['SYSTEM_TESTING', 'FINISHED'].includes(c.status) ? 'FST' : r.verdict),
+    verdict: r.verdict,
     points_awarded: pts, time_ms: r.results[0]?.timeMs ?? s.time_ms,
     detail: `Rejudge: ${r.message}`, rejudged_at: new Date().toISOString(),
   });
@@ -879,7 +1032,7 @@ route('POST', '^/api/v1/admin/testcases$', async (req, res) => {
   const tc = db.insert('testcases', {
     id: db.nextId('tc'), problem_id: p.id, order_index,
     stdin, expected_stdout: String(body.expected_stdout ?? ''),
-    is_sample: false, is_pretest: body.is_pretest !== false,
+    is_sample: false,
     strategy: String(body.strategy || 'manual'),
   });
   send(res, 201, { testcase: tc });
@@ -1042,6 +1195,11 @@ route('GET', '^/api/v1/stream/contests/([^/]+)$', async (req, res, url, m) => {
 }, { auth: true });
 
 // ============================ BOOT ============================
+// Auto-phase scheduler (Task 103): REGISTRATION→CODING→FINISHED theo giờ thật.
+// SCHEDULER_DISABLED=1 để tắt (test tự điều khiển tick).
+export const scheduler = createScheduler({ db, finishContest, broadcast, log: (...a) => console.log(...a) });
+if (process.env.SCHEDULER_DISABLED !== '1') scheduler.start();
+
 export function startServer(port = PORT) {
   const server = createServer(handle);
   server.listen(port, () => console.log(`[dever-api] REST+SSE chạy tại http://localhost:${port}`));

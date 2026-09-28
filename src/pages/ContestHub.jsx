@@ -80,8 +80,6 @@ export const ContestHub = () => {
   const { phase, formattedTime, getDynamicScore, problems = [] } = useContest();
   const navigate = useNavigate();
 
-  const [virtual, setVirtual] = useState(null); // { session_id, elapsedMinutes, standings, slug }
-  const [virtualLoading, setVirtualLoading] = useState(false);
   const [contests, setContests] = useState(null);
   const [regMsg, setRegMsg] = useState('');
   const [now, setNow] = useState(() => Date.now());
@@ -104,21 +102,10 @@ export const ContestHub = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // Virtual Contest: nút nằm trên từng thẻ contest FINISHED
-
-  const startVirtual = async (slug) => {
-    if (!getToken()) { navigate('/login?redirect=/arena'); return; }
-    setVirtualLoading(true);
-    try {
-      const s = await api.createVirtual(slug);
-      const v = await api.getVirtual(slug, s.session_id);
-      setVirtual({ ...v, slug });
-    } catch { /* im lặng, giữ thẻ */ }
-    finally { setVirtualLoading(false); }
-  };
+  // Virtual Contest (Task 111): nút điều hướng tới trang /virtual/:slug — API POST/GET /virtual có sẵn.
 
   // Nhóm kiểu Codeforces: live / upcoming / past
-  const live = (contests || []).filter((c) => ['CODING', 'HACK_PHASE', 'SYSTEM_TESTING'].includes(c.status));
+  const live = (contests || []).filter((c) => ['CODING'].includes(c.status));
   const upcoming = (contests || []).filter((c) => ['REGISTRATION'].includes(c.status))
     .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
   const past = (contests || []).filter((c) => ['FINISHED'].includes(c.status))
@@ -164,19 +151,21 @@ export const ContestHub = () => {
         )}
         {c.status === 'FINISHED' && (
           <button
-            onClick={() => startVirtual(c.slug)}
-            disabled={virtualLoading}
-            className="px-3 py-1.5 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#34343a] text-slate-200 font-medium text-xs transition disabled:opacity-50"
+            onClick={() => navigate(`/virtual/${c.slug}`)}
+            className="px-3 py-1.5 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] text-white font-medium text-xs transition"
           >
-            {virtualLoading ? 'Đang tạo...' : 'Thi ảo (Ghost Replay)'}
+            Thi ảo (Virtual) →
+          </button>
+        )}
+        {c.status === 'FINISHED' && (
+          <button
+            onClick={() => navigate(`/contest/${c.slug}/summary`)}
+            className="px-3 py-1.5 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#34343a] text-slate-200 font-medium text-xs transition"
+          >
+            Tổng kết
           </button>
         )}
       </div>
-      {virtual && virtual.slug === c.slug && (
-        <div className="text-[11px] text-slate-400 font-mono pt-1">
-          Phiên {virtual.session_id} • đã trôi {virtual.elapsedMinutes}′ • {virtual.standings?.length || 0} ghost trên bảng
-        </div>
-      )}
     </div>
   );
 
@@ -185,7 +174,7 @@ export const ContestHub = () => {
     setRegMsg('');
     try {
       const data = await api.register(slug);
-      setRegMsg(`Đã đăng ký thành công, xếp vào ${data.participant.room_id}.`);
+      setRegMsg('Đã đăng ký thành công, hẹn gặp tại kỳ thi.');
     } catch (err) {
       setRegMsg(err?.message || 'Đăng ký thất bại.');
     }
@@ -220,7 +209,7 @@ export const ContestHub = () => {
             </h1>
 
             <p className="text-slate-400 text-xs sm:text-sm mt-1.5 max-w-xl">
-              2 giờ 15 phút thi đấu chuẩn Codeforces: 120 phút Coding, 15 phút Bẻ khóa Hack Room, và chốt điểm qua 45 System Tests.
+              2 giờ thi đấu chuẩn quốc tế: 120 phút Coding chấm full-suite, freeze bảng điểm 30 phút cuối, chốt kết quả và cập nhật Elo.
             </p>
           </div>
 

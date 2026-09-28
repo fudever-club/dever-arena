@@ -1,21 +1,22 @@
 /**
  * DEVER Arena Judge Worker Queue Protocol
  * Hàng đợi ưu tiên 3 cấp độ chuẩn hóa theo docs/JUDGE_ARCHITECTURE.md
- * Cấp 1 (HACK) > Cấp 2 (PRETEST) > Cấp 3 (SYSTEM_TEST)
+ * Cấp 1 (HIGH: hack-oracle đổi thành job ưu tiên cao/chấm thủ công) > Cấp 2 (DEFAULT: nộp bài thi) > Cấp 3 (BATCH: chấm lại hàng loạt)
+ * Ghi chú ADR-005: không còn hàng đợi Hack; cấp 1 dành cho job ưu tiên cao tương lai (chấm xét duyệt, custom test).
  */
 
 import { evaluateSubmission } from './isolateRunner.js';
 
 export const QUEUE_PRIORITIES = {
-  HACK: 1,        // Cấp ưu tiên cao nhất (Instant Hack Queue: phản hồi < 3s)
-  PRETEST: 2,     // Cấp ưu tiên trung bình (Pretest Queue trong Coding Phase)
-  SYSTEM_TEST: 3  // Cấp ưu tiên thấp / chạy hàng loạt (System Test Queue sau contest)
+  HIGH: 1,      // Cấp ưu tiên cao nhất (phản hồi < 3s: custom test / tác vụ ưu tiên)
+  DEFAULT: 2,   // Cấp mặc định (nộp bài trong contest)
+  BATCH: 3      // Cấp thấp / chạy hàng loạt (rejudge, chấm lại toàn contest)
 };
 
 export class JudgeWorkerQueue {
   /**
-   * @param {object} options 
-   * @param {number} options.maxConcurrency 
+   * @param {object} options
+   * @param {number} options.maxConcurrency
    */
   constructor(options = {}) {
     this.maxConcurrency = options.maxConcurrency || 2;
@@ -25,21 +26,21 @@ export class JudgeWorkerQueue {
 
     // 3 hàng đợi độc lập cho 3 tầng ưu tiên
     this.queues = {
-      [QUEUE_PRIORITIES.HACK]: [],
-      [QUEUE_PRIORITIES.PRETEST]: [],
-      [QUEUE_PRIORITIES.SYSTEM_TEST]: []
+      [QUEUE_PRIORITIES.HIGH]: [],
+      [QUEUE_PRIORITIES.DEFAULT]: [],
+      [QUEUE_PRIORITIES.BATCH]: []
     };
   }
 
   /**
-   * Đưa job chấm bài hoặc hack vào hàng đợi
-   * @param {object} job 
-   * @param {string} job.id 
-   * @param {number} [job.priority=QUEUE_PRIORITIES.PRETEST] 
-   * @param {string} job.sourceCode 
-   * @param {string} job.language 
-   * @param {Array<{ stdin: string, expectedStdout: string }>} job.testcases 
-   * @param {object} [job.limits] 
+   * Đưa job chấm bài vào hàng đợi
+   * @param {object} job
+   * @param {string} job.id
+   * @param {number} [job.priority=QUEUE_PRIORITIES.DEFAULT]
+   * @param {string} job.sourceCode
+   * @param {string} job.language
+   * @param {Array<{ stdin: string, expectedStdout: string }>} job.testcases
+   * @param {object} [job.limits]
    * @returns {{ jobId: string, priority: number, queuePosition: number, status: string }}
    */
   enqueue(job) {
@@ -47,9 +48,9 @@ export class JudgeWorkerQueue {
       throw new Error('Invalid job: job must have an id');
     }
 
-    const priority = job.priority || QUEUE_PRIORITIES.PRETEST;
+    const priority = job.priority || QUEUE_PRIORITIES.DEFAULT;
     if (!this.queues[priority]) {
-      throw new Error(`Invalid priority level: ${priority}. Must be 1 (HACK), 2 (PRETEST), or 3 (SYSTEM_TEST)`);
+      throw new Error(`Invalid priority level: ${priority}. Must be 1 (HIGH), 2 (DEFAULT), or 3 (BATCH)`);
     }
 
     const jobItem = {
@@ -81,17 +82,17 @@ export class JudgeWorkerQueue {
    * @returns {object | null}
    */
   dequeue() {
-    // 1. Kiểm tra Instant Hack Queue (Priority 1)
-    if (this.queues[QUEUE_PRIORITIES.HACK].length > 0) {
-      return this.queues[QUEUE_PRIORITIES.HACK].shift();
+    // 1. Kiểm tra hàng ưu tiên cao (Priority 1)
+    if (this.queues[QUEUE_PRIORITIES.HIGH].length > 0) {
+      return this.queues[QUEUE_PRIORITIES.HIGH].shift();
     }
-    // 2. Kiểm tra Pretest Queue (Priority 2)
-    if (this.queues[QUEUE_PRIORITIES.PRETEST].length > 0) {
-      return this.queues[QUEUE_PRIORITIES.PRETEST].shift();
+    // 2. Kiểm tra hàng nộp bài thường (Priority 2)
+    if (this.queues[QUEUE_PRIORITIES.DEFAULT].length > 0) {
+      return this.queues[QUEUE_PRIORITIES.DEFAULT].shift();
     }
-    // 3. Kiểm tra System Test Queue (Priority 3)
-    if (this.queues[QUEUE_PRIORITIES.SYSTEM_TEST].length > 0) {
-      return this.queues[QUEUE_PRIORITIES.SYSTEM_TEST].shift();
+    // 3. Kiểm tra hàng chạy hàng loạt (Priority 3)
+    if (this.queues[QUEUE_PRIORITIES.BATCH].length > 0) {
+      return this.queues[QUEUE_PRIORITIES.BATCH].shift();
     }
 
     return null;
@@ -99,19 +100,19 @@ export class JudgeWorkerQueue {
 
   /**
    * Thống kê trạng thái hàng đợi
-   * @returns {{ totalWaiting: number, byPriority: { hack: number, pretest: number, systemTest: number }, activeWorkers: number, processedCount: number }}
+   * @returns {{ totalWaiting: number, byPriority: { high: number, default: number, batch: number }, activeWorkers: number, processedCount: number }}
    */
   getQueueStats() {
-    const hackCount = this.queues[QUEUE_PRIORITIES.HACK].length;
-    const pretestCount = this.queues[QUEUE_PRIORITIES.PRETEST].length;
-    const systemTestCount = this.queues[QUEUE_PRIORITIES.SYSTEM_TEST].length;
+    const highCount = this.queues[QUEUE_PRIORITIES.HIGH].length;
+    const defaultCount = this.queues[QUEUE_PRIORITIES.DEFAULT].length;
+    const batchCount = this.queues[QUEUE_PRIORITIES.BATCH].length;
 
     return {
-      totalWaiting: hackCount + pretestCount + systemTestCount,
+      totalWaiting: highCount + defaultCount + batchCount,
       byPriority: {
-        hack: hackCount,
-        pretest: pretestCount,
-        systemTest: systemTestCount
+        high: highCount,
+        default: defaultCount,
+        batch: batchCount
       },
       activeWorkers: this.activeWorkers,
       processedCount: this.processedCount
@@ -179,7 +180,7 @@ export class JudgeWorkerQueue {
 
   /**
    * Xử lý toàn bộ các jobs hiện có trong hàng đợi theo thứ tự ưu tiên
-   * @param {Function} [customExecutor] 
+   * @param {Function} [customExecutor]
    * @returns {Promise<Array<object>>}
    */
   async processAll(customExecutor) {
@@ -195,8 +196,8 @@ export class JudgeWorkerQueue {
    * Xóa sạch toàn bộ hàng đợi
    */
   clear() {
-    this.queues[QUEUE_PRIORITIES.HACK] = [];
-    this.queues[QUEUE_PRIORITIES.PRETEST] = [];
-    this.queues[QUEUE_PRIORITIES.SYSTEM_TEST] = [];
+    this.queues[QUEUE_PRIORITIES.HIGH] = [];
+    this.queues[QUEUE_PRIORITIES.DEFAULT] = [];
+    this.queues[QUEUE_PRIORITIES.BATCH] = [];
   }
 }

@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useContest } from '../../context/ContestContext';
+import { NotificationCenter } from '../common/NotificationCenter';
 
 export const Navbar = () => {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
@@ -104,17 +105,6 @@ export const Navbar = () => {
             >
               Standings
             </Link>
-
-            <Link
-              to="/hack-room"
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
-                isCurrent('/hack-room')
-                  ? 'bg-white/10 text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              Hack Room
-            </Link>
           </nav>
         </div>
 
@@ -128,22 +118,26 @@ export const Navbar = () => {
 
         {/* Right Section: User Profile */}
         <div className="flex items-center gap-3">
+          {/* Task 109: Notification center */}
+          {isAuthenticated && <NotificationCenter />}
           {/* Member Profile Badge */}
           {isAuthenticated ? (
             <div className="flex items-center gap-2.5 pl-2 border-l border-white/10">
+              <a href="#/profile" title="Xem profile của bạn" className="hover:opacity-80 transition">
               <img
                 src={user.avatar}
                 alt={user.username}
                 className="w-6 h-6 rounded-full border border-white/20 bg-slate-800"
               />
-              <div className="hidden sm:block text-left text-xs leading-none">
+              </a>
+              <a href="#/profile" className="hidden sm:block text-left text-xs leading-none hover:opacity-80 transition">
                 <span className="font-bold text-slate-200 block truncate max-w-[100px]">
                   {user.username}
                 </span>
                 <span className={`text-[10px] border px-1 rounded inline-block mt-0.5 ${getRankBadgeColor(user.role, user.rating)}`}>
                   {user.role === 'ADMIN' ? 'Giám Khảo' : `${user.rating} Elo`}
                 </span>
-              </div>
+              </a>
               <button
                 onClick={() => { logout(); navigate('/login'); }}
                 title="Đăng xuất"

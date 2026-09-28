@@ -98,8 +98,7 @@ export function calculateVirtualStandings({
       clan: virtualUser.clan || 'DEVER',
       isVirtual: true,
       problems: {},
-      totalScore: 0,
-      hackScore: 0
+      totalScore: 0
     };
   }
 
@@ -115,8 +114,7 @@ export function calculateVirtualStandings({
         clan: sub.clan || 'DEVER',
         isVirtual: false,
         problems: {},
-        totalScore: 0,
-        hackScore: 0
+        totalScore: 0
       };
     }
   });
@@ -192,7 +190,7 @@ export function calculateVirtualStandings({
 
   // Tính tổng điểm cho mỗi user
   const standings = Object.values(userMap).map(u => {
-    let totalScore = u.hackScore || 0;
+    let totalScore = 0;
     let solvedCount = 0;
     Object.values(u.problems).forEach(prob => {
       if (prob.verdict === 'OK' || prob.verdict === 'ACCEPTED') {

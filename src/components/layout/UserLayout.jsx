@@ -5,7 +5,7 @@ import { AnnouncementBanner } from '../common/AnnouncementBanner';
 
 /**
  * UserLayout — vỏ thí sinh đã đăng nhập (PARTICIPANT + ADMIN xem ké).
- * Routes: /arena, /problem/:id, /standings, /hack-room. Bảo vệ bởi RequireAuth.
+ * Routes: /arena, /problem/:id, /standings, /profile, /problemset. Bảo vệ bởi RequireAuth.
  */
 export const UserLayout = () => {
   return (

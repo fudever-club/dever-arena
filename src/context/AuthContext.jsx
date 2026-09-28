@@ -94,8 +94,33 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const loginWithPreset = (roleKey) => {
+  // Mật khẩu demo khớp seed backend (dever_hero/hero123, dever_admin/admin123).
+  // Fast-switch thử đăng nhập backend thật trước (có JWT → profile/API auth đầy đủ);
+  // backend rớt mạng mới fallback user demo local (không token → các API auth sẽ báo lỗi rõ).
+  const PRESET_PASSWORDS = { PARTICIPANT: 'hero123', ADMIN: 'admin123' };
+  const loginWithPreset = async (roleKey) => {
     const user = PRESET_USERS[roleKey] || PRESET_USERS.PARTICIPANT;
+    const pw = PRESET_PASSWORDS[roleKey];
+    if (pw) {
+      try {
+        const data = await api.login(user.username, pw);
+        saveToken(data.accessToken || data.token);
+        const u = data.user;
+        const backendUser = {
+          id: u.id,
+          username: u.username,
+          name: u.full_name || u.username,
+          rating: u.rating,
+          role: u.role,
+          rank: u.rank_tier || u.rank || 'Newbie',
+          clan: u.clan_id || '',
+          avatar: LOCAL_AVATAR,
+        };
+        setCurrentUser(backendUser);
+        broadcastAuthChange(backendUser);
+        return backendUser;
+      } catch { /* backend offline → fallback dưới */ }
+    }
     setCurrentUser(user);
     broadcastAuthChange(user);
     return user;

@@ -145,10 +145,6 @@ export function canSubmit(user = getCurrentUser()) {
   return user.role === ROLES.PARTICIPANT || user.role === ROLES.ADMIN;
 }
 
-export function canHack(user = getCurrentUser()) {
-  return user.role === ROLES.PARTICIPANT || user.role === ROLES.ADMIN;
-}
-
 export function canAccessAdmin(user = getCurrentUser()) {
   return user.role === ROLES.ADMIN;
 }

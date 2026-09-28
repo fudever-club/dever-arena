@@ -1,5 +1,5 @@
 /**
- * DEVER-Forces Core Scoring Engine
+ * DEVER Arena Core Scoring Engine
  * Triển khai công thức tính điểm đa thể thức: Codeforces Dynamic Decay, ICPC 20-minute Penalty, và IOI Subtasks.
  */
 
@@ -11,7 +11,7 @@
  * Tính điểm thực nhận khi giải thành công một bài toán tại phút thứ t với W lần nộp sai.
  * @param {number} maxPoints - Điểm ban đầu của bài (VD: 500, 1000, 1500, 2000, 2500)
  * @param {number} elapsedMinutes - Số phút trôi qua từ lúc bắt đầu contest (0 <= t <= contestDuration)
- * @param {number} wrongAttempts - Số lần nộp sai trên Pretest trước khi Accepted (W >= 0)
+ * @param {number} wrongAttempts - Số lần nộp sai trước khi Accepted (W >= 0)
  * @returns {number} Điểm thực nhận được làm tròn xuống
  */
 export function calculateProblemScore(maxPoints, elapsedMinutes, wrongAttempts = 0) {
@@ -33,33 +33,18 @@ export function calculateProblemScore(maxPoints, elapsedMinutes, wrongAttempts =
 }
 
 /**
- * Tính điểm từ hoạt động Hack trong Room
- * @param {number} successfulHacks - Số lần hack thành công (+100đ mỗi lần)
- * @param {number} unsuccessfulHacks - Số lần hack thất bại (-50đ mỗi lần)
- * @returns {number} Điểm hack ròng (có thể âm nếu hack trượt nhiều)
- */
-export function calculateHackScore(successfulHacks = 0, unsuccessfulHacks = 0) {
-  const succ = Math.max(0, successfulHacks);
-  const unsucc = Math.max(0, unsuccessfulHacks);
-  return (succ * 100) - (unsucc * 50);
-}
-
-/**
- * Tính tổng điểm của một thí sinh trong contest chuẩn Codeforces
- * @param {Array<{ maxPoints: number, elapsedMinutes: number, wrongAttempts: number, solved: boolean }>} submissions 
- * @param {number} successfulHacks 
- * @param {number} unsuccessfulHacks 
+ * Tính tổng điểm bài nộp của một thí sinh trong contest chuẩn Codeforces
+ * @param {Array<{ maxPoints: number, elapsedMinutes: number, wrongAttempts: number, solved: boolean }>} submissions
  * @returns {number} Tổng điểm cuối cùng
  */
-export function calculateTotalScore(submissions = [], successfulHacks = 0, unsuccessfulHacks = 0) {
+export function calculateTotalScore(submissions = []) {
   let problemScore = 0;
   for (const sub of submissions) {
     if (sub.solved) {
       problemScore += calculateProblemScore(sub.maxPoints, sub.elapsedMinutes, sub.wrongAttempts);
     }
   }
-  const hackScore = calculateHackScore(successfulHacks, unsuccessfulHacks);
-  return problemScore + hackScore;
+  return problemScore;
 }
 
 // ==========================================

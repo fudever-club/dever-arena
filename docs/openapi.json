@@ -1,0 +1,1263 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "DEVER Arena API",
+    "version": "1.0.0",
+    "description": "REST API nền tảng thi đấu thuật toán CLB FU-DEVER. Sinh tự động từ server/index.js bằng `npm run gen:openapi`."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8787",
+      "description": "Local dev"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Đăng nhập POST /api/v1/auth/login lấy accessToken."
+      }
+    }
+  },
+  "paths": {
+    "/api/v1/openapi.json": {
+      "get": {
+        "summary": "GET /api/v1/openapi.json",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        }
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "summary": "GET /api/v1/health",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        }
+      }
+    },
+    "/api/v1/ready": {
+      "get": {
+        "summary": "GET /api/v1/ready",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "summary": "POST /api/v1/auth/login",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/{param1}": {
+      "get": {
+        "summary": "GET /api/v1/users/{param1}",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/users/{param1}/profile": {
+      "get": {
+        "summary": "GET /api/v1/users/{param1}/profile",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/compare": {
+      "get": {
+        "summary": "GET /api/v1/compare",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        }
+      }
+    },
+    "/api/v1/contests": {
+      "get": {
+        "summary": "GET /api/v1/contests",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        }
+      }
+    },
+    "/api/v1/contests/{param1}": {
+      "get": {
+        "summary": "GET /api/v1/contests/{param1}",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/contests/{param1}/register": {
+      "post": {
+        "summary": "POST /api/v1/contests/{param1}/register",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/contests/{param1}/standings": {
+      "get": {
+        "summary": "GET /api/v1/contests/{param1}/standings",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/contests/{param1}/virtual": {
+      "post": {
+        "summary": "POST /api/v1/contests/{param1}/virtual",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "GET /api/v1/contests/{param1}/virtual",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/practice/stats": {
+      "get": {
+        "summary": "GET /api/v1/practice/stats",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/problems": {
+      "get": {
+        "summary": "GET /api/v1/problems",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        }
+      }
+    },
+    "/api/v1/problems/{param1}/editorial": {
+      "get": {
+        "summary": "GET /api/v1/problems/{param1}/editorial",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/problems/{param1}": {
+      "get": {
+        "summary": "GET /api/v1/problems/{param1}",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/submissions": {
+      "post": {
+        "summary": "POST /api/v1/submissions",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "GET /api/v1/submissions",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/submissions/{param1}": {
+      "get": {
+        "summary": "GET /api/v1/submissions/{param1}",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/users": {
+      "get": {
+        "summary": "GET /api/v1/admin/users",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN."
+      },
+      "post": {
+        "summary": "POST /api/v1/admin/users",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{param1}/password": {
+      "post": {
+        "summary": "POST /api/v1/admin/users/{param1}/password",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/phase": {
+      "post": {
+        "summary": "POST /api/v1/admin/phase",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/contests": {
+      "post": {
+        "summary": "POST /api/v1/admin/contests",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/rejudge": {
+      "post": {
+        "summary": "POST /api/v1/admin/rejudge",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/problems": {
+      "post": {
+        "summary": "POST /api/v1/admin/problems",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/problems/{param1}": {
+      "put": {
+        "summary": "PUT /api/v1/admin/problems/{param1}",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "DELETE /api/v1/admin/problems/{param1}",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN."
+      }
+    },
+    "/api/v1/admin/stress": {
+      "post": {
+        "summary": "POST /api/v1/admin/stress",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/testcases": {
+      "post": {
+        "summary": "POST /api/v1/admin/testcases",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "GET /api/v1/admin/testcases",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN."
+      }
+    },
+    "/api/v1/admin/testcases/{param1}": {
+      "delete": {
+        "summary": "DELETE /api/v1/admin/testcases/{param1}",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN."
+      }
+    },
+    "/api/v1/admin/problems/{param1}/submit-testing": {
+      "post": {
+        "summary": "POST /api/v1/admin/problems/{param1}/submit-testing",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/problems/{param1}/review": {
+      "post": {
+        "summary": "POST /api/v1/admin/problems/{param1}/review",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/testing/queue": {
+      "get": {
+        "summary": "GET /api/v1/testing/queue",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/testing/report": {
+      "post": {
+        "summary": "POST /api/v1/testing/report",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clarifications": {
+      "post": {
+        "summary": "POST /api/v1/clarifications",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "GET /api/v1/clarifications",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/clarifications/{param1}/answer": {
+      "post": {
+        "summary": "POST /api/v1/admin/clarifications/{param1}/answer",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/announcements": {
+      "post": {
+        "summary": "POST /api/v1/admin/announcements",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/announcements": {
+      "get": {
+        "summary": "GET /api/v1/announcements",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/stream/contests/{param1}": {
+      "get": {
+        "summary": "GET /api/v1/stream/contests/{param1}",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  }
+}

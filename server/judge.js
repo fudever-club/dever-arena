@@ -14,6 +14,21 @@ import { checkSecurity, compareOutputs } from '../src/engine/isolateRunner.js';
 const MAX_SOURCE = 100 * 1024; // 100KB
 const MAX_STDIN = 50 * 1024;   // 50KB
 const MAX_STDOUT = 50 * 1024;  // 50KB
+const MAX_COMPILE_ERR = 4000;  // Task 104: stderr compile đầy đủ hơn (trước chỉ 500 ký tự)
+
+// Task 104: MLE heuristic — JS/Python/Java throw message đặc trưng khi hết bộ nhớ.
+const MLE_PATTERNS = /heap out of memory|JavaScript heap|MemoryError|bad_alloc|std::bad_alloc|OutOfMemoryError|unable to allocate/i;
+
+/** Đọc memoryLimit "256 MB" → bytes (fallback 256MB). */
+export function memoryLimitBytes(memoryLimit) {
+  const m = String(memoryLimit || '').match(/([\d.]+)\s*(MB|GB|KB)?/i);
+  if (!m) return 256 * 1024 * 1024;
+  const v = parseFloat(m[1]) || 256;
+  const unit = (m[2] || 'MB').toUpperCase();
+  if (unit === 'GB') return v * 1024 ** 3;
+  if (unit === 'KB') return v * 1024;
+  return v * 1024 * 1024;
+}
 
 const RUNNERS = {
   javascript: { cmd: 'node', args: (f) => [f], ext: 'js', aliases: ['js', 'node20', 'nodejs'], kind: 'direct' },
@@ -40,7 +55,7 @@ function compileCpp(dir, file) {
   const out = process.platform === 'win32' ? 'solution.exe' : 'solution';
   const r = spawnSync('g++', ['-O2', '-std=c++20', '-o', out, file], { cwd: dir, timeout: 10000, windowsHide: true });
   if (r.error || r.status !== 0) {
-    const err = ((r.stderr || Buffer.alloc(0)).toString('utf8') || r.error?.message || '').slice(0, 500);
+    const err = ((r.stderr || Buffer.alloc(0)).toString('utf8') || r.error?.message || '').slice(0, MAX_COMPILE_ERR);
     return `Compilation Error:\n${err}`;
   }
   return { exe: join(dir, out) };
@@ -54,7 +69,7 @@ function compileJava(dir, source) {
   writeFileSync(file, source);
   const r = spawnSync('javac', [file], { cwd: dir, timeout: 10000, windowsHide: true });
   if (r.error || r.status !== 0) {
-    const err = ((r.stderr || Buffer.alloc(0)).toString('utf8') || r.error?.message || '').slice(0, 500);
+    const err = ((r.stderr || Buffer.alloc(0)).toString('utf8') || r.error?.message || '').slice(0, MAX_COMPILE_ERR);
     return `Compilation Error:\n${err}`;
   }
   return { exe: cls, useClasspath: dir };
@@ -83,9 +98,9 @@ export function supportedLanguages() {
 
 /**
  * Thực thi 1 testcase. Trả về { verdict, stdout, timeMs, message }.
- * verdict: AC | WA | TLE | RTE | CE
+ * verdict: AC | WA | TLE | MLE | RTE | CE (Task 104: thêm MLE)
  */
-export function executeOne({ language, source, stdin = '', timeLimitMs = 1000 }) {
+export function executeOne({ language, source, stdin = '', timeLimitMs = 1000, memoryLimit = '256 MB' }) {
   const lang = normalizeLanguage(language);
   if (!lang) {
     return { verdict: 'SKIP', stdout: '', timeMs: 0, message: `Ngôn ngữ ${language} cần Isolate production (local dev chỉ hỗ trợ javascript/python).` };
@@ -114,7 +129,13 @@ export function executeOne({ language, source, stdin = '', timeLimitMs = 1000 })
     } else {
       const file = join(dir, `solution.${runner.ext}`);
       writeFileSync(file, source);
-      cmd = runner.cmd; args = runner.args(file);
+      cmd = runner.cmd;
+      if (lang === 'javascript') {
+        // Task 104: ràng buộc heap V8 theo memoryLimit của đề (đơn giản nhất, cross-platform).
+        args = ['--max-old-space-size=' + Math.max(16, Math.floor(memoryLimitBytes(memoryLimit) / 1024 / 1024)), file];
+      } else {
+        args = runner.args(file);
+      }
     }
     const t0 = Date.now();
     const res = spawnSync(cmd, args, {
@@ -132,7 +153,11 @@ export function executeOne({ language, source, stdin = '', timeLimitMs = 1000 })
       return { verdict: 'RTE', stdout: '', timeMs, message: `Runtime Error: ${String(res.error.message).slice(0, 200)}` };
     }
     if (res.status !== 0) {
-      const err = (res.stderr || Buffer.alloc(0)).toString('utf8').slice(0, 300);
+      const err = (res.stderr || Buffer.alloc(0)).toString('utf8').slice(0, MAX_COMPILE_ERR);
+      // Task 104: phân loại MLE khỏi RTE theo message đặc trưng của từng runtime.
+      if (MLE_PATTERNS.test(err)) {
+        return { verdict: 'MLE', stdout: '', timeMs, message: `Memory Limit Exceeded (${memoryLimit}): ${err.slice(0, 200)}` };
+      }
       const looksCompile = /SyntaxError|IndentationError|NameError.*not defined/i.test(err) && timeMs < 300 && lang === 'python';
       return { verdict: looksCompile ? 'CE' : 'RTE', stdout: '', timeMs, message: err || `Exit code ${res.status}` };
     }
@@ -143,14 +168,14 @@ export function executeOne({ language, source, stdin = '', timeLimitMs = 1000 })
 }
 
 /**
- * Chấm 1 bài trên bộ tests (fail-fast). Trả về { verdict, results, failedIndex }.
- * verdict chung: AC | WA | TLE | RTE | CE | SKIP
+ * Chấm 1 bài trên bộ tests (fail-fast). Trả về { verdict, results, failedIndex, perTest }.
+ * verdict chung: AC | WA | TLE | MLE | RTE | CE | SKIP (verdict map chuẩn ADR-005 + Task 104)
  */
-export function judgeTests({ language, source, tests, timeLimitMs = 1000 }) {
+export function judgeTests({ language, source, tests, timeLimitMs = 1000, memoryLimit = '256 MB' }) {
   const results = [];
   for (let i = 0; i < tests.length; i++) {
     const t = tests[i];
-    const r = executeOne({ language, source, stdin: t.stdin || '', timeLimitMs });
+    const r = executeOne({ language, source, stdin: t.stdin || '', timeLimitMs, memoryLimit });
     if (r.verdict === 'SKIP') return { verdict: 'SKIP', results, failedIndex: i, message: r.message };
     if (r.verdict !== 'OK') {
       results.push({ ...r, index: i });

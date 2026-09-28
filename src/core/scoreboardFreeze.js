@@ -79,13 +79,11 @@ export function createFrozenStandings(standings, submissions = [], freezeMinute 
       }
     }
 
-    const hackScore = coder.hack_score || 0;
-
     return {
       ...coder,
-      score: frozenScore + hackScore,
-      frozen_score: frozenScore + hackScore,
-      pre_freeze_score: preFreezeScore + hackScore,
+      score: frozenScore,
+      frozen_score: frozenScore,
+      pre_freeze_score: preFreezeScore,
       actual_final_score: coder.score,
       problems: frozenProblems,
       has_frozen_problems: Object.values(frozenProblems).some(p => p.is_frozen)

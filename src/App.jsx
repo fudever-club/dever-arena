@@ -9,11 +9,13 @@ import { LoginPage } from './pages/LoginPage';
 import { LandingPage } from './pages/LandingPage';
 import { ContestHub } from './pages/ContestHub';
 
-// Code-split nặng: Monaco workspace + Standings/Hack/Admin/Clans (frozen) tải lazy để giảm bundle đầu
+// Code-split nặng: Monaco workspace + Standings/Admin tải lazy để giảm bundle đầu
 const ProblemWorkspace = lazy(() => import('./pages/ProblemWorkspace.jsx').then(m => ({ default: m.ProblemWorkspace })));
 const StandingsPage = lazy(() => import('./pages/StandingsPage.jsx').then(m => ({ default: m.StandingsPage })));
-const HackRoomPage = lazy(() => import('./pages/HackRoomPage.jsx').then(m => ({ default: m.HackRoomPage })));
 const ProfilePage = lazy(() => import('./pages/ProfilePage.jsx').then(m => ({ default: m.ProfilePage })));
+const ComparePage = lazy(() => import('./pages/ComparePage.jsx').then(m => ({ default: m.ComparePage })));
+const VirtualContestPage = lazy(() => import('./pages/VirtualContestPage.jsx').then(m => ({ default: m.VirtualContestPage })));
+const ContestSummaryPage = lazy(() => import('./pages/ContestSummaryPage.jsx').then(m => ({ default: m.ContestSummaryPage })));
 const ProblemsetPage = lazy(() => import('./pages/ProblemsetPage.jsx').then(m => ({ default: m.ProblemsetPage })));
 
 const PageFallback = () => (
@@ -59,8 +61,11 @@ export function App() {
                 <Route path="/arena" element={<ContestHub />} />
                 <Route path="/problem/:id" element={<Suspense fallback={<PageFallback />}><ProblemWorkspace /></Suspense>} />
                 <Route path="/standings" element={<Suspense fallback={<PageFallback />}><StandingsPage /></Suspense>} />
-                <Route path="/hack-room" element={<Suspense fallback={<PageFallback />}><HackRoomPage /></Suspense>} />
                 <Route path="/profile" element={<Suspense fallback={<PageFallback />}><ProfilePage /></Suspense>} />
+                <Route path="/profile/:username" element={<Suspense fallback={<PageFallback />}><ProfilePage /></Suspense>} />
+                <Route path="/compare" element={<Suspense fallback={<PageFallback />}><ComparePage /></Suspense>} />
+                <Route path="/virtual/:slug" element={<Suspense fallback={<PageFallback />}><VirtualContestPage /></Suspense>} />
+                <Route path="/contest/:slug/summary" element={<Suspense fallback={<PageFallback />}><ContestSummaryPage /></Suspense>} />
                 <Route path="/problemset" element={<Suspense fallback={<PageFallback />}><ProblemsetPage /></Suspense>} />
               </Route>
             </Route>

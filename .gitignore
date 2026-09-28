@@ -26,6 +26,7 @@ test-results/
 playwright-report/
 blob-report/
 .playwright-report/
+.playwright-cli/
 
 # Logs
 logs/

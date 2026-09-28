@@ -52,13 +52,15 @@ export async function backendAvailable(timeoutMs = 2000) {
 export const api = {
   login: (username, password) => req('/api/v1/auth/login', { method: 'POST', body: { username, password } }),
   getContests: () => req('/api/v1/contests'),
+  getUserProfile: (username) => req(`/api/v1/users/${encodeURIComponent(username)}/profile`, { auth: true }),
+  // Task 108: so sánh 2 thí sinh (public, không cần auth)
+  compareUsers: (a, b) => req(`/api/v1/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`),
   getContest: (slug) => req(`/api/v1/contests/${encodeURIComponent(slug)}`),
   register: (slug) => req(`/api/v1/contests/${encodeURIComponent(slug)}/register`, { method: 'POST', body: {}, auth: true }),
   getStandings: (slug, opts = {}) => {
     const q = new URLSearchParams({ page: 1, limit: 50, ...opts }).toString();
     return req(`/api/v1/contests/${encodeURIComponent(slug)}/standings?${q}`);
   },
-  getRoom: (slug, roomId) => req(`/api/v1/contests/${encodeURIComponent(slug)}/rooms/${encodeURIComponent(roomId)}`, { auth: true }),
   getProblems: (filters = {}) => {
     const q = new URLSearchParams(filters).toString();
     return req(`/api/v1/problems${q ? `?${q}` : ''}`);
@@ -67,7 +69,9 @@ export const api = {
   createUser: (payload) => req('/api/v1/admin/users', { method: 'POST', body: payload, auth: true }),
   resetPassword: (id, password) => req(`/api/v1/admin/users/${encodeURIComponent(id)}/password`, { method: 'POST', body: { password }, auth: true }),
   createSubmission: (payload) => req('/api/v1/submissions', { method: 'POST', body: payload, auth: true }),
-  executeHack: (payload) => req('/api/v1/hacks/execute', { method: 'POST', body: payload, auth: true }),
+  getSubmission: (id) => req(`/api/v1/submissions/${encodeURIComponent(id)}`, { auth: true }),
+  // Task 105: stats per problem của tôi (solved/attempts từ bài nộp thật)
+  getPracticeStats: () => req('/api/v1/practice/stats', { auth: true }),
   createVirtual: (slug, duration_minutes) => req(`/api/v1/contests/${encodeURIComponent(slug)}/virtual`, { method: 'POST', body: { duration_minutes }, auth: true }),
   getVirtual: (slug, session_id) => req(`/api/v1/contests/${encodeURIComponent(slug)}/virtual?session_id=${encodeURIComponent(session_id)}`, { auth: true }),
   setPhase: (contest_id, phase) => req('/api/v1/admin/phase', { method: 'POST', body: { contest_id, phase }, auth: true }),
@@ -93,7 +97,7 @@ export const api = {
   streamContest(contestId, onEvent) {
     const t = getToken();
     const es = new EventSource(`${BASE}/api/v1/stream/contests/${encodeURIComponent(contestId)}?token=${encodeURIComponent(t || '')}`);
-    for (const ev of ['EVENT_STANDINGS_UPDATE', 'EVENT_HACK_BROADCAST', 'EVENT_PHASE_CHANGED', 'CONNECTED']) {
+    for (const ev of ['EVENT_STANDINGS_UPDATE', 'EVENT_PHASE_CHANGED', 'CONNECTED']) {
       es.addEventListener(ev, (e) => { try { onEvent?.(ev, JSON.parse(e.data)); } catch {} });
     }
     return es;

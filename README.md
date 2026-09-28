@@ -15,7 +15,7 @@
 [![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8.2-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4.3-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Tests](https://img.shields.io/badge/Tests-157%2F157%20Passed%20(100%25)-success?logo=checkmarx&logoColor=white)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-152%2F152%20Passed%20(100%25)-success?logo=checkmarx&logoColor=white)](tests/)
 [![Website](https://img.shields.io/badge/Website-fudever.com-FF6600?logo=google-chrome&logoColor=white)](https://fu-dever-landingpage-v2.vercel.app/)
 [![GitHub Org](https://img.shields.io/badge/GitHub-fudever--club-181717?logo=github&logoColor=white)](https://github.com/fudever-club)
 
@@ -31,9 +31,9 @@
 **DEVER Arena** (mật danh: *DEVER-Forces*) là nền tảng thi đấu thuật toán và luyện tập Competitive Programming chuyên sâu được nghiên cứu và phát triển bởi **CLB Lập trình FU-DEVER (Trường Đại học FPT Đà Nẵng)**.
 
 Hệ thống được thiết kế nhằm mục đích:
-1. **Vòng đời thi đấu theo thể thức Codeforces**: phân phòng 25 người, chấm pretest, phase bẻ khóa bài đối thủ (hack +100/−50) và chấm lại toàn bộ (system test) trước khi chốt Elo.
+1. **Vòng đời thi đấu chuẩn quốc tế (ADR-005)**: 3 phase `REGISTRATION → CODING → FINISHED`, bài nộp chấm trên toàn bộ test ngay khi nộp (verdict cuối cùng), bảng điểm ICPC (solved + penalty 20′) là thể thức mặc định, freeze 30 phút cuối giờ.
 2. **Liêm chính học thuật**: quét tương đồng mã nguồn AST sau contest, cấm AI sinh code trong các round tính điểm (ADR-003).
-3. **Học qua phản biện**: đọc code bạn cùng phòng, tìm ca biên, tràn số và lỗi độ phức tạp trong Hack Phase.
+3. **Học qua upsolving**: sau khi kết thúc, mở editorial + toàn bộ mã nguồn để thí sinh học hỏi từ đối thủ.
 4. **Tổ chức linh hoạt**: tài khoản cá nhân hoặc đội thi do admin cấp trước giờ contest, không đăng ký công khai.
 
 ---
@@ -41,13 +41,13 @@ Hệ thống được thiết kế nhằm mục đích:
 <a id="tinh-nang-noi-bat"></a>
 ## ⚡ Tính Năng Nổi Bật
 
-### 1. 🎯 Chế Độ Thi Đấu Chuẩn Codeforces & ICPC
-* **Dynamic Time-Decay Scoring**: Điểm bài nộp giảm dần theo thời gian làm bài theo công thức chính thống Codeforces:
+### 1. 🎯 Chế Độ Thi Đấu Chuẩn Quốc Tế (ICPC + Codeforces)
+* **Dynamic Time-Decay Scoring** (thể thức Codeforces, tùy chọn):
   $$\text{Score} = \max\left(0.3 \cdot P_{\max},\; P_{\max} - \frac{P_{\max} \cdot t}{250} - 50 \cdot W\right)$$
   *(với $P_{\max}$ là điểm tối đa, $t$ là số phút thi trôi qua, $W$ là số lần nộp Wrong Answer).*
-* **Phòng Thách Đấu (Hack Room 25 Thí Sinh)**: Xem mã nguồn đối thủ trong cùng phòng thi, nộp test phản biện (Generator/Custom Test). Thách đấu thành công nhận **+100 điểm**, thách đấu sai bị phạt **-50 điểm**.
-* **System Testing Tự Động**: Chạy toàn bộ 45+ bộ test ngầm bí mật để xác định kết quả chung cuộc, lật ngược tình thế trước khi cập nhật điểm xếp hạng Elo.
-* **ICPC Scoreboard Freeze & Dramatic Reveal**: Đóng băng bảng điểm ở 60 phút cuối trận và công cụ mô phỏng giải băng kịch tính từng bài thi.
+* **ICPC Scoring** (mặc định): xếp theo số bài giải được, penalty = phút AC + 20×số lần nộp sai trước đó.
+* **Chấm Full-Suite Ngay**: toàn bộ testcase chấm ngay khi nộp, verdict trả về là kết quả cuối cùng — không pretest, không system test, không bằng chứng tạm thời.
+* **ICPC Scoreboard Freeze & Dramatic Reveal**: Đóng băng bảng điểm ở 30 phút cuối trận và công cụ mô phỏng giải băng kịch tính từng bài thi.
 
 ### 2. 🛡️ AST Winnowing Anti-Cheat Sentinel (ADR-004)
 * **AST Tokenizer**: Phân tích cú pháp trừu tượng, loại bỏ bình luận, khoảng trắng, chuẩn hóa tên biến/hàm về token định danh đồng nhất `ID`.
@@ -94,36 +94,30 @@ DEVER Arena (React 19 + Vite)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Registration: Đăng ký & Phân phòng
+    [*] --> Registration: Đăng ký (tài khoản admin cấp)
     Registration --> CodingPhase: Bắt đầu Contest (120 phút)
     
     state CodingPhase {
         [*] --> SubmitCode: Nộp bài
-        SubmitCode --> Pretests: Chấm Pretests
-        Pretests --> PassedPretests: Chấp nhận tạm thời
-        Pretests --> Rejected: Wrong Answer / TLE / MLE
+        SubmitCode --> Judged: Chấm full-suite
+        Judged --> Accepted: Verdict cuối (AC)
+        Judged --> Rejected: WA / TLE / MLE / RE / CE
+        CodingPhase --> Frozen: 30 phút cuối đóng băng bảng điểm
     }
     
-    CodingPhase --> HackPhase: Hết giờ Code (15 phút Hack)
+    CodingPhase --> RatingUpdate: Hết giờ — chốt bảng xếp hạng
     
-    state HackPhase {
-        [*] --> ReadOpponentCode: Soi code phòng 25 người
-        ReadOpponentCode --> LaunchHack: Nộp Test phản biện
-        LaunchHack --> SuccessHack: Hack Đúng (+100 điểm)
-        LaunchHack --> FailedHack: Hack Sai (-50 điểm)
+    state RatingUpdate {
+        [*] --> FinalStandings: Bảng điểm chung cuộc
+        FinalStandings --> EloRecalc: Tính lại Elo (kỳ Rated)
+        EloRecalc --> Upsolving: Mở editorial + mã nguồn
     }
     
-    HackPhase --> SystemTesting: Chấm toàn bộ bài nộp (45 Tests)
-    
-    state SystemTesting {
-        [*] --> RunHiddenTests: Kiểm thử ngầm
-        RunHiddenTests --> Accepted: Trọn vẹn điểm
-        RunHiddenTests --> FailedSystemTest: Mất điểm hoàn toàn
-    }
-    
-    SystemTesting --> RatingUpdate: Tính toán lại Elo & Rank Badge
     RatingUpdate --> [*]: Hoàn tất Contest
 ```
+
+### Vòng đời cũ (Hack Phase / System Testing) đã gỡ
+Xem [ADR-005](docs/decisions/ADR-005-international-contest-lifecycle.md) — Hack Room, Pretest/System Testing và phân phòng 25 người đã được loại bỏ toàn stack để bám chuẩn thi đấu quốc tế.
 
 ---
 
@@ -195,7 +189,7 @@ Bản build tối ưu hóa sẽ được tạo tại thư mục `dist/`.
 Dự án áp dụng quy chuẩn kiểm thử nghiêm ngặt với bộ Test Runner tích hợp sẵn trong Node.js (Zero external test runner bloatware):
 
 ```bash
-# Chạy toàn bộ Test Suites (157 tests / 25 suites)
+# Chạy toàn bộ Test Suites (184 tests / 30 suites)
 npm run test
 
 # Chạy chế độ theo dõi (Watch mode)
@@ -208,11 +202,11 @@ npm run lint
 ### Kết quả kiểm thử tự động mẫu:
 ```
 ✔ DEVER-Forces Rating Engine Tests
-✔ DEVER Server API Lifecycle Tests (judge thật, hack oracle, Elo, SSE)
+✔ DEVER Server API Lifecycle Tests (judge thật, Elo, ICPC, SSE)
 ...
-ℹ tests 157
-ℹ suites 21
-ℹ pass 157
+ℹ tests 152
+ℹ suites 24
+ℹ pass 152
 ℹ fail 0
 ```
 
@@ -239,18 +233,17 @@ dever-arena/
 │   └── schema.sql              # Cấu trúc bảng SQL chuẩn cho production
 ├── src/                        # Mã nguồn chính của ứng dụng (React 19 + Tailwind v4)
 │   ├── components/layout/      # GuestLayout, UserLayout, AdminLayout (+StressPanel), Navbar
-│   ├── components/common/      # MathRenderer (KaTeX, escape XSS)
+│   ├── components/common/      # MathRenderer (KaTeX, escape XSS), AnnouncementBanner
 │   ├── context/                # AuthContext, ContestContext (BroadcastChannel sync)
-│   ├── core/                   # Scoring, rating, contest state machine, freeze, contestResults, virtualContest
+│   ├── core/                   # Scoring, rating, contest state machine (3 phase), freeze, contestResults, virtualContest
 │   ├── engine/                 # AST diff, runner, workerQueue, isolateRunner, testlibValidator, testGenerator
 │   ├── lib/                    # apiClient (fetch + JWT + SSE)
-│   ├── pages/                  # LandingPage, LoginPage, ContestHub (+TestingQueue), ProblemWorkspace, StandingsPage, HackRoomPage
+│   ├── pages/                  # LandingPage, LoginPage, ContestHub (+TestingQueue), ProblemWorkspace, StandingsPage, ProfilePage, ProblemsetPage
 │   └── index.css               # Tailwind v4 + Luxury-Minimal tokens (canvas #010102, accent #ff6600)
 ├── server/                     # Backend API thật (REST + SSE + judge JS/Python/Java/C++)
-│   ├── index.js                # Router, phase machine, system test, Elo, rate-limit
+│   ├── index.js                # Router, phase machine 3 phase, full-suite judging, Elo, rate-limit
 │   ├── queue.js + judgeWorker.js # Fork pool chấm riêng (FIFO, timeout 60s + respawn)
 │   ├── judge.js                # Thực thi code thật (tự phát hiện toolchain)
-│   ├── oracles.js              # Lời giải chuẩn chấm hack
 │   ├── auth.js                 # SHA-256 + JWT HS256
 │   ├── pg.js                   # Adapter Postgres (KV + meta)
 │   └── db.js                   # JSON store (server/data, tự seed)
@@ -262,7 +255,7 @@ dever-arena/
 ├── docker-compose.yml          # Production: web + api + db (Postgres)
 ├── .env.example                # Mẫu biến môi trường production
 ├── DESIGN.md                   # Design library (Linear consensus)
-├── tests/                      # Bộ test suites kiểm thử tự động (157 tests / 25 suites)
+├── tests/                      # Bộ test suites kiểm thử tự động (184 tests / 30 suites)
 ├── app.html                    # Giao diện ứng dụng SPA (duy nhất)
 ├── detect.mjs                  # Bộ kiểm tra ràng buộc kiến trúc bất biến
 ├── package.json

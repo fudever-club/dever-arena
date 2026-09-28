@@ -392,6 +392,73 @@
 - **QA bắt lỗi thật:** docs agent ghi sai số liệu (150/21) → đếm lại: **153 tests / 25 suites**; design reviewer quét còn 1 sót `app.html` → đã fix; grep neon/gradient/glow/shadow màu toàn repo = 0 hit.
 - **Verify cuối:** `npm run test` **153 pass / 0 fail**, `node detect.mjs` 0, `npm run lint:js` 0 errors, `npm run build` sạch, `test:load` 20/20 PASS, audit 0 high/critical.
 
+## Vòng 29: Hồ sơ merge team + Chốt định hướng sản phẩm
+
+- **Hồ sơ merge team (chưa ghi ở Vòng 27–28):** ProfilePage `/profile`, ProblemsetPage `/problemset`, announcement banner + SSE, standings2 (friends star + CSV export + first-blood), hackroom2 (validator bounds + preset payload), landing2 (FAQ + luật chơi 4 bước), load-sre scale test → **157/157 tests / 25 suites** tại thời điểm merge.
+- **Chốt định hướng với chủ dự án:** platform nội bộ CLB theo chuẩn thi đấu quốc tế (ICPC/AtCoder/CSES), KHÔNG theo cơ chế riêng Codeforces quy mô lớn: gỡ Hack Phase, bỏ pretest/system-test, ICPC làm thể thức mặc định, đào sâu scheduler + kho bài luyện tập + judge sâu. Ghi vào `tasks/plan.md` Task 95–106.
+
+## Vòng 30: Đơn giản hóa vòng đời thi đấu chuẩn quốc tế (ADR-005)
+
+- **State machine 5 → 3 phase:** `src/core/contestStateMachine.js` giờ chỉ còn `REGISTRATION → CODING → FINISHED`; xóa `startHackPhase`, `startSystemTesting`, `distributeRooms`, `canPerformHack`; freeze là cửa sổ cuối của CODING (`contestResults.js`), không phải phase.
+- **Chấm full-suite:** `POST /api/v1/submissions` chấm toàn bộ test ngay (`judgeSuiteOf` thay `pretestsOf`), trả `verdict` cuối cùng (bỏ `pretests_passed` + FST); rejudge dùng đúng một code path; bỏ nhánh SYSTEM_TESTING trong `POST /admin/phase`.
+- **Gỡ Hack toàn stack:** xóa `server/oracles.js`, route `/api/v1/hacks/execute`, `hacks`/`hack_events` khỏi store (JSON + PG + IndexedDB v5 auto-delete store cũ), `HackRoomPage.jsx` + route `/hack-room` + tab Navbar + `api.executeHack`/`getRoom` + `calculateHackScore` + SSE event `EVENT_HACK_BROADCAST` + panel Rooms admin.
+- **ICPC mặc định:** seed + `POST /api/v1/admin/contests` mặc định `contest_format: 'ICPC'`; standings mặc định trả solved/penalty; bảng CF decay giữ làm lựa chọn (`?format=CODEFORCES`), freeze chỉ áp cho bảng CF.
+- **UI thí sinh:** Workspace hiện "Accepted"/verdict cuối (hết "Qua pretest"), ContestHub/GuestLayout/Landing viết lại theo vòng đời Đăng ký → Coding → Freeze → Chốt+Elo; FAQ thay mục Hack bằng Hỏi đáp jury ICPC; Admin phase control còn 3 nút (Registration/Coding/Finished).
+- **Verify:** `npm run test` **152 pass / 0 fail** (24 suites), `node detect.mjs` 0 error, `npm run lint:js` 0 errors, `npm run build` sạch (~306ms), `test:load` 20/20 AC.
+
+## Vòng 31: Profile thí sinh analytics (backend aggregate + chart SVG zero-dep)
+
+- **Endpoint aggregate mới:** `GET /api/v1/users/:username/profile` trả `{ user, stats, rating_history, heatmap[182 ngày], verdicts, tags, languages, per_contest, recent_submissions }` — mọi số liệu tính từ DB thật trên server (solved DISTINCT per tag, rank lấy từ standings thật, heatmap từ `submitted_at`), **không bao giờ trả `source_code`**. Bài nộp luyện tập (`contest_id = null`) được tính vào solved/heatmap.
+- **Seed demo deterministic:** `rating_history` (dãy Elo kết thúc đúng rating hiện tại) + 81 bài nộp luyện tập LCG-seeded cho 6 thí sinh — không random mỗi lần seed.
+- **Frontend profile mới:** `src/components/profile/charts.jsx` — RatingChart (đường Elo + vạch tier), Heatmap 26 tuần (cường độ nộp bài), VerdictBars, LanguageBars, TagStrength; toàn bộ SVG thuần JSX, **không thêm dependency nào**. `ProfilePage` viết lại: header rank màu 7 bậc, 4 stat cards, 7 section, filter verdict (ALL/AC/WA/TLE/RE/CE); route `/profile/:username` xem profile người khác; link từ Navbar avatar + username trong Standings.
+- **Fast-switch đăng nhập backend thật:** nút dever_hero/dever_admin ở LoginPage giờ gọi `api.login` thật (có JWT → các API auth như profile hoạt động), chỉ fallback demo local khi backend offline.
+- **Skills library:** cài 5 agent skills vào `.agents/skills/` — `web-design-guidelines` + `react-best-practices` (Vercel), `playwright-cli` (Microsoft), `design-taste-frontend` (taste-skill), `awesome-design` (Linear.app DESIGN.md reference — xác nhận hệ token DEVER đúng chuẩn Linear gốc). Áp audit Web Interface Guidelines: `…` thay `...`, `focus-visible:ring` cho filter/links, `tabular-nums` cho cột số liệu.
+- **Verify:** `npm run test` **154 pass / 0 fail** (24 suites, +2 test profile), `node detect.mjs` 0 error, `npm run lint:js` 0 errors, `npm run build` sạch (~233ms).
+
+## Vòng 31.5: Scheduler tự động + Judge sâu + Kho bài luyện tập (Phase 31 hoàn tất — Task 103/104/105)
+
+- **Task 103 — Auto-phase scheduler:** `server/scheduler.js` mới (thuần Node, zero dependency): tick 30s tự chuyển `REGISTRATION→CODING` (theo `start_time`) và `CODING→FINISHED` (theo `start_time + duration_minutes`), broadcast SSE `EVENT_PHASE_CHANGED` kèm `by=scheduler`. Tách hàm `finishContest()` dùng chung admin phase + scheduler (một code path cộng Elo rated). Admin override tôn trọng (idempotent theo status, không downgrade); `SCHEDULER_DISABLED=1` cho test; inject `now()` → test giả lập thời gian không sleep thật (+6 tests).
+- **Task 104 — Judge sâu:** stderr compile mở cap 500→4000 ký tự; thêm verdict **MLE** (phân loại theo message heap/MemoryError/bad_alloc/OutOfMemoryError; JS chạy `--max-old-space-size` theo `memoryLimit` của đề); `judgeTests` nhận `memoryLimit`. Lưu `per_test` (verdict + time_ms, **không kèm input/expected** — chống lộ test) cho mỗi bài nộp; `GET /submissions/:id` chỉ mở per_test khi contest FINISHED/upsolve/practice — khi CODING trả `per_test_hidden: true` + `failed_index`. Workspace hiện dải chip T1✓/T2✗ per test sau FINISHED (+5 tests).
+- **Task 105 — Kho bài luyện tập:** endpoint `GET /api/v1/practice/stats` tổng hợp `{solved, attempts, ac_attempt, last_verdict, solved_at, is_upsolve}` per problem từ bài nộp thật (gồm practice `contest_id=null`). ProblemsetPage thêm cột trạng thái (✓ Solved / ⟳ N lần) + filter "Đã solved / Đang thử / Chưa làm". **Upsolving:** nộp bài sau FINISHED được (`is_upsolve: true`, 0 điểm, không broadcast standings, `computeStandings` loại bỏ dòng upsolve); badge UPSOLVE trên Workspace history + ProfilePage; editorial auto-open khi contest FINISHED (đã có, giữ nguyên gate server).
+- **Verify:** `npm test` **168 pass / 0 fail** (26 suites, +14 tests), `node detect.mjs` 0 error, `lint:js` 0 errors (68 warnings), `build` sạch (~352ms).
+
+## Vòng 32: So sánh 2 thí sinh + Profile public (Task 108)
+
+- **`GET /api/v1/compare?a=&b=`:** trả `{ a, b, head_to_head }` — mỗi bên gồm user + stats + rating_history + verdicts + tags (tái dùng `profileAggregate`, một code path với profile). Head-to-head tính theo **rank thật** từ standings các kỳ thi cả hai cùng có (rank thấp hơn thắng, hòa không tính). Lỗi hợp lệ: 404 USER_NOT_FOUND, 422 SAME_USER.
+- **Profile public:** route `GET /users/:username/profile` gỡ yêu cầu token — share URL `#/profile/:username` cho khách; aggregate **không bao giờ** chứa `source_code` (skill dever-profile-analytics).
+- **Frontend:** `ComparePage.jsx` (`#/compare?a=&b=`) — form A/B, **Elo chart overlay** (`RatingChartOverlay` mới trong charts.jsx: nhiều series, legend màu, vạch tier), bảng stats diff tô xanh bên tốt hơn, bảng đối đầu, sức mạnh theo tag union (cam/blue). Nút "Chia sẻ" (copy URL) + "So sánh" trên ProfilePage.
+- **Verify:** +4 tests compare (tổng **172 pass**), lint 0 errors, build sạch.
+
+## Vòng 33: Notification center + OpenAPI + Thi ảo UI + Trang tổng kết (Task 109–112)
+
+- **Task 109 — Notification center:** `src/hooks/useNotifications.js` + `src/components/common/NotificationCenter.jsx` (zero-dep, SVG bell inline thay lucide). Nguồn: SSE mọi contest LIVE (`EVENT_PHASE_CHANGED`, `EVENT_ANNOUNCEMENT`) + poll `GET /submissions` 30s → verdict mới sau chấm (bỏ qua khi tab ẩn). Badge unread trên Navbar (chỉ khi đăng nhập), dropdown, lưu localStorage `dever.notifs` (tối đa 50).
+- **Task 110 — OpenAPI machine-readable:** `scripts/gen_openapi.mjs` (`npm run gen:openapi`) parse bảng `route()` của `server/index.js` → sinh `docs/openapi.json` (OpenAPI **3.1**, 42 operations / 36 paths, bearerAuth map đúng theo opts, path params từ regex groups). Server phục vụ spec tại `GET /api/v1/openapi.json`. +3 tests đối chiếu từng route với spec.
+- **Task 111 — Thi ảo cho member:** trang `VirtualContestPage` (`#/virtual/:slug`) — HUD đồng hồ ảo tick từng giây + progress bar, ghost standings poll 5s với chip per-problem màu; nút "Thi ảo" trên card contest FINISHED (ContestHub) điều hướng thay vì tạo phiên inline (bỏ state virtual rác).
+- **Task 112 — Trang tổng kết:** `ContestSummaryPage` (`#/contest/:slug/summary`) — podium top 3 (link profile), 3 stat cards, bảng ICPC cuối chip per-problem; **in PDF = Ctrl+P** qua `@media print` (`.no-print`, nền trắng) — zero dependency. Nút "Tổng kết" trên card contest FINISHED.
+- **Verify:** `npm test` **181 pass / 0 fail** (29 suites, +13 tests), `node detect.mjs` 0 error, `lint:js` 0 errors (73 warnings), `build` sạch (~245ms).
+
+## Vòng 34: A11y audit toàn app với axe-core trong E2E (Task 113 — Phase 34)
+
+- **Audit engine:** `tests/a11y_axe.test.js` — dựng server + Vite thật (y hệt spa_e2e), chạy **axe-core 4.13.0** trong Chromium trên **10 trang** (landing/login guest + 8 trang thí sinh: arena, standings, problemset, workspace, profile, compare, summary, virtual), gate **serious/critical = 0**; moderate/minor ghi nhận log không chặn CI. Thêm test focus-visible: Tab đầu tiên phải thấy outline/ring. Script hỗ trợ `scripts/a11y_scan.mjs` dump chi tiết node + contrast ratio để fix chính xác.
+- **Kết quả lần quét đầu:** ~45 node contrast serious (toàn app) + 1 label critical (textarea sandbox) + 28 node ở riêng /arena.
+- **Fix contrast (root-cause, 1 chỗ/loại thay vì từng node):**
+  - `@theme` override Tailwind: `slate-500/600 → #9ba3ae`, `slate-400 → #a8b1bd` (mọi muted label đạt ≥4.5:1 trên canvas/surface); `!important` utilities theo opacity mờ (`orange-400/70`, `red-400/70`, `#62666d → #8a8f98`).
+  - **CTA nền cam #ff6600: chữ trắng → đen canvas `#010102`** (2.93:1 → **7.4:1**, bold 700) — áp toàn bộ nút/nhãn cam qua 1 rule CSS.
+  - Badge "Bạn" trên Standings: `#ff6600 → #ffb066` trên nền orange/20 (3.92 → ≥4.5).
+  - **Monaco comment token** `#608b4e` (4.2:1) → theme `dever-dark` với comment `#6fa856` (≥4.5:1).
+- **Fix aria:** `aria-label` cho 3 textarea (sandbox Landing, custom input/expected Workspace); login h4→p (heading-order); Workspace h2→h1 (page-has-heading-one).
+- **Kết quả cuối:** axe quét 10 trang = **0 serious/critical, 0 moderate** ({}). Nhận thêm bằng chứng scheduler (Vòng 31.5) hoạt động thật: Round #1 tự chuyển FINISHED trên server local không ai bấm tay.
+- **Verify:** `npm test` **184 pass / 0 fail** (30 suites, +3 tests a11y), `node detect.mjs` 0 error, `lint:js` 0 errors, `build` sạch (~248ms). axe-core thêm vào devDependencies.
+
+## Vòng 34.1: Polish UI 3 trang mới theo taste skill + Linear tokens (Task 113.1 — Phase 34)
+
+- **Phạm vi:** `ComparePage`, `VirtualContestPage`, `ContestSummaryPage` — rà soát viền/spacing/typography theo Linear tokens (headline 28px/-0.6px, card-title 22px/-0.4px, eyebrow 13px/500/+0.4px) và taste skill (zero em-dash hiển thị, zero emoji, shape lock, spacing lg 24px).
+- **Typography:** h1 cả 3 trang chuẩn 28px/600/-0.6px; eyebrow uppercase đồng nhất 13px/medium/+0.4px (kể cả **thead** các bảng — bỏ 11px tracking-wider); card-title VS 22px/-0.4px; số liệu stats/timer mono 28px hoặc 40px/-1px.
+- **Spacing:** card head-to-head/tags ComparePage p-5→p-6; dòng bảng đối đầu py-2→py-3; error box cả 3 trang thống nhất p-4/text-sm; form/VS header/Elo/stats giữ p-6.
+- **Nội dung:** em-dash hiển thị "—" → "chưa có" (stats trống), "ẩn danh" + penalty `?? 0` (summary), giữ `—` trong JS comment (không render); bỏ emoji huy chương 🥇🥈🥉 → rank badge mono tròn (top 1 nền cam chữ đen), 🖨 → icon máy in SVG inline; subtitle Virtual bỏ em-dash → eyebrow "Ghost Replay" + mô tả.
+- **Layout:** podium `grid-cols-3` cứng → `grid-cols-1 sm:grid-cols-3`; progress bar ảo gộp vào HUD card (track nền #010102 + viền hairline, Linear: 1 panel 1 chủ thể).
+- **Verify:** computed-style qua preview khớp token (28px/-0.6px, 13px/0.4px, padding 24px, zero em-dash trong DOM); `npm test` **184/184**, `detect.mjs` 0, `lint:js` 0 errors (73 warnings), `build` 244ms.
+
 
 
 

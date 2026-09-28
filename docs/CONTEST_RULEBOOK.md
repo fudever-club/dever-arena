@@ -1,6 +1,7 @@
 # QUY CHẾ THI ĐẤU GIẢI THUẬT DEVER-FORCES
 > **Ban hành bởi Ban Chuyên Môn & Kỹ Thuật CLB Lập Trình FU-DEVER**  
 > **Áp dụng cho toàn bộ các kỳ thi xếp hạng (Rated Rounds) và tuyển quân nội bộ.**
+> **Phiên bản 2 (2026-09-27): Cập nhật theo ADR-005 — vòng đời thi đấu chuẩn quốc tế, gỡ Hack Phase & Pretest/System Testing.**
 
 ---
 
@@ -27,43 +28,50 @@ DEVER-Forces tổ chức các kỳ thi theo hệ thống phân cấp độ khó 
 
 ## ĐIỀU 2: THỜI GIAN & QUY TRÌNH DIỄN RA KỲ THI
 
-Một kỳ thi chuẩn kéo dài **2 giờ 15 phút**, gồm 3 giai đoạn liên hoàn:
+Một kỳ thi chuẩn kéo dài **2 giờ**, theo vòng đời 3 phase nghiêm ngặt `REGISTRATION → CODING → FINISHED` (ADR-005):
 
-### 2.1. Giai đoạn Làm bài (Coding Phase - 120 phút)
+### 2.1. Giai đoạn Đăng ký (REGISTRATION)
+* Tài khoản thi đấu do BTC cấp trước giờ thi; đăng ký qua nền tảng. Kiểm tra điều kiện phân hạng Div theo Elo.
+* Không chấp nhận đăng ký sau khi contest bắt đầu.
+
+### 2.2. Giai đoạn Làm bài (CODING - 120 phút)
 * Thí sinh làm việc độc lập. Các bài toán được mở đồng thời từ khi đồng hồ đếm ngược về $00:00:00$.
-* Khi nộp bài, hệ thống chấm code trên **Tập Pretests** (thường từ 5 đến 15 testcases cơ bản).
-* Nếu vượt qua toàn bộ Pretests: Thí sinh nhận verdict `Pretests Passed` và được tạm tính điểm theo công thức suy giảm.
+* **Chấm full-suite:** mỗi lần nộp bài được chấm trên **toàn bộ testcase** của đề; verdict trả về là **kết quả cuối cùng** (AC/WA/TLE/MLE/RE/CE) — không có pretest, không có System Testing, không có verdict tạm thời.
+* **Scoreboard Freeze (chuẩn ICPC):** trong 30 phút cuối, bảng điểm đóng băng — các bài nộp mới chỉ hiển thị dấu hỏi `?` kèm số lần nộp, giữ kịch tính đến khi chốt.
 * **Quyền riêng tư:** Trong suốt Coding Phase, thí sinh **tuyệt đối không được xem** mã nguồn của người khác.
 
-### 2.2. Giai đoạn Thách đấu & Bẻ khóa (Hack / Challenge Phase - 15 phút)
-* Bắt đầu ngay khi hết 120 phút làm bài. Thí sinh không thể nộp thêm lời giải mới.
-* Thí sinh được phân vào các **Room** (mỗi phòng 20–25 người).
-* Trong Room, thí sinh được phép mở xem mã nguồn của các thí sinh khác đối với những bài đã `Pretests Passed`.
-* Thí sinh có quyền nộp một bộ dữ liệu đầu vào (Input) hoặc file test để chứng minh code đối thủ bị sai (HACK):
-  * **Hack thành công (Successful Hack):** Code đối thủ bị TLE, MLE, WA hoặc RTE trên testcase của bạn. Bạn được **+100 điểm**, bài của đối thủ chuyển trạng thái `Hacked` (0 điểm).
-  * **Hack thất bại (Unsuccessful Hack):** Code đối thủ vẫn chạy đúng và ra kết quả chính xác. Bạn bị phạt **-50 điểm**.
-* *Lưu ý:* Input dùng để hack phải tuân thủ nghiêm ngặt giới hạn đề bài (được kiểm tra tự động qua Validator).
+### 2.3. Giai đoạn Chốt & Upsolving (FINISHED)
+* Hết giờ: chốt bảng xếp hạng chung cuộc; kỳ thi Rated tự cập nhật Elo.
+* Mở editorial và toàn bộ mã nguồn đã nộp để thí sinh học hỏi lẫn nhau (upsolving).
 
-### 2.3. Giai đoạn Kiểm tra Toàn diện (System Testing)
-* Sau khi kết thúc Hack Phase, toàn bộ các bài nộp còn sống (chưa bị hack) sẽ được chấm lại trên **Full Test Suite** (gồm tất cả các hidden tests và các testcase hack thành công trong contest).
-* Bài nộp không vượt qua sẽ nhận verdict `Failed on system test X` và mất toàn bộ điểm của bài đó.
+### 2.4. Hỏi đáp Jury (Clarifications — chuẩn ICPC)
+* Trong giờ thi, thí sinh gửi câu hỏi cho ban giám khảo ngay trong đấu trường.
+* Câu trả lời của jury được công bố công khai cho toàn bộ thí sinh; câu hỏi riêng tư chỉ người hỏi và jury thấy.
+
+> **Ghi chú phiên bản 2:** Hack Phase (+100/−50), Hack Room 25 người, Pretest và System Testing đã được loại bỏ toàn bộ khỏi quy chế, máy chủ và giao diện theo ADR-005.
 
 ---
 
 ## ĐIỀU 3: CƠ CHẾ TÍNH ĐIỂM & XẾP HẠNG
 
-### 3.1. Điểm số bài toán (Dynamic Score Decay)
+### 3.1. Thể thức mặc định: ICPC
+* Xếp hạng theo **số bài giải được (solved)**, secondary là **penalty**.
+* Penalty = $\sum (\text{Phút AC} + 20 \times W)$ — chỉ tính trên bài **đã AC**; bài không AC không bị cộng penalty.
+* Freeze 30 phút cuối như Điều 2.2.
+
+### 3.2. Thể thức tùy chọn: Codeforces (Dynamic Score Decay)
 Điểm của mỗi bài giảm dần theo từng phút trôi qua kể từ đầu contest:
 
 $$\text{Points} = \max\left( \lfloor 0.3 \times P_{\max} \rfloor, \; P_{\max} - \lfloor \frac{P_{\max} \times t}{250} \rfloor - 50 \times W \right)$$
 
 * $P_{\max}$: Điểm gốc của bài (500, 1000, 1500, 2000,...).
 * $t$: Phút nộp bài thành công (0 đến 120).
-* $W$: Số lần nộp sai trên Pretest trước khi Accepted.
+* $W$: Số lần nộp sai trước khi Accepted.
 * Sàn điểm: Thí sinh luôn nhận được tối thiểu $30\%$ điểm gốc nếu bài giải đúng.
+* Freeze chỉ áp dụng cho bảng hiển thị này khi bật `?frozen=1`.
 
-### 3.2. Tiêu chí Xếp hạng
-1. Tổng điểm cao hơn xếp trên (Tổng điểm = Điểm bài thi + Điểm Hack ròng).
+### 3.3. Tiêu chí Xếp hạng (thể thức Codeforces)
+1. Tổng điểm cao hơn xếp trên (Tổng điểm = tổng điểm các bài AC).
 2. Nếu bằng điểm: Thí sinh có thời điểm nộp bài cuối cùng sớm hơn sẽ xếp trên.
 
 ---
@@ -71,4 +79,4 @@ $$\text{Points} = \max\left( \lfloor 0.3 \times P_{\max} \rfloor, \; P_{\max} - 
 ## ĐIỀU 4: ĐIỀU KHOẢN THI HÀNH
 Mọi thí sinh đăng ký tham gia contest trên nền tảng DEVER-Forces mặc nhiên đồng ý tuân thủ toàn bộ quy định trong Quy chế này và [Chính Sách Chống Gian Lận (ANTI_CHEAT_POLICY.md)](./ANTI_CHEAT_POLICY.md).
 
-> Cập nhật: DB schema và API contract tại db/schema.sql và src/db/api.js (2026-09-07)
+> Cập nhật: DB schema và API contract tại db/schema.sql và src/db/api.js (2026-09-07). Vòng đời 3 phase + chấm full-suite theo ADR-005 (2026-09-27).

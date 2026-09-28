@@ -13,9 +13,9 @@ export const LoginPage = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleFastSwitch = (roleKey) => {
-    const loggedUser = loginWithPreset(roleKey);
-    if (loggedUser.role === 'ADMIN') {
+  const handleFastSwitch = async (roleKey) => {
+    const loggedUser = await loginWithPreset(roleKey);
+    if (loggedUser?.role === 'ADMIN') {
       navigate('/admin');
     } else {
       navigate(redirectUrl);
@@ -62,31 +62,31 @@ export const LoginPage = () => {
           </div>
 
           <h1 className="text-3xl lg:text-4xl font-semibold tracking-tight text-[#f7f8f8] mb-4 leading-tight">
-            Thi đấu theo thể thức <span className="text-[#ff6600]">Codeforces</span>
+            Thi đấu theo thể thức <span className="text-[#ff6600]">ICPC quốc tế</span>
           </h1>
 
           <p className="text-slate-400 text-sm leading-relaxed max-w-lg mb-8">
-            Nền tảng thi đấu của CLB FU-DEVER: làm bài 120 phút, bẻ khóa bài đối thủ cùng phòng, chấm lại toàn bộ rồi xếp hạng Elo.
+            Nền tảng thi đấu của CLB FU-DEVER: làm bài 120 phút độc lập, nộp bài chấm full-suite nhận verdict cuối cùng, freeze bảng điểm 30 phút cuối rồi chốt Elo.
           </p>
 
           <div className="space-y-3.5 max-w-md">
             <div className="p-3 rounded-lg bg-[#141516] border border-[#23252a]">
               <div>
-                <h4 className="text-xs font-bold text-slate-200">Không gian làm bài</h4>
+                <p className="text-xs font-bold text-slate-200">Không gian làm bài</p>
                 <p className="text-[11px] text-slate-400 mt-0.5">Soạn code, chạy thử testcase và nộp bài chấm điểm ngay trên trình duyệt.</p>
               </div>
             </div>
 
             <div className="p-3 rounded-lg bg-[#141516] border border-[#23252a]">
               <div>
-                <h4 className="text-xs font-bold text-slate-200">Phòng thách đấu</h4>
-                <p className="text-[11px] text-slate-400 mt-0.5">Đọc code đối thủ cùng phòng, tìm input làm code sai để được cộng điểm.</p>
+                <p className="text-xs font-bold text-slate-200">Verdict cuối cùng</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Bài nộp chấm trên toàn bộ test ngay khi gửi — không pretest, không chấm lại, kết quả chốt tức thì.</p>
               </div>
             </div>
 
             <div className="p-3 rounded-lg bg-[#141516] border border-[#23252a]">
               <div>
-                <h4 className="text-xs font-bold text-slate-200">Chống gian lận mã nguồn</h4>
+                <p className="text-xs font-bold text-slate-200">Chống gian lận mã nguồn</p>
                 <p className="text-[11px] text-slate-400 mt-0.5">So khớp cây cú pháp để phát hiện bài sao chép. Cấm dùng AI sinh code trong giờ thi tính điểm.</p>
               </div>
             </div>

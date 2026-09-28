@@ -1,8 +1,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateProblemScore, calculateHackScore, calculateTotalScore } from '../src/core/scoring.js';
+import { calculateProblemScore, calculateTotalScore } from '../src/core/scoring.js';
 
-describe('DEVER-Forces Scoring Engine Tests', () => {
+describe('DEVER Arena Scoring Engine Tests', () => {
   test('Nộp ngay phút 0 không sai lần nào phải nhận trọn vẹn điểm tối đa', () => {
     assert.equal(calculateProblemScore(500, 0, 0), 500);
     assert.equal(calculateProblemScore(1000, 0, 0), 1000);
@@ -27,21 +27,13 @@ describe('DEVER-Forces Scoring Engine Tests', () => {
     assert.equal(calculateProblemScore(500, 119, 10), 150);
   });
 
-  test('Điểm Hack được tính chính xác (+100 hack đúng, -50 hack sai)', () => {
-    assert.equal(calculateHackScore(0, 0), 0);
-    assert.equal(calculateHackScore(2, 0), 200);
-    assert.equal(calculateHackScore(1, 1), 50);
-    assert.equal(calculateHackScore(0, 2), -100); // Hack trượt 2 lần bị phạt âm 100đ
-  });
-
-  test('Tính tổng điểm toàn contest kết hợp bài nộp và điểm hack', () => {
+  test('Tính tổng điểm bài nộp toàn contest (không còn điểm hack)', () => {
     const submissions = [
       { maxPoints: 500, elapsedMinutes: 10, wrongAttempts: 0, solved: true },  // 500 - 20 = 480
       { maxPoints: 1000, elapsedMinutes: 45, wrongAttempts: 1, solved: true }, // 1000 - 180 - 50 = 770
       { maxPoints: 1500, elapsedMinutes: 90, wrongAttempts: 3, solved: false } // Chưa giải được => 0
     ];
-    // 480 + 770 = 1250 điểm bài. Hack: 1 trúng (+100), 1 trượt (-50) => +50 điểm.
-    // Tổng = 1300 điểm
-    assert.equal(calculateTotalScore(submissions, 1, 1), 1300);
+    // 480 + 770 = 1250 điểm
+    assert.equal(calculateTotalScore(submissions), 1250);
   });
 });

@@ -19,7 +19,7 @@ export function openDatabase(dbPath = join(ROOT, 'db.json')) {
   if (!data || typeof data !== 'object') {
     data = null;
   }
-  const DEFAULTS = { users: [], contests: [], problems: [], testcases: [], submissions: [], hacks: [], participants: [], virtual_sessions: [], clans: [], clarifications: [], announcements: [], seq: 1 };
+  const DEFAULTS = { users: [], contests: [], problems: [], testcases: [], submissions: [], participants: [], virtual_sessions: [], clans: [], clarifications: [], announcements: [], seq: 1 };
   data = { ...DEFAULTS, ...(data || {}) };
   for (const k of Object.keys(DEFAULTS)) {
     if (!Array.isArray(data[k]) && k !== 'seq') data[k] = [];

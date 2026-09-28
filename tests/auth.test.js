@@ -9,7 +9,6 @@ import {
   login,
   logout,
   canSubmit,
-  canHack,
   canAccessAdmin,
   canManageContest,
   canAuthorProblems,
@@ -55,7 +54,6 @@ describe('DEVER Arena RBAC & Authentication Module Tests', () => {
     assert.strictEqual(canViewProblem(guest), true, 'Khách phải đọc được đề bài');
     assert.strictEqual(canViewStandings(guest), true, 'Khách phải xem được bảng điểm công khai');
     assert.strictEqual(canSubmit(guest), false, 'Khách KHÔNG được nộp bài trực tiếp');
-    assert.strictEqual(canHack(guest), false, 'Khách KHÔNG được vào phòng Hack');
     assert.strictEqual(canAccessAdmin(guest), false, 'Khách KHÔNG được vào Admin Portal');
     assert.strictEqual(canManageContest(guest), false, 'Khách KHÔNG được điều khiển kỳ thi');
     assert.strictEqual(canAuthorProblems(guest), false, 'Khách KHÔNG được sửa đề Polygon');
@@ -69,7 +67,6 @@ describe('DEVER Arena RBAC & Authentication Module Tests', () => {
     assert.strictEqual(canViewProblem(participant), true);
     assert.strictEqual(canViewStandings(participant), true);
     assert.strictEqual(canSubmit(participant), true, 'Thí sinh được phép nộp bài');
-    assert.strictEqual(canHack(participant), true, 'Thí sinh được vào phòng Hack');
     assert.strictEqual(canAccessAdmin(participant), false, 'Thí sinh KHÔNG được vào Admin Portal');
     assert.strictEqual(canManageContest(participant), false, 'Thí sinh KHÔNG được điều khiển contest');
     assert.strictEqual(canAuthorProblems(participant), false, 'Thí sinh KHÔNG được duyệt đề');
@@ -83,7 +80,6 @@ describe('DEVER Arena RBAC & Authentication Module Tests', () => {
     assert.strictEqual(canViewProblem(admin), true);
     assert.strictEqual(canViewStandings(admin), true);
     assert.strictEqual(canSubmit(admin), true);
-    assert.strictEqual(canHack(admin), true);
     assert.strictEqual(canAccessAdmin(admin), true, 'Admin được vào Admin Portal');
     assert.strictEqual(canManageContest(admin), true, 'Admin được điều khiển Contest Phases');
     assert.strictEqual(canAuthorProblems(admin), true, 'Admin được tạo và duyệt đề Polygon');

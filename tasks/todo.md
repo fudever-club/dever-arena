@@ -177,3 +177,36 @@
 - [x] Task 93: Sweep design toàn repo: chỉ còn 1 sót `app.html` body bg → canvas `#010102`; grep neon/gradient/glow/shadow màu = 0 hit.
 - [x] Task 94: Full gate: 153/153 tests (25 suites), detect 0, lint:js 0 errors, build sạch, load 20/20 PASS, audit 0 high/critical.
 
+## Phase 29: Hồ sơ Vòng 29 + Chốt định hướng sản phẩm (Completed)
+- [x] Task 95: Ghi Vòng 29 vào `docs/CHANGELOG.md` (8 merge team: profile, problemset, banner, standings2, hackroom2, landing2, load-sre).
+- [x] Task 96: Chốt định hướng với chủ dự án: platform nội bộ theo chuẩn quốc tế (ICPC/AtCoder/CSES) — gỡ Hack Phase + pretest/system-test, ICPC mặc định, đào sâu scheduler + kho bài + judge sâu.
+
+## Phase 30: Đơn giản hóa vòng đời thi đấu chuẩn quốc tế (Completed — ADR-005)
+- [x] Task 98: State machine 5 → 3 phase (REGISTRATION→CODING→FINISHED, freeze là cửa sổ cuối CODING) + unit test mới.
+- [x] Task 99: Chấm full-suite trả verdict cuối ngay (bỏ pretests_passed/FST), rejudge một code path; server_api tests cập nhật (21/21).
+- [x] Task 100: Gỡ Hack toàn stack: route hacks/execute + oracles.js + HackRoomPage + route /hack-room + stores hack (IndexedDB v5 auto-delete) + calculateHackScore + RoomsPanel.
+- [x] Task 101: UI thí sinh bỏ nhắc hack/room/pretest; seed + tạo kỳ thi mặc định ICPC; Admin phase control 3 nút (Registration/Coding/Finished).
+- [x] Task 102: Full gate: **152/152 tests (24 suites)**, detect 0, lint 0 errors, build sạch (~306ms), load 20/20 AC; CHANGELOG Vòng 29–30.
+
+## Phase 31: Scheduler tự động + Judge sâu + Kho bài luyện tập (Completed)
+- [x] Task 103: Auto-phase scheduler `server/scheduler.js` (tick 30s, inject now(), finishContest dùng chung, admin override tôn trọng) + `tests/scheduler.test.js` (6 tests).
+- [x] Task 104: Judge sâu — stderr 4000 ký tự, verdict MLE + `--max-old-space-size` theo memoryLimit, `per_test` không kèm input/expected, mở sau FINISHED (`per_test_hidden`/`failed_index` khi CODING), chip per-test trên Workspace (+5 tests).
+- [x] Task 105: `GET /practice/stats`, filter trạng thái ProblemsetPage, upsolve sau FINISHED (0 điểm, không vào standings, badge UPSOLVE), editorial auto-open (+3 tests).
+- [x] Task 106: Gate Vòng 31+31.5: **168/168 tests (26 suites)**, detect 0, lint 0 errors, build ~352ms; CHANGELOG Vòng 31.5; README/SPEC 168 tests.
+
+## Phase 31b: Profile thí sinh analytics (Completed 28/9/2026)
+- [x] Task 107: `GET /users/:username/profile` aggregate (stats/heatmap/verdicts/tags/languages/per_contest, không lộ source_code) + seed rating_history + 81 practice submissions LCG; charts SVG zero-dep (RatingChart/Heatmap/VerdictBars/LanguageBars/TagStrength); ProfilePage mới + `/profile/:username` + link Navbar/Standings; fast-switch login backend thật; gate: **154/154 tests (24 suites)**, detect 0, lint 0 errors, build ~233ms.
+- [x] Task 108: `GET /compare?a=&b=` + `ComparePage` (Elo overlay `RatingChartOverlay`, stats diff, head-to-head rank thật, tags union); profile public không token; nút Chia sẻ/So sánh trên ProfilePage (+4 tests).
+
+## Phase 33: Nền tảng mở (Completed)
+- [x] Task 109: Notification center — `src/hooks/useNotifications.js` + `src/components/common/NotificationCenter.jsx` (SSE + poll verdict, badge Navbar, localStorage `dever.notifs`, zero-dep SVG bell).
+- [x] Task 110: OpenAPI 3.1 — `scripts/gen_openapi.mjs` + `npm run gen:openapi` → `docs/openapi.json` (42 ops/36 paths, bearerAuth map đúng) + route `GET /api/v1/openapi.json`; `tests/openapi.test.js` đối chiếu từng route (+3 tests).
+- [x] Task 111: Virtual Contest UI member — `src/pages/VirtualContestPage.jsx` (`/virtual/:slug`) HUD timer + ghost standings poll 5s; nút Thi ảo trên ContestHub card FINISHED.
+- [x] Task 112: Trang tổng kết — `src/pages/ContestSummaryPage.jsx` (`/contest/:slug/summary`) podium top 3 + bảng ICPC + `@media print` in PDF; `tests/phase33_ui.test.js` (+6 tests).
+- [x] Task 117: Gate Vòng 32+33: **181/181 tests (29 suites)**, detect 0, lint 0 errors (73 warnings), build ~245ms; CHANGELOG Vòng 32/33; README/SPEC 181 tests.
+
+## Phase 34: Backlog sau khi CLB dùng thật (Task 113 done; 114–115 planned)
+- [x] Task 113: A11y audit — `tests/a11y_axe.test.js` (axe-core 4.13 trong Chromium, quét 10 trang, gate serious/critical = 0 + test focus-visible) + `scripts/a11y_scan.mjs` dump node/contrast; fix: @theme override slate-400/500/600 ≥4.5:1, CTA nền cam chữ đen #010102 (2.93→7.4:1) + badge Standings #ffb066 + Monaco theme dever-dark comment #6fa856, aria-label 3 textarea, h4→p login, h2→h1 workspace; +3 tests → **184/184 (30 suites)**.- [x] Task 113.1: Polish 3 trang compare/virtual/summary theo taste skill + Linear tokens: typography (h1 28px/-0.6px, card-title 22px/-0.4px, eyebrow 13px/+0.4px uppercase, thead cùng style), spacing p-6/py-3 px-4, viền hairline #23252a + surface ladder, em-dash hiển thị → text thay thế, emoji → badge mono/SVG, podium responsive, error box p-4; verify computed-style qua preview + **184/184 tests**, detect 0, lint 0 errors, build 244ms.
+- [ ] Task 114: Postgres production thật (bỏ store JSON, migration script) + object storage cho source_code.
+- [ ] Task 115: Phân quyền multi-organizer (admin tạo admin, quản lý kỳ thi theo người phụ trách).
+

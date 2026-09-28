@@ -108,7 +108,7 @@ test('standings tải bảng thật từ API (có dever_hero)', async () => {
   await page.close();
 });
 
-test('workspace: nộp Python chấm thật, hiện điểm pretest', async () => {
+test('workspace: nộp Python chấm thật full-suite, hiện verdict cuối', async () => {
   const page = await browser.newPage();
   // Đăng nhập trước để có token
   await page.goto(`${WEB}login`, { waitUntil: 'networkidle' });
@@ -128,6 +128,6 @@ test('workspace: nộp Python chấm thật, hiện điểm pretest', async () =
   await page.goto(`${WEB}problem/p102`, { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: 'Python', exact: true }).click();
   await page.getByRole('button', { name: 'Nộp bài', exact: true }).click();
-  await page.waitForSelector('text=Qua pretest', { timeout: 30000 });
+  await page.waitForSelector('text=Accepted', { timeout: 30000 });
   await page.close();
 });

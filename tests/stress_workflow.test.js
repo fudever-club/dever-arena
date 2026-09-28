@@ -202,40 +202,13 @@ test('bounds: testcase vượt bounds 422, đúng bounds 201', async () => {
   assert.ok(over.data.message);
   // Giá trị vượt maxVal=50 (sau PUT merge) → 422
   const overVal = await call('/api/v1/admin/testcases', 'POST', {
-    problem_id: bdId, stdin: '2\n60 70\n', expected_stdout: '130\n', is_pretest: false,
+    problem_id: bdId, stdin: '2\n60 70\n', expected_stdout: '130\n',
   }, adminToken);
   assert.equal(overVal.status, 422);
   // Đúng bounds → 201
   const ok = await call('/api/v1/admin/testcases', 'POST', {
-    problem_id: bdId, stdin: '3\n1 2 3\n', expected_stdout: '6\n', is_pretest: true, strategy: 'manual',
+    problem_id: bdId, stdin: '3\n1 2 3\n', expected_stdout: '6\n', strategy: 'manual',
   }, adminToken);
   assert.equal(ok.status, 201);
   assert.equal(ok.data.testcase.problem_id, bdId);
-});
-
-test('bounds: hack payload sai format/bounds 422 (luật Polygon)', async () => {
-  const bdId = globalThis.__bdProblemId;
-  assert.ok(bdId);
-  // Nộp victim đúng để có target AC (vẫn CODING)
-  const victim = await call('/api/v1/submissions', 'POST', {
-    contest_id: 'contest_dever_round1', problem_id: bdId, language: 'python', source_code: MODEL,
-  }, heroToken);
-  assert.equal(victim.status, 201);
-  assert.equal(victim.data.submission.verdict, 'AC');
-  const targetId = victim.data.submission.id;
-  // Sang HACK_PHASE để được hack
-  const go = await call('/api/v1/admin/phase', 'POST', { contest_id: 'contest_dever_round1', phase: 'HACK_PHASE' }, adminToken);
-  assert.ok([200, 409].includes(go.status));
-  // Payload vượt bounds (N=15 > maxN=10) → 422
-  const hackOver = await call('/api/v1/hacks/execute', 'POST', {
-    contest_id: 'contest_dever_round1', target_submission_id: targetId,
-    test_payload: '15\n1 2 3 4 5 6 7 8 9 10 11 12 13 14 15\n',
-  }, hackerToken);
-  assert.equal(hackOver.status, 422);
-  assert.equal(hackOver.data.error, 'HACK_VALIDATOR_REJECT');
-  // Payload sai format (thiếu newline cuối) → 422
-  const hackBadFmt = await call('/api/v1/hacks/execute', 'POST', {
-    contest_id: 'contest_dever_round1', target_submission_id: targetId, test_payload: '3\n1 2 3',
-  }, hackerToken);
-  assert.equal(hackBadFmt.status, 422);
 });

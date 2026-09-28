@@ -423,7 +423,7 @@ export const ProblemWorkspace = () => {
     return () => { cancelled = true; };
   }, [currentProblem.id, contestId, submissionVerdict]);
 
-  // Submit Code: chấm thật trên máy chủ (pretest). Rớt mạng → báo rõ, không bịa điểm.
+  // Submit Code: chấm thật trên máy chủ (full-suite, verdict cuối). Rớt mạng → báo rõ, không bịa điểm.
   const handleSubmit = async () => {
     if (!isAuthenticated) {
       navigate('/login?redirect=' + encodeURIComponent(window.location.pathname));
@@ -441,12 +441,14 @@ export const ProblemWorkspace = () => {
         contest_id: contestId, problem_id: currentProblem.id, language, source_code: code,
       });
       const s = data.submission;
-      const passed = data.pretests_passed;
+      const passed = s.verdict === 'AC';
       setSubmissionVerdict({
         ok: passed,
-        verdict: passed ? `Qua pretest (+${s.points_awarded}đ)` : `Chưa qua: ${s.verdict}`,
+        verdict: passed ? (data.is_upsolve ? `Upsolve Accepted (+0đ)` : `Accepted (+${s.points_awarded}đ)`) : `${s.verdict}`,
         detail: passed ? `Thời gian ${s.time_ms ?? '—'}ms` : (s.detail || s.verdict),
         points: passed ? s.points_awarded : 0,
+        upsolve: Boolean(data.is_upsolve),
+        perTest: Array.isArray(data.per_test) ? data.per_test : null,
       });
       setActiveTab('submissions');
     } catch (err) {
@@ -738,9 +740,9 @@ export const ProblemWorkspace = () => {
               {activeTab === 'statement' && (
                 <>
                   <div>
-                    <h2 className="text-xl font-semibold text-white mb-2">
+                    <h1 className="text-xl font-semibold text-white mb-2">
                       {currentProblem.code}. {currentProblem.title}
-                    </h2>
+                    </h1>
                     {/* Limits kiểu Codeforces: box hairline, mono bold */}
                     <div className="inline-flex items-center gap-4 px-3 py-1.5 rounded-lg bg-[#0f1011] border border-[#23252a] text-xs font-mono">
                       <span className="text-slate-500">time limit <b className="text-slate-200">{currentProblem.timeLimit || '1.0s'}</b></span>
@@ -818,8 +820,29 @@ export const ProblemWorkspace = () => {
                         : 'bg-red-500/10 border-red-500/30'
                     }`}>
                       <div>
-                        <span className={`text-xs font-bold block ${submissionVerdict.ok ? 'text-emerald-300' : 'text-red-300'}`}>{submissionVerdict.verdict}</span>
+                        <span className={`text-xs font-bold block ${submissionVerdict.ok ? 'text-emerald-300' : 'text-red-300'}`}>
+                          {submissionVerdict.upsolve && <span className="mr-1.5 px-1.5 py-0.5 rounded bg-blue-500/20 border border-blue-500/30 text-blue-300 text-[10px] font-mono align-middle">UPSOLVE</span>}
+                          {submissionVerdict.verdict}
+                        </span>
                         <span className="text-[11px] opacity-80">{submissionVerdict.detail}</span>
+                        {/* Task 104: chi tiết per-test — chỉ hiển thị khi server trả per_test (contest FINISHED/upsolve/practice) */}
+                        {Array.isArray(submissionVerdict.perTest) && submissionVerdict.perTest.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {submissionVerdict.perTest.map((t, i) => (
+                              <span
+                                key={i}
+                                title={`Test ${i + 1}: ${t.verdict} • ${t.time_ms ?? 0}ms`}
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                                  t.verdict === 'AC'
+                                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                                    : 'bg-red-500/15 border-red-500/30 text-red-400'
+                                }`}
+                              >
+                                T{t.index + 1} {t.verdict === 'AC' ? '✓' : '✗'}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         {submissionVerdict.code === 'NO_TOKEN' && (
                           <button
                             type="button"
@@ -830,13 +853,13 @@ export const ProblemWorkspace = () => {
                           </button>
                         )}
                       </div>
-                      {submissionVerdict.ok && (
+                      {submissionVerdict.ok && !submissionVerdict.upsolve && (
                         <span className="text-sm font-extrabold text-emerald-400">+{submissionVerdict.points}đ</span>
                       )}
                     </div>
                   ) : (
                     <div className="p-6 rounded-lg bg-white/5 border border-white/5 text-center text-xs text-slate-500">
-                      Chưa có bài nộp nào. Nhấn Nộp bài để chấm pretest.
+                      Chưa có bài nộp nào. Nhấn Nộp bài để chấm trên toàn bộ test.
                     </div>
                   )}
                   {history && history.length > 0 && (
@@ -853,7 +876,10 @@ export const ProblemWorkspace = () => {
                         <tbody className="divide-y divide-[#23252a] font-mono">
                           {history.slice(0, 10).map((s) => (
                             <tr key={s.id}>
-                              <td className="py-2 px-3 text-slate-400">{new Date(s.submitted_at).toLocaleTimeString('vi-VN')}</td>
+                              <td className="py-2 px-3 text-slate-400">
+                                {new Date(s.submitted_at).toLocaleTimeString('vi-VN')}
+                                {s.is_upsolve && <span className="ml-1.5 px-1 py-0 rounded bg-blue-500/20 text-blue-300 text-[9px] font-bold" title="Nộp sau khi kết thúc — không tính điểm">UPSOLVE</span>}
+                              </td>
                               <td className="py-2 px-3 text-slate-300">{s.language}</td>
                               <td className={`py-2 px-3 font-bold ${s.verdict === 'AC' ? 'text-emerald-400' : 'text-red-400'}`}>{s.verdict}</td>
                               <td className="py-2 px-3 text-right text-slate-200">+{s.points_awarded || 0}đ</td>
@@ -977,6 +1003,16 @@ export const ProblemWorkspace = () => {
               height="100%"
               language={language === 'cpp' ? 'cpp' : language === 'python' ? 'python' : language === 'java' ? 'java' : 'javascript'}
               theme="vs-dark"
+              beforeMount={(monaco) => {
+                // Task 113 a11y: comment màu mặc định #608b4e chỉ đạt 4.2:1 → sáng hơn (≥4.5:1)
+                monaco.editor.defineTheme('dever-dark', {
+                  base: 'vs-dark',
+                  inherit: true,
+                  rules: [{ token: 'comment', foreground: '6fa856' }],
+                  colors: {},
+                });
+              }}
+              theme="dever-dark"
               value={code}
               onChange={handleCodeChange}
               options={{
@@ -1110,6 +1146,7 @@ export const ProblemWorkspace = () => {
                         updated[activeCaseIndex].input = e.target.value;
                         setTestCases(updated);
                       }}
+                      aria-label="Input tùy chỉnh cho chạy thử"
                       className="w-full flex-1 p-2 rounded-lg bg-[#010102] border border-[#23252a] text-slate-200 font-mono text-xs focus:border-[#ff6600] outline-none resize-none"
                       placeholder="Nhập testcase đầu vào..."
                     />
@@ -1124,6 +1161,7 @@ export const ProblemWorkspace = () => {
                         updated[activeCaseIndex].expected = e.target.value;
                         setTestCases(updated);
                       }}
+                      aria-label="Output mong đợi để đối soát"
                       className="w-full p-2 rounded-lg bg-[#010102] border border-[#23252a] text-slate-200 font-mono text-xs focus:border-[#ff6600] outline-none resize-none"
                       placeholder="Output đúng để đối soát..."
                     />
@@ -1179,7 +1217,7 @@ export const ProblemWorkspace = () => {
             <div className="h-11 bg-[#141516] border-t border-[#23252a] px-4 flex items-center justify-between shrink-0 select-none">
               <div className="flex items-center gap-2 text-xs text-slate-400">
                 <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                <span>Chế độ pretest: chấm trên bộ test mẫu</span>
+                <span>Chấm full-suite: verdict cuối cùng ngay khi nộp</span>
               </div>
 
               <div className="flex items-center gap-2">

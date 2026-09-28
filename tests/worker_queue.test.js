@@ -4,27 +4,27 @@ import { JudgeWorkerQueue, QUEUE_PRIORITIES } from '../src/engine/workerQueue.js
 import { executeTestcase, evaluateSubmission, VERDICTS, compareOutputs, normalizeOutput } from '../src/engine/isolateRunner.js';
 
 describe('DEVER Judge Worker Queue & Priority Engine Tests', () => {
-  it('Phải ưu tiên xử lý Instant Hack (P1) trước Pretest (P2) và System Test (P3)', () => {
+  it('Phải ưu tiên xử lý HIGH (P1) trước DEFAULT (P2) và BATCH (P3)', () => {
     const queue = new JudgeWorkerQueue();
 
-    // Enqueue ngược thứ tự ưu tiên: System Test -> Pretest -> Hack
-    queue.enqueue({ id: 'sys_job_1', priority: QUEUE_PRIORITIES.SYSTEM_TEST });
-    queue.enqueue({ id: 'pretest_job_1', priority: QUEUE_PRIORITIES.PRETEST });
-    queue.enqueue({ id: 'hack_job_1', priority: QUEUE_PRIORITIES.HACK });
-    queue.enqueue({ id: 'pretest_job_2', priority: QUEUE_PRIORITIES.PRETEST });
-    queue.enqueue({ id: 'hack_job_2', priority: QUEUE_PRIORITIES.HACK });
+    // Enqueue ngược thứ tự ưu tiên: BATCH -> DEFAULT -> HIGH
+    queue.enqueue({ id: 'batch_job_1', priority: QUEUE_PRIORITIES.BATCH });
+    queue.enqueue({ id: 'default_job_1', priority: QUEUE_PRIORITIES.DEFAULT });
+    queue.enqueue({ id: 'high_job_1', priority: QUEUE_PRIORITIES.HIGH });
+    queue.enqueue({ id: 'default_job_2', priority: QUEUE_PRIORITIES.DEFAULT });
+    queue.enqueue({ id: 'high_job_2', priority: QUEUE_PRIORITIES.HIGH });
 
     assert.equal(queue.getQueueStats().totalWaiting, 5);
-    assert.equal(queue.getQueueStats().byPriority.hack, 2);
-    assert.equal(queue.getQueueStats().byPriority.pretest, 2);
-    assert.equal(queue.getQueueStats().byPriority.systemTest, 1);
+    assert.equal(queue.getQueueStats().byPriority.high, 2);
+    assert.equal(queue.getQueueStats().byPriority.default, 2);
+    assert.equal(queue.getQueueStats().byPriority.batch, 1);
 
     // Dequeue lần lượt
-    assert.equal(queue.dequeue().id, 'hack_job_1');
-    assert.equal(queue.dequeue().id, 'hack_job_2');
-    assert.equal(queue.dequeue().id, 'pretest_job_1');
-    assert.equal(queue.dequeue().id, 'pretest_job_2');
-    assert.equal(queue.dequeue().id, 'sys_job_1');
+    assert.equal(queue.dequeue().id, 'high_job_1');
+    assert.equal(queue.dequeue().id, 'high_job_2');
+    assert.equal(queue.dequeue().id, 'default_job_1');
+    assert.equal(queue.dequeue().id, 'default_job_2');
+    assert.equal(queue.dequeue().id, 'batch_job_1');
     assert.equal(queue.dequeue(), null);
   });
 
@@ -33,7 +33,7 @@ describe('DEVER Judge Worker Queue & Priority Engine Tests', () => {
     assert.throws(() => queue.enqueue({}), /Invalid job/);
     assert.throws(() => queue.enqueue({ id: 'job_invalid', priority: 99 }), /Invalid priority level/);
 
-    queue.enqueue({ id: 'job_ok_1', priority: QUEUE_PRIORITIES.PRETEST });
+    queue.enqueue({ id: 'job_ok_1', priority: QUEUE_PRIORITIES.DEFAULT });
     assert.equal(queue.getQueueStats().totalWaiting, 1);
     queue.clear();
     assert.equal(queue.getQueueStats().totalWaiting, 0);
@@ -51,7 +51,7 @@ describe('DEVER Judge Worker Queue & Priority Engine Tests', () => {
 
     queue.enqueue({
       id: 'sub_test_1',
-      priority: QUEUE_PRIORITIES.PRETEST,
+      priority: QUEUE_PRIORITIES.DEFAULT,
       sourceCode: validCode,
       language: 'javascript',
       testcases: [
