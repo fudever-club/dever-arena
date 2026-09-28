@@ -16,6 +16,23 @@ docker compose up --build -d
 * Volume `dever-data` giữ `server/data/db.json` qua restart. Sao lưu file này là sao lưu toàn bộ dữ liệu giải (xem `docs/ops/BACKUP_RESTORE.md`; bản Postgres dùng volume `dever-pgdata`).
 * Judge hiện tại: **worker pool riêng** (`server/queue.js` + `server/judgeWorker.js` — fork pool FIFO, `DEVER_JUDGE_WORKERS` mặc định 2 / tối đa 4, timeout job 60s + respawn, `unref` + shutdown tường minh). API không chạy code thí sinh trên event-loop. Quy mô lab vài chục → trăm concurrent; muốn 500+ concurrent đa máy thì tách Redis Streams + judge cluster (mục 1–2 bên dưới là hướng mở rộng).
 
+## 0b. TRIỂN KHAI QUA SPECIFIC (IaC — đang chạy production)
+
+Kho có sẵn `specific.hcl` khai báo toàn bộ hạ tầng (api + web + postgres). Deploy một lệnh:
+
+```bash
+npm install -g @specific.dev/cli   # cài CLI (một lần)
+specific check                     # xác thực specific.hcl sau mỗi lần sửa
+specific deploy                    # build + đẩy lên Specific Cloud (free tier)
+```
+
+* Đang live: web `https://web-elegant-horse.spcf.app` • API `https://api-elegant-horse.spcf.app` — quản trị tại https://dashboard.specific.dev (logs, metrics, DB browser, secrets).
+* Postgres managed tự cấp qua `DEVER_DATABASE_URL`; `server/pg.js` tự tạo bảng (`dever_store`/`dever_meta`) lần đầu kết nối — không cần migration script cho KV store.
+* JWT secret: `secret "dever_jwt_secret" { generated = true }` — tự sinh, không cần .env.
+* CORS tự khóa theo domain web: `DEVER_CORS_ORIGIN = "https://${service.web.public_url}"` trong `specific.hcl` — tự theo domain khi deploy, không cần hardcode.
+* Object storage S3 (Task 114): khai báo block `storage "..." {}` trong `specific.hcl` khi cần — xem `specific docs storage`.
+* Lưu ý Windows: `specific dev` (môi trường dev cục bộ) cần macOS/Linux/WSL; còn `specific deploy`/`check` chạy từ Windows bình thường.
+
 ## 1. SƠ ĐỒ KIẾN TRÚC HẠ TẦNG MỤC TIÊU (MỞ RỘNG TƯƠNG LAI — ĐA MÁY)
 
 > **Lưu ý:** compose thật trong repo (`docker-compose.yml`) hiện chỉ gồm 3 service `web + api + db` (Postgres 16, không Redis). Sơ đồ + file mẫu dưới đây là **template mở rộng** (Redis Streams + judge cluster đa máy), chưa phải compose đang chạy.

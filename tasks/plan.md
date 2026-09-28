@@ -164,7 +164,7 @@ Xây dựng nền tảng thi đấu giải thuật nội bộ của CLB FU-DEVER
 
 ### Phase 34: Backlog sau khi CLB dùng thật (Task 113 done; 114–115 planned)
 - [x] Task 113: A11y audit toàn app — axe-core 4.13 trong E2E Chromium quét 10 trang, gate serious/critical=0: fix contrast root-cause (@theme override slate palette, CTA cam chữ đen 7.4:1, badge Standings #ffb066, Monaco comment theme dever-dark), aria-label 3 textarea, heading order login/workspace; `tests/a11y_axe.test.js` (+3 tests) + `scripts/a11y_scan.mjs`; **184/184 tests**.- [x] Task 113.1: Polish UI 3 trang mới (compare/virtual/summary) theo taste skill + Linear tokens — headline 28px/-0.6px, card-title 22px/-0.4px, eyebrow 13px/500/+0.4px uppercase thống nhất (kể cả thead), spacing card p-6/bảng py-3 px-4, zero em-dash hiển thị ("chưa có"/"ẩn danh"/"?? 0"), zero emoji (podium rank badge mono, icon in SVG), podium sm:grid-cols-3, progress bar gộp vào HUD card, error box thống nhất p-4.
-- [ ] Task 114: Postgres production thật (bỏ store JSON, migration script) + object storage cho source_code.
+- [ ] Task 114: Postgres production thật (bỏ store JSON, migration script) + object storage cho source_code. — **Nửa đầu ĐÃ XONG qua Specific (28/9/2026)**: `specific.hcl` postgres "main" + `DEVER_DATABASE_URL` (KV store tự migrate lần đầu kết nối, prod đang chạy — web/api live `*.spcf.app`, CORS khóa domain web, dashboard specific.dev). Còn lại: object storage S3 cho source_code (block `storage "..."` trong specific.hcl) + migration script nếu chuyển KV sang schema bảng thật.
 - [ ] Task 115: Phân quyền multi-organizer (admin tạo admin, quản lý kỳ thi theo người phụ trách).
 
 
