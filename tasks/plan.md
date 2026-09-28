@@ -162,10 +162,17 @@ Xây dựng nền tảng thi đấu giải thuật nội bộ của CLB FU-DEVER
 - [x] Task 112: Trang tổng kết — `ContestSummaryPage` (`/contest/:slug/summary`) podium + bảng ICPC + `@media print` in PDF zero-dep.
 - [x] Task 117: Gate Vòng 32+33: **181/181 tests (29 suites)**, detect 0, lint 0 errors, build ~245ms; CHANGELOG Vòng 32/33.
 
-### Phase 34: Backlog sau khi CLB dùng thật (Task 113 done; 114–115 planned)
+### Phase 34: Backlog sau khi CLB dùng thật (Task 113–113.1 done; 114 half-done qua Specific; 114–115 → Phase 35)
 - [x] Task 113: A11y audit toàn app — axe-core 4.13 trong E2E Chromium quét 10 trang, gate serious/critical=0: fix contrast root-cause (@theme override slate palette, CTA cam chữ đen 7.4:1, badge Standings #ffb066, Monaco comment theme dever-dark), aria-label 3 textarea, heading order login/workspace; `tests/a11y_axe.test.js` (+3 tests) + `scripts/a11y_scan.mjs`; **184/184 tests**.- [x] Task 113.1: Polish UI 3 trang mới (compare/virtual/summary) theo taste skill + Linear tokens — headline 28px/-0.6px, card-title 22px/-0.4px, eyebrow 13px/500/+0.4px uppercase thống nhất (kể cả thead), spacing card p-6/bảng py-3 px-4, zero em-dash hiển thị ("chưa có"/"ẩn danh"/"?? 0"), zero emoji (podium rank badge mono, icon in SVG), podium sm:grid-cols-3, progress bar gộp vào HUD card, error box thống nhất p-4.
 - [ ] Task 114: Postgres production thật (bỏ store JSON, migration script) + object storage cho source_code. — **Nửa đầu ĐÃ XONG qua Specific (28/9/2026)**: `specific.hcl` postgres "main" + `DEVER_DATABASE_URL` (KV store tự migrate lần đầu kết nối, prod đang chạy — web/api live `*.spcf.app`, CORS khóa domain web, dashboard specific.dev). Còn lại: object storage S3 cho source_code (block `storage "..."` trong specific.hcl) + migration script nếu chuyển KV sang schema bảng thật.
-- [ ] Task 115: Phân quyền multi-organizer (admin tạo admin, quản lý kỳ thi theo người phụ trách).
+- [ ] Task 115: Phân quyền multi-organizer (admin tạo admin, quản lý kỳ thi theo người phụ trách). — *(lên lịch thực hiện trong Phase 35, Task 119)*
+
+### Phase 35: Hoàn thiện hạ tầng Specific + phân quyền organizer (Planned)
+- [ ] Task 118: Object storage S3 cho source_code (hoàn tất Task 114) — block `storage "sources" {}` trong `specific.hcl` (bơm `S3_ENDPOINT/ACCESS_KEY/SECRET_KEY/BUCKET` vào service api qua env), server nộp bài lưu `source_code` lên S3 (KV chỉ giữ metadata + object key), route đọc submission fetch nội dung từ S3; local (không Specific) vẫn dùng JSON store như cũ; tests với fake S3, gate không gọi mạng thật.
+- [ ] Task 119: Multi-organizer (thực hiện nội dung Task 115) — role mới `ORGANIZER`: `POST /admin/users/:id/role` (ADMIN cấp/hạ quyền); kỳ thi có `organizer_id` = người tạo, organizer chỉ sửa/điều phase kỳ thi mình phụ trách, ADMIN toàn quyền; UI AdminLayout: quản lý role trong tab Người dùng + hiển thị organizer trên card kỳ thi admin; tests phân quyền 3 role (PARTICIPANT/ORGANIZER/ADMIN).
+- [ ] Task 120: Ops trên Specific — custom domain (`specific docs domains`: web + api trỏ `arena.fu-dever.vn`/`api.fu-dever.vn`, user tự thêm DNS), bật alerts email trong dashboard, crons backup hằng ngày (`specific docs crons`: job `pg_dump` + đẩy dump lên storage bucket riêng).
+- [ ] Task 121: CI/CD — kết nối GitHub repo trong Specific dashboard để auto-deploy `main` + preview environment theo PR (web), cập nhật `docs/DEPLOYMENT_GUIDE.md` mục 0b; quy ước: CLI deploy chỉ dùng khi cần gấp.
+- [ ] Task 122: Gate Vòng 35 — full tests + detect 0 + lint 0 errors + build sạch; deploy lại lên Specific, smoke prod (health/login/CORS/DB query); CHANGELOG Vòng 35; đóng Task 114 + 115.
 
 
 
