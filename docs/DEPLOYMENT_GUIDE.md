@@ -32,6 +32,9 @@ specific deploy                    # build + đẩy lên Specific Cloud (free ti
 * CORS tự khóa theo domain web: `DEVER_CORS_ORIGIN = "https://${service.web.public_url}"` trong `specific.hcl` — tự theo domain khi deploy, không cần hardcode.
 * Object storage S3 (Task 114): khai báo block `storage "..." {}` trong `specific.hcl` khi cần — xem `specific docs storage`.
 * Lưu ý Windows: `specific dev` (môi trường dev cục bộ) cần macOS/Linux/WSL; còn `specific deploy`/`check` chạy từ Windows bình thường.
+* **Backup hằng ngày (Task 120):** cron `db-backup` chạy 02:00 UTC (09:00 VN) — dump toàn bộ KV Postgres ra JSON, đẩy lên bucket object store (`backups/db-<stamp>.json`). Xem log chạy qua `specific query "SELECT * FROM observability.logs WHERE Body LIKE '%backup-cron%'"`; khôi phục: tải JSON từ bucket rồi nạp lại `dever_store`.
+* **Custom domain (cần chủ dự án):** chạy `specific docs domains` để xem quy trình — thêm domain trong Specific rồi trỏ DNS CNAME `arena.fu-dever.vn` → web URL và `api.fu-dever.vn` → api URL; TLS tự động.
+* **Alerts email (cần chủ dự án):** bật tại https://dashboard.specific.dev/user-settings — nhận cảnh báo 5xx/latency/restart mặc định của mọi service.
 
 ## 1. SƠ ĐỒ KIẾN TRÚC HẠ TẦNG MỤC TIÊU (MỞ RỘNG TƯƠNG LAI — ĐA MÁY)
 

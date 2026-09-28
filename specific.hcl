@@ -44,6 +44,21 @@ service "api" {
   }
 }
 
+# Task 120: backup DB hằng ngày (02:00 UTC = 09:00 VN) — dump KV → JSON → S3 bucket.
+cron "db-backup" {
+  build    = build.api
+  command  = "node scripts/backup_cron.mjs"
+  schedule = "0 2 * * *"
+
+  env = {
+    DEVER_DATABASE_URL = postgres.main.url
+    S3_ENDPOINT        = storage.sources.endpoint
+    S3_ACCESS_KEY      = storage.sources.access_key
+    S3_SECRET_KEY      = storage.sources.secret_key
+    S3_BUCKET          = storage.sources.bucket
+  }
+}
+
 build "web" {
   base    = "node"
   command = "npm run build"
