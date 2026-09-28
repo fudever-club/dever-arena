@@ -51,6 +51,7 @@ const PORT = Number(process.env.PORT || 8787);
 // Store: DEVER_DATABASE_URL → Postgres (đa máy), không thì JSON file (mặc định server/data/db.json).
 // DEVER_DB_PATH cho phép test dùng DB file riêng.
 import { openStore } from './pg.js';
+import { putObject as s3Put, getObject as s3Get, objectStoreActive } from './objectStore.js';
 const { store: db, kind: storeKind } = await openStore();
 console.log(`[dever-api] store: ${storeKind}`);
 
@@ -689,8 +690,11 @@ route('GET', '^/api/v1/problems/([^/]+)$', async (req, res, url, m) => {
 // ---- Submissions ----
 // Upsolve (Task 105): nộp sau khi contest FINISHED — chấm thật nhưng không tính điểm, không vào standings.
 function subView(s, { withSource = false } = {}) {
-  const { source_code, per_test, ...pub } = s;
-  return withSource ? { ...s } : { ...pub, has_source: Boolean(source_code) };
+  // Task 118: source_key là chi tiết storage nội bộ — không bao giờ lộ ra API.
+  const { source_code, source_key, per_test, ...pub } = s;
+  return withSource
+    ? { ...pub, source_code, per_test }
+    : { ...pub, has_source: Boolean(source_code != null || source_key) };
 }
 
 route('POST', '^/api/v1/submissions$', async (req, res, url, m, user) => {
@@ -716,13 +720,23 @@ route('POST', '^/api/v1/submissions$', async (req, res, url, m, user) => {
   const pts = isUpsolve ? 0 : (passed ? calculateProblemScore(prob.base_points || prob.rating || 1000, elapsedMinutes(c), priorWA) : 0);
   // Task 104: lưu per-test (verdict + time) để mở feedback sau FINISHED — KHÔNG lưu input/expected (chống lộ test).
   const per_test = (judged.results || []).map((r) => ({ index: r.index, verdict: r.verdict, time_ms: r.timeMs || 0 }));
-  const sub = db.insert('submissions', {
-    id: db.nextId('sub'), user_id: user.id, problem_id: prob.id, contest_id: c.id,
-    language: normalizeLanguage(language), source_code, verdict: passed ? 'AC' : judged.verdict,
+  // Task 118: source_code lưu object store (S3 trên Specific) — KV chỉ giữ metadata + key.
+  const subId = db.nextId('sub');
+  let sourceKey = null;
+  if (objectStoreActive && source_code != null) {
+    sourceKey = `submissions/${subId}.txt`;
+    if ((await s3Put(sourceKey, source_code)) === null) sourceKey = null; // lỗi tạm → fallback KV
+  }
+  const subRow = {
+    id: subId, user_id: user.id, problem_id: prob.id, contest_id: c.id,
+    language: normalizeLanguage(language), verdict: passed ? 'AC' : judged.verdict,
     points_awarded: pts, time_ms: judged.results[0]?.timeMs ?? null,
     elapsed_min: elapsedMinutes(c), detail: judged.message, submitted_at: new Date().toISOString(),
     is_upsolve: isUpsolve || undefined, per_test,
-  });
+  };
+  if (sourceKey) subRow.source_key = sourceKey;
+  else subRow.source_code = source_code;
+  const sub = db.insert('submissions', subRow);
   if (!isUpsolve) broadcast(c.id, 'EVENT_STANDINGS_UPDATE', { standings: computeStandings(c) });
   send(res, 201, { submission: subView(sub), verdict: judged.verdict, is_upsolve: isUpsolve, per_test });
 }, { auth: true });
@@ -736,7 +750,10 @@ route('GET', '^/api/v1/submissions/([^/]+)$', async (req, res, url, m, user) => 
   const revealPerTest = isPractice || isUpsolve || (c && c.status === 'FINISHED');
   const showSource = s.user_id === user.id || user.role === 'ADMIN' || (c && c.status === 'FINISHED');
   const firstFail = (s.per_test || []).findIndex((t) => t.verdict !== 'AC');
-  const base = subView(s, { withSource: showSource });
+  let base = subView(s, { withSource: showSource });
+  if (showSource && base.source_code === undefined && s.source_key) {
+    base = { ...base, source_code: (await s3Get(s.source_key)) ?? undefined };
+  }
   send(res, 200, {
     submission: revealPerTest ? base : { ...base, per_test: undefined, per_test_hidden: true, failed_index: firstFail >= 0 ? firstFail : undefined },
   });
@@ -751,12 +768,17 @@ route('GET', '^/api/v1/submissions$', async (req, res, url, m, user) => {
   const showSource = user.role === 'ADMIN' || (c && c.status === 'FINISHED');
   const contestDone = !cid || (c && c.status === 'FINISHED');
   send(res, 200, {
-    submissions: list.map((s) => {
-      const base = (showSource || s.user_id === user.id) ? subView(s, { withSource: true }) : subView(s);
+    submissions: await Promise.all(list.map(async (s) => {
+      const withSource = showSource || s.user_id === user.id;
+      let base = withSource ? subView(s, { withSource: true }) : subView(s);
+      // Task 118: fetch source từ object store khi được phép xem.
+      if (withSource && base.source_code === undefined && s.source_key) {
+        base = { ...base, source_code: (await s3Get(s.source_key)) ?? undefined };
+      }
       // Khi contest còn CODING: ẩn per_test của người khác (chống dò test), giữ của chính mình.
       if (!contestDone && s.user_id !== user.id && s.per_test) return { ...base, per_test: undefined, per_test_hidden: true };
       return base;
-    }),
+    })),
   });
 }, { auth: true });
 
@@ -849,7 +871,10 @@ route('POST', '^/api/v1/admin/rejudge$', async (req, res) => {
   if (!c || !prob) { send(res, 404, { error: 'NOT_FOUND' }); return; }
   // Rejudge dùng đúng một code path với submit: full-suite, verdict cuối (ADR-005)
   const timeLimitMs = parseFloat(prob?.timeLimit) * 1000 || 1000;
-  const r = await judgeQueue.judgeTests({ language: s.language, source: s.source_code, tests: judgeSuiteOf(s.problem_id), timeLimitMs });
+  // Task 118: source có thể nằm trên object store (S3) — fetch khi cần.
+  let src = s.source_code;
+  if (src === undefined && s.source_key) src = await s3Get(s.source_key);
+  const r = await judgeQueue.judgeTests({ language: s.language, source: src, tests: judgeSuiteOf(s.problem_id), timeLimitMs });
   if (r.verdict === 'SKIP') { send(res, 422, { error: 'TOOLCHAIN_MISSING', message: r.message }); return; }
   const passed = r.verdict === 'AC';
   const priorWA = db.filter('submissions', (x) => x.contest_id === c.id && x.user_id === s.user_id && x.problem_id === s.problem_id && x.id !== s.id && x.verdict !== 'AC').length;

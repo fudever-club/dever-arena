@@ -10,8 +10,12 @@ secret "dever_jwt_secret" {
 
 postgres "main" {}
 
+# Task 118: object store cho source_code thí sinh (S3-compatible).
+storage "sources" {}
+
+# Custom Dockerfile: cần toolchain chấm thật (python3, JDK 17, g++) — xem Dockerfile.api.
 build "api" {
-  base = "node"
+  dockerfile = "Dockerfile.api"
 }
 
 service "api" {
@@ -33,6 +37,10 @@ service "api" {
     DEVER_DATABASE_URL  = postgres.main.url
     DEVER_CORS_ORIGIN   = "https://${service.web.public_url}"
     DEVER_JUDGE_WORKERS = "2"
+    S3_ENDPOINT         = storage.sources.endpoint
+    S3_ACCESS_KEY       = storage.sources.access_key
+    S3_SECRET_KEY       = storage.sources.secret_key
+    S3_BUCKET           = storage.sources.bucket
   }
 }
 

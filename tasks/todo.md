@@ -212,7 +212,7 @@
 
 
 ## Phase 35: Hoàn thiện hạ tầng Specific + phân quyền organizer (Planned)
-- [ ] Task 118: Object storage S3 cho source_code (hoàn tất Task 114) — block `storage "sources" {}` trong `specific.hcl` (bơm `S3_ENDPOINT/ACCESS_KEY/SECRET_KEY/BUCKET` vào service api qua env), server nộp bài lưu `source_code` lên S3 (KV chỉ giữ metadata + object key), route đọc submission fetch nội dung từ S3; local (không Specific) vẫn dùng JSON store như cũ; tests với fake S3, gate không gọi mạng thật.
+- [x] Task 118: Object storage S3 cho source_code (hoàn tất Task 114) — `server/objectStore.js` SigV4 zero-dep, `storage "sources"` trong specific.hcl, nộp bài PUT S3 / KV giữ source_key, rejudge + GET fetch từ S3, subView ẩn source_key, api build qua Dockerfile.api (toolchain chấm thật); prod verify round-trip `print("task118-final")` + KV không còn inline code; **188/188 tests (28 suites)**.
 - [ ] Task 119: Multi-organizer (nội dung Task 115) — role mới `ORGANIZER`: `POST /admin/users/:id/role` (ADMIN cấp/hạ quyền); kỳ thi có `organizer_id` = người tạo, organizer chỉ sửa/điều phase kỳ thi mình phụ trách, ADMIN toàn quyền; UI AdminLayout: quản lý role trong tab Người dùng + hiển thị organizer trên card kỳ thi admin; tests phân quyền 3 role (PARTICIPANT/ORGANIZER/ADMIN).
 - [ ] Task 120: Ops trên Specific — custom domain (`specific docs domains`: web + api trỏ `arena.fu-dever.vn`/`api.fu-dever.vn`, user tự thêm DNS), bật alerts email trong dashboard, crons backup hằng ngày (`specific docs crons`: job `pg_dump` + đẩy dump lên storage bucket riêng).
 - [ ] Task 121: CI/CD — kết nối GitHub repo trong Specific dashboard để auto-deploy `main` + preview environment theo PR (web), cập nhật `docs/DEPLOYMENT_GUIDE.md` mục 0b; quy ước: CLI deploy chỉ dùng khi cần gấp.

@@ -462,3 +462,10 @@
 
 
 
+
+## Vòng 35.1: Object storage S3 cho source_code — Task 118 đóng Task 114 (Phase 35)
+
+- **Hạ tầng Specific:** block `storage "sources" {}` trong `specific.hcl` (S3-compatible) — bơm `S3_ENDPOINT/ACCESS_KEY/SECRET_KEY/BUCKET` vào service api; đổi build api sang custom Dockerfile (`dockerfile = "Dockerfile.api"`) để có toolchain chấm thật (python3, JDK 17, g++) — trước đó judge trả TOOLCHAIN_MISSING vì base "node" không có Python.
+- **`server/objectStore.js` (mới):** S3 SigV4 client thuần Node crypto — zero dependency ngoài core (ADR-003). Tự vô hiệu khi thiếu env (local/test luôn fallback KV/JSON như cũ); chỉ active ở production (`NODE_ENV=production` + đủ 4 env). Keys `submissions/<subId>.txt`.
+- **Luồng source_code:** nộp bài → `PUT` S3, KV chỉ giữ `source_key` (+ fallback inline khi lỗi tạm hoặc chưa bật); rejudge/GET-by-id/GET-list fetch từ S3 khi được phép xem; `subView` không bao giờ lộ `source_key`, `has_source` đúng cho cả bài lưu S3.
+- **Verify prod:** submit thật → `dever_store` có `source_key`, không còn inline code (query `specific query --db main`); GET trả lại nguyên văn `print("task118-final")`; log PUT 200 (sửa lỗi 403 SignatureDoesNotMatch: S3 phải encode từng segment, giữ nguyên `/` trên canonical path). `npm test` **188/188 (28 suites)**, `specific check` hợp lệ (2 builds + postgres + storage).
