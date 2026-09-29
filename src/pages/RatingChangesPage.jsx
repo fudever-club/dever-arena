@@ -7,7 +7,7 @@ import { api } from '../lib/apiClient';
  * Kỳ đang thi → 403 từ server (chỉ ADMIN/organizer xem preview); FINISHED → công khai.
  * Kỳ unrated → bảng rỗng + thông báo.
  */
-export default function RatingChangesPage() {
+export function RatingChangesPage() {
   const { slug } = useParams();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -105,3 +105,5 @@ export default function RatingChangesPage() {
     </div>
   );
 }
+
+export default RatingChangesPage;
