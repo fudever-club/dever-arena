@@ -10,8 +10,15 @@ import { api } from '../lib/apiClient';
 export function RatingChangesPage() {
   const { slug } = useParams();
   const [data, setData] = useState(null);
+  const [title, setTitle] = useState(slug);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    api.getContest(slug).then((c) => { if (alive && c?.contest?.title) setTitle(c.contest.title); }).catch(() => {});
+    return () => { alive = false; };
+  }, [slug]);
 
   useEffect(() => {
     let alive = true;
@@ -32,7 +39,7 @@ export function RatingChangesPage() {
       <div className="flex items-center justify-between border-b border-[#23252a] pb-6">
         <div>
           <div className="text-[13px] font-medium uppercase tracking-[0.4px] text-[#ff6600] mb-1.5">Rating Changes</div>
-          <h1 className="text-[28px] leading-[34px] font-semibold tracking-[-0.6px]">{data?.contest_id || slug}</h1>
+          <h1 className="text-[28px] leading-[34px] font-semibold tracking-[-0.6px]">{title}</h1>
           <p className="text-sm text-slate-400 mt-1">
             Biến động Elo của kỳ thi — tính theo thuật toán Codeforces chuẩn.
           </p>
