@@ -82,6 +82,17 @@ function diffCollection(dumpRows, nowRows) {
 }
 const clean = (diffs) => diffs.every((d) => d.missing.length === 0 && d.extra.length === 0 && d.changed.length === 0);
 
+/** Poll dump DB cho tới khi điều kiện đúng (flush định kỳ cần thời gian persist xuống Postgres). */
+async function waitUntil(fn, { timeoutMs = 20000, stepMs = 1000, label = '' }) {
+  const t0 = Date.now();
+  for (;;) {
+    const d = await adminDump();
+    if (fn(d)) return d;
+    if (Date.now() - t0 > timeoutMs) throw new Error(`Hết giờ chờ flush persist (${label}) — pipeline ghi DB có vấn đề.`);
+    await new Promise((r) => setTimeout(r, stepMs));
+  }
+}
+
 try {
   // ---- Bước 0: login admin
   const login = await api('POST', '/api/v1/auth/login', { username: ADMIN_USER, password: ADMIN_PASS }, { auth: false });
@@ -104,12 +115,17 @@ try {
     .forEach((d) => console.warn(`   ⚠ ${d.col}: missing=${d.missing.length} extra=${d.extra.length} changed=${d.changed.length}`, d.samples));
 
   // ---- Bước 2: DAMAGE — reset-demo (giữ admin + kỳ thi) + user probe
+  // reset-demo đổi MIRROR bộ nhớ; flush định kỳ mới persist xuống Postgres → POLL chờ.
   const reset = await api('POST', '/api/v1/admin/reset-demo', { mode: 'demo' });
   if (reset.status !== 200) throw new Error(`reset-demo thất bại: ${reset.status} ${JSON.stringify(reset.json)}`);
+  const damaged = await waitUntil(
+    (d) => (d.data.users || []).length === 1 && (d.data.submissions || []).length === 0 && (d.data.participants || []).length === 0,
+    { label: 'reset-demo persist' }
+  );
   const probe = await api('POST', '/api/v1/admin/users', { username: PROBE_USERNAME, full_name: 'Restore Drill Probe', password: `probe-${stamp}`, role: 'PARTICIPANT' });
   if (probe.status !== 201) throw new Error(`Tạo probe thất bại: ${probe.status} ${JSON.stringify(probe.json)}`);
   probeId = probe.json?.user?.id || null;
-  const damaged = await adminDump();
+  await waitUntil((d) => (d.data.users || []).some((u) => u.username === PROBE_USERNAME), { label: 'probe persist' });
   const damagedCounts = counts(damaged);
   const nonAdminGone = (dump.data.users || []).filter((u) => u.username !== ADMIN_USER)
     .every((u) => !(damaged.data.users || []).some((x) => x.username === u.username));
