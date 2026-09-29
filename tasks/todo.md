@@ -229,3 +229,33 @@
 - [x] Task 130 (sớm theo yêu cầu chủ dự án): `POST /admin/drop-legacy-kv` (guard schema v2, 3 tests) — **DROP dever_store trên prod 29/9 05:01 UTC** (chỉ còn dever_admin, backup S3 pre-migration là phương án phục hồi); DB còn 11 bảng (10 domain + dever_meta); `docs/DATABASE_SCHEMA.md` viết lại thành nguồn sự thật schema v2 (kiến trúc mirror+flush, 10 bảng, quan hệ logic, vận hành).
 - [x] Bổ sung — 2 bug prod lộ khi chạy thử vòng đời thật (unit tests không bắt được vì fake pool không serialize như Postgres thật): (1) mảng JS cho cột jsonb → pg driver serialize Postgres array literal → `invalid input syntax for type json` → problems/testcases/participants không bao giờ ghi DB; vá jsonb luôn JSON.stringify; (2) bool undefined → INSERT NULL vi phạm NOT NULL; vá bool undefined→false + `buildUpsert()` bỏ cột NULL khỏi INSERT (DEFAULT áp dụng) dùng chung flush/migrate/restore. Cả 2 kèm regression test.
 - [x] Nâng cấp CF-parity (tham khảo schema Codeforces của chủ dự án): `submissions.passed_tests/total_tests` (passedTestCount — bài WA vẫn hiện pass X/Y; ALTER IF NOT EXISTS tự áp dụng bảng có sẵn; submit+rejudge đều ghi) + `GET /contests/:slug/rating-changes` (engine rating.js; đang thi chỉ ADMIN/organizer preview, FINISHED công khai; unrated → rỗng). **213/213 core**; prod verify WA `passed 0/1`.
+
+## Phase 36.5: Sprint 1 Ops — QA load test + SRE restore-drill (Completed 29/9/2026)
+- [x] QA load test trên schema v2: 20/20 AC tổng 724ms (p50 451, max 713); 50/50 AC tổng 1676ms (p50 885, max 1665) — không suy hao so baseline ~413ms trước migration.
+- [x] SRE restore-drill trên prod: script `scripts/restore_drill.mjs` 5 bước (FRESH dump/đối chiếu → DAMAGE reset-demo+probe → RESTORE từ dump → VERIFY row-by-row 10 bảng + probe biến mất → SMOKE login/health/rating). PASS 5/5 trên prod thật; pre-restore snapshot S3 hoạt động.
+- [x] Bug drill bắt được: restore mất `created_at` (rowToPayload bỏ cột) → mọi đường restore/migrate ghi NOW() thay timestamp gốc. Fix: `created_at` thành cột typed 'ts' cả 10 bảng (`server/pg_schema.js`), flush thường không đổi; +2 regression tests → **215/215 tests (24 suites)**, detect 0, lint 0, build sạch; commit `bc82bf6` + `35b7edc` đã push/deploy.
+- [x] Quirk ghi nhận: mirror đổi trong RAM, flush định kỳ (~1s trên prod) mới persist — drill phải poll chờ (`waitUntil`); cũng là bài test pipeline flush thật.
+- [x] Alert flush DB thất bại — `flushStatus()` 2 store + log JSON `db_flush_failed`/`db_flush_recovered` + `/health` khối `flush` + `/ready` 503 khi degraded (DB_FLUSH_STALE > 60s); E2E prod verify 15:35 UTC; **219/219 tests**.
+- [ ] Verify cron backup lần chạy lịch đầu 02:00 UTC 30/9 (09:00 VN) — chờ giờ chạy.
+
+## Phase 37: Sprint 1b — Ra mắt Round #2 RATED (Planned, CEO duyệt 29/9/2026)
+> Quyết định CEO: (1) Round #2 **RATED** — kích hoạt Elo thật; (2) lịch thi **Tối T4 7/10/2026, 19:00–21:00 VN (12:00–14:00 UTC)**, 120 phút; (3) scope **trọn gói A1–A8**; hạn sprint 2/10.
+- [ ] A1: Verify cron backup lần chạy lịch 02:00 UTC 30/9 — dump lên S3, đối chiếu khớp prod bằng drill script (SRE-Backup).
+- [ ] A2: Reset trắng prod (reset-demo mode demo, giữ admin) — dọn dữ liệu test Round #1 trước khi soạn bài (SRE + PO-Contest).
+- [ ] A3: Soạn bộ bài Round #2 — 4 bài ICPC rating 800–1300, workflow DRAFT→IN_TESTING→APPROVED, stress test + testcases đầy đủ (PO-Contest + Eng-Judge).
+- [ ] A4: Mở kỳ Round #2 — contest is_rated=true, start 2026-10-07T12:00:00Z, 120 phút, REGISTRATION mở sớm; verify đăng ký hoạt động (PO-Contest).
+- [ ] A5: Bài đăng fanpage — nội dung + ảnh OG + link đăng ký, gửi duyệt trước 4/10 (PM + Design).
+- [ ] A6: Probe monitor — script cron 1 phút gọi /health + /ready, cảnh báo khi flush.stale / ready 503, hướng dẫn treo cron Specific (SRE-Lead).
+- [ ] A7: Runbook sự cố 1 trang (docs/ops/) + lịch restore-drill hằng tháng + xoay secret admin (SRE-Backup + SRE-Security).
+- [ ] A8: Verify toolbar workspace nowrap ở viewport 390px (Eng-Frontend).
+
+### Giai đoạn B — Ngày thi 7/10 + hậu kỳ (đã lên lịch)
+- [ ] Live ops: dashboard real-time, freeze 20' cuối, announcements, trực SRE trong 2 giờ thi.
+- [ ] Sau FINISHED: tổng kết tự động, podium/summary, RATING CHANGES lần đầu chạy thật (rated), luồng upsolve.
+- [ ] Retro 24h sau thi; drill lại restore với khối lượng dữ liệu thật (100+ submissions).
+
+### Giai đoạn C — Backlog sau Round #2 (PM ưu tiên)
+- [ ] Verify chấm C++/Java trong container prod (toolchain auto-detect).
+- [ ] Backup retention 30 ngày + drill khối lượng thật.
+- [ ] Multi-organizer thật: cấp tài khoản BTC CLB, bỏ phụ thuộc dever_admin (key-person risk).
+- [ ] Anti-cheat AST diff chạy đại trà trên bài nộp thật.
