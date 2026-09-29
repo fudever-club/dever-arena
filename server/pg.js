@@ -14,7 +14,7 @@
  * Facade (data/save/nextId/find/filter/insert/update/flush/stop) KHÔNG ĐỔI ở cả 2 mode
  * — server/index.js không phải sửa gì.
  */
-import { SCHEMA_VERSION, TABLES_SQL, rowToValues, rowToPayload } from './pg_schema.js';
+import { SCHEMA_VERSION, TABLES_SQL, rowToValues, rowToPayload, buildUpsert } from './pg_schema.js';
 
 export const COLLECTIONS = ['users', 'contests', 'problems', 'testcases', 'submissions', 'participants', 'virtual_sessions', 'clans', 'clarifications', 'announcements'];
 
@@ -143,14 +143,10 @@ export async function createPgStore(pool, opts = {}) {
       for (const row of data[col]) {
         const id = String(row.id ?? JSON.stringify(row).slice(0, 64));
         ids.push(id);
-        const { cols, extra } = rowToValues(col, row);
-        const names = ['id', ...Object.keys(cols), 'extra'];
-        const vals = [id, ...Object.values(cols), JSON.stringify(extra)];
-        const ph = names.map((_, i) => `$${i + 1}`).join(', ');
-        const updates = names.slice(1).map((n, i) => `${n} = $${i + 2}`).join(', ');
+        const { names, vals, ph, setSql } = buildUpsert(col, { ...row, id });
         await pool.query(
           `INSERT INTO ${col} (${names.join(', ')}) VALUES (${ph})
-           ON CONFLICT (id) DO UPDATE SET ${updates}`,
+           ON CONFLICT (id) DO UPDATE SET ${setSql}`,
           vals
         );
       }

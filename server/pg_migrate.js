@@ -12,7 +12,7 @@
  *  - Đối chiếu số rows KV vs bảng theo từng collection — lệch → ném lỗi (exit 1 / HTTP 500).
  *  - KHÔNG xóa dever_store (giữ làm archive — dọn ở Task 130 khi prod ổn định).
  */
-import { TABLES_SQL, rowToValues, rowToPayload } from './pg_schema.js';
+import { TABLES_SQL, rowToPayload, buildUpsert } from './pg_schema.js';
 import { COLLECTIONS } from './pg.js';
 
 const BOOT_META_SQL = [
@@ -69,14 +69,10 @@ export async function migrateKvToTables(pool, { s3Backup = null } = {}) {
     let n = 0;
     for (const row of byCollection[col]) {
       const id = String(row.id ?? JSON.stringify(row).slice(0, 64));
-      const { cols, extra } = rowToValues(col, row);
-      const names = ['id', ...Object.keys(cols), 'extra'];
-      const vals = [id, ...Object.values(cols), JSON.stringify(extra)];
-      const ph = names.map((_, i) => `$${i + 1}`).join(', ');
-      const updates = names.slice(1).map((nm, i) => `${nm} = $${i + 2}`).join(', ');
+      const { names, vals, ph, setSql } = buildUpsert(col, { ...row, id });
       await pool.query(
         `INSERT INTO ${col} (${names.join(', ')}) VALUES (${ph})
-         ON CONFLICT (id) DO UPDATE SET ${updates}`,
+         ON CONFLICT (id) DO UPDATE SET ${setSql}`,
         vals
       );
       n += 1;
@@ -172,14 +168,10 @@ export async function restoreFromDump(pool, dump, { s3Backup = null } = {}) {
     for (const raw of data[col] || []) {
       const payload = mode === 'tables' ? rowToPayload(col, raw) : raw;
       const id = String(payload.id ?? JSON.stringify(payload).slice(0, 64));
-      const { cols, extra } = rowToValues(col, payload);
-      const names = ['id', ...Object.keys(cols), 'extra'];
-      const vals = [id, ...Object.values(cols), JSON.stringify(extra)];
-      const ph = names.map((_, i) => `$${i + 1}`).join(', ');
-      const updates = names.slice(1).map((nm, i) => `${nm} = $${i + 2}`).join(', ');
+      const { names, vals, ph, setSql } = buildUpsert(col, { ...payload, id });
       await pool.query(
         `INSERT INTO ${col} (${names.join(', ')}) VALUES (${ph})
-         ON CONFLICT (id) DO UPDATE SET ${updates}`,
+         ON CONFLICT (id) DO UPDATE SET ${setSql}`,
         vals
       );
       n += 1;

@@ -246,7 +246,8 @@ export function rowToValues(table, payload) {
         break;
       }
       case 'bool':
-        cols[key] = Boolean(value);
+        // Mọi cột bool trong schema đều NOT NULL — undefined/null → false (giống DEFAULT).
+        cols[key] = value == null ? false : Boolean(value);
         break;
       default: // 'text'
         cols[key] = typeof value === 'string' ? value : String(value);
@@ -257,6 +258,29 @@ export function rowToValues(table, payload) {
 
 function safeParse(s, fallback) {
   try { return JSON.parse(s); } catch { return fallback; }
+}
+
+/**
+ * Dựng 1 câu upsert dùng chung cho flush/migrate/restore:
+ *  - Cột có giá trị NULL được BỎ KHỎI INSERT (DEFAULT của bảng áp dụng — tránh vi phạm
+ *    NOT NULL như is_upsolve/is_pretest/is_rated) nhưng vẫn SET NULL trong UPDATE (mirror đúng).
+ *  - extra JSONB luôn là chuỗi JSON.
+ * Trả { names, vals, ph, setSql } cho: INSERT INTO t (names) VALUES (ph) ON CONFLICT (id) DO UPDATE setSql.
+ */
+export function buildUpsert(table, payload) {
+  const { cols, extra } = rowToValues(table, payload);
+  const nnKeys = [];
+  const nullKeys = [];
+  for (const [k, v] of Object.entries(cols)) (v === null ? nullKeys : nnKeys).push(k);
+  const names = ['id', ...nnKeys, 'extra'];
+  const vals = [String(payload.id), ...nnKeys.map((k) => cols[k]), JSON.stringify(extra)];
+  const ph = names.map((_, i) => `$${i + 1}`).join(', ');
+  const sets = [
+    ...nnKeys.map((k, i) => `${k} = $${i + 2}`),
+    ...nullKeys.map((k) => `${k} = NULL`),
+    `extra = $${nnKeys.length + 2}`,
+  ];
+  return { names, vals, ph, setSql: sets.join(', ') };
 }
 
 /**

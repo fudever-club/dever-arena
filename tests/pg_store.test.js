@@ -7,7 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPgStore, MIGRATE_SQL, COLLECTIONS } from '../server/pg.js';
-import { TABLES_SQL, TABLE_COLUMNS, rowToValues, rowToPayload, SCHEMA_VERSION } from '../server/pg_schema.js';
+import { TABLES_SQL, TABLE_COLUMNS, rowToValues, rowToPayload, buildUpsert, SCHEMA_VERSION } from '../server/pg_schema.js';
 
 /** Pool giả: trả lời đúng các query boot của pg.js, ghi nhận mọi SQL + params. */
 function fakePool({ legacyRows = [], hasLegacyTable = false, seedSeq = 1, tableRows = {} } = {}) {
@@ -219,6 +219,21 @@ test('rowToValues: REGRESSION — mảng/object cho cột jsonb phải ra chuỗ
   assert.equal(cols.tags, '["math","implementation"]');
   const { cols: c2 } = rowToValues('submissions', { id: 's_2', per_test: [{ index: 0, verdict: 'AC', time_ms: 12 }] });
   assert.equal(c2.per_test, '[{"index":0,"verdict":"AC","time_ms":12}]');
+});
+
+test('buildUpsert: bool thiếu → false, cột NULL bị bỏ khỏi INSERT nhưng SET NULL', () => {
+  // is_upsolve không có trong payload — flush cũ truyền NULL → vi phạm NOT NULL trên prod
+  const { names, vals, ph, setSql } = buildUpsert('submissions', {
+    id: 's_9', user_id: 'u_1', problem_id: 'p_1', verdict: 'AC', is_upsolve: undefined, detail: null,
+  });
+  assert.ok(names.includes('is_upsolve'));
+  assert.equal(vals[names.indexOf('is_upsolve')], false);
+  // detail = null: không nằm trong INSERT (DEFAULT) nhưng được SET NULL khi update
+  assert.equal(names.includes('detail'), false);
+  assert.match(setSql, /detail = NULL/);
+  assert.match(setSql, /is_upsolve = \$\d+/);
+  assert.equal(ph.split(',').length, names.length);
+  assert.equal(vals.length, names.length);
 });
 
 test('rowToValues: ts không hợp lệ → NULL, int NaN → NULL', () => {
