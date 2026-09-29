@@ -39,6 +39,9 @@ pnpm-debug.log*
 # Local backend runtime data (seed tự tạo khi chạy npm run server)
 server/data/
 
+# Freebuff runtime (agent workspace, không thuộc repo)
+.freebuff/
+
 # Editor & OS files
 .DS_Store
 Thumbs.db
