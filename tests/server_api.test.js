@@ -427,10 +427,14 @@ test('CF-parity: passedTestCount — bài WA vẫn hiện số test pass/total; 
   assert.ok(wrong.data.submission.total_tests >= 1);
   assert.ok(wrong.data.submission.passed_tests < wrong.data.submission.total_tests, 'đáp án sai → không pass hết');
 
-  // Rating changes: gate theo trạng thái — đang thi chỉ ADMIN/organizer, FINISHED công khai (chuẩn CF)
+  // Rating changes: gate theo trạng thái — đang thi chỉ ADMIN/organizer, FINISHED CÔNG KHAI không cần token (chuẩn CF)
   const cStatus = (await call('/api/v1/contests/dever-round-1-div3', 'GET', null, heroToken)).data.contest.status;
-  const asHero = await call('/api/v1/contests/dever-round-1-div3/rating-changes', 'GET', null, heroToken);
-  assert.equal(asHero.status, cStatus === 'FINISHED' ? 200 : 403);
+  if (cStatus !== 'FINISHED') {
+    const asHero = await call('/api/v1/contests/dever-round-1-div3/rating-changes', 'GET', null, heroToken);
+    assert.equal(asHero.status, 403);
+  }
+  const anon = await call('/api/v1/contests/dever-round-1-div3/rating-changes', 'GET', null, null);
+  assert.equal(anon.status, cStatus === 'FINISHED' ? 200 : 403);
   const preview = await call('/api/v1/contests/dever-round-1-div3/rating-changes', 'GET', null, adminToken);
   assert.equal(preview.status, 200);
   assert.equal(preview.data.finished, cStatus === 'FINISHED');
