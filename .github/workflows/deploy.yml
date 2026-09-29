@@ -1,10 +1,8 @@
 name: dever-arena-deploy
 
+# Đường deploy CHÍNH là GitHub integration của Specific: push main → deploy ngay (~36s).
+# Workflow này là nút cứu hộ chạy tay (Actions → Run workflow) dùng API key secret.
 on:
-  workflow_run:
-    workflows: [dever-arena-ci]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -13,12 +11,6 @@ concurrency:
 
 jobs:
   deploy:
-    # Deploy khi CI xanh trên push main, hoặc khi bấm Run workflow tay
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main' &&
-       github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
