@@ -25,7 +25,39 @@ export function openDatabase(dbPath = join(ROOT, 'db.json')) {
     if (!Array.isArray(data[k]) && k !== 'seq') data[k] = [];
   }
   if (typeof data.seq !== 'number') data.seq = 1;
-  const save = () => writeFileSync(dbPath, JSON.stringify(data, null, 2));
+
+  // ---- Flush health (đồng bộ shape với server/pg.js — bài học restore-drill 29/9/2026) ----
+  const flushHealth = {
+    ok: true, lastAttemptAt: null, lastSuccessAt: null, lastFailureAt: null,
+    lastError: null, consecutiveFailures: 0, pendingWrites: false,
+  };
+  const save = () => {
+    flushHealth.lastAttemptAt = new Date().toISOString();
+    try {
+      writeFileSync(dbPath, JSON.stringify(data, null, 2));
+      const recovered = !flushHealth.ok;
+      flushHealth.ok = true;
+      flushHealth.lastSuccessAt = flushHealth.lastAttemptAt;
+      flushHealth.lastError = null;
+      flushHealth.consecutiveFailures = 0;
+      flushHealth.pendingWrites = false;
+      if (recovered) console.log(JSON.stringify({ ts: flushHealth.lastSuccessAt, level: 'INFO', event: 'db_flush_recovered', mode: 'json' }));
+    } catch (e) {
+      flushHealth.ok = false;
+      flushHealth.lastFailureAt = flushHealth.lastAttemptAt;
+      flushHealth.lastError = String(e?.message || e);
+      flushHealth.consecutiveFailures += 1;
+      flushHealth.pendingWrites = true;
+      console.error(JSON.stringify({ ts: flushHealth.lastFailureAt, level: 'ERROR', event: 'db_flush_failed', attempt: flushHealth.consecutiveFailures, mode: 'json', error: flushHealth.lastError, pending_writes: true }));
+      throw e; // giữ hành vi cũ: route gọi save() thấy lỗi
+    }
+  };
+  const flushStatus = () => {
+    const ageS = flushHealth.lastSuccessAt
+      ? Math.round((Date.now() - Date.parse(flushHealth.lastSuccessAt)) / 1000)
+      : null;
+    return { ...flushHealth, age_since_success_s: ageS, stale: flushHealth.pendingWrites && (ageS === null || ageS > 60) };
+  };
 
   const nextId = (prefix) => `${prefix}_${data.seq++}_${Date.now().toString(36)}`;
 
@@ -41,5 +73,6 @@ export function openDatabase(dbPath = join(ROOT, 'db.json')) {
       if (row) { Object.assign(row, patch); save(); }
       return row || null;
     },
+    flushStatus,
   };
 }

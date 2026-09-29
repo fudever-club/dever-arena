@@ -113,7 +113,7 @@ export async function createPgStore(pool, opts = {}) {
 
   let dirty = false;
   let stopped = false;
-  const markDirty = () => { dirty = true; };
+  const markDirty = () => { dirty = true; flushHealth.pendingWrites = true; };
 
   /** Mode kv: upsert payload JSONB vào dever_store + mirror DELETE (hành vi cũ). */
   async function flushKv() {
@@ -159,17 +159,63 @@ export async function createPgStore(pool, opts = {}) {
     }
   }
 
+  // ---- Flush health (bài học restore-drill 29/9/2026) ----
+  // Flush Postgres từng thất bại ÂM THẦM ~12 phút trên prod (bug created_at) vì chỉ
+  // console.error văn bản rồi tự thử lại. Từ giờ: state quan sát được qua flushStatus(),
+  // log cấu trúc JSON khi THẤT BẠI và khi PHỤC HỒI, /health + /ready phản ánh degraded.
+  const flushHealth = {
+    ok: true,
+    lastAttemptAt: null,
+    lastSuccessAt: null,
+    lastFailureAt: null,
+    lastError: null,
+    consecutiveFailures: 0,
+    pendingWrites: false, // memory có thay đổi CHƯA persist xuống DB
+  };
+
+  const flushStatus = () => {
+    const ageS = flushHealth.lastSuccessAt
+      ? Math.round((Date.now() - Date.parse(flushHealth.lastSuccessAt)) / 1000)
+      : null;
+    return {
+      ...flushHealth,
+      age_since_success_s: ageS,
+      // Degraded thật sự: còn ghi chưa persist VÀ (chưa từng thành công || quá 60s không flush được).
+      // Lỗi chốc lát tự hồi phục trong 60s chỉ cảnh báo qua log, không hạ /ready (tránh flap).
+      stale: flushHealth.pendingWrites && (ageS === null || ageS > 60),
+    };
+  };
+
   async function flush() {
     if (!dirty || stopped) return;
     dirty = false;
+    const wasFailing = !flushHealth.ok;
+    flushHealth.lastAttemptAt = new Date().toISOString();
     try {
       if (mode === 'tables') await flushTables();
       else await flushKv();
       await pool.query(`INSERT INTO dever_meta (key, value) VALUES ('seq', $1)
         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [data.seq]);
+      flushHealth.ok = true;
+      flushHealth.lastSuccessAt = new Date().toISOString();
+      flushHealth.lastError = null;
+      flushHealth.consecutiveFailures = 0;
+      flushHealth.pendingWrites = false;
+      if (wasFailing) {
+        console.log(JSON.stringify({ ts: flushHealth.lastSuccessAt, level: 'INFO', event: 'db_flush_recovered', mode }));
+      }
     } catch (e) {
       dirty = true; // thử lại kỳ sau, không mất dữ liệu memory
-      console.error('[pg] flush thất bại, sẽ thử lại:', e.message);
+      flushHealth.ok = false;
+      flushHealth.lastFailureAt = new Date().toISOString();
+      flushHealth.lastError = String(e?.message || e);
+      flushHealth.consecutiveFailures += 1;
+      flushHealth.pendingWrites = true;
+      console.error(JSON.stringify({
+        ts: flushHealth.lastFailureAt, level: 'ERROR', event: 'db_flush_failed',
+        attempt: flushHealth.consecutiveFailures, mode,
+        error: flushHealth.lastError, pending_writes: true,
+      }));
     }
   }
   const timer = setInterval(flush, flushMs);
@@ -203,6 +249,8 @@ export async function createPgStore(pool, opts = {}) {
       return row || null;
     },
     flush,
+    /** Trạng thái persist — /health + /ready đọc từ đây; monitor/probe cũng có thể poll. */
+    flushStatus,
     stop: async () => { stopped = true; clearInterval(timer); await flush(); try { await pool.end(); } catch {} },
   };
 }

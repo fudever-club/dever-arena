@@ -269,6 +269,67 @@ test('rowToPayload: NULL có bản gốc trong extra → trả lại giá trị 
   assert.equal(payload.email, 'old@fpt.edu.vn');
 });
 
+// ---------- Flush health (Vòng 36.5 — lỗi persist không bao giờ âm thầm nữa) ----------
+
+test('[kv] flush thất bại → flushStatus degraded + log cấu trúc; phục hồi → log recovered', async () => {
+  const logs = [];
+  const origErr = console.error, origLog = console.log;
+  console.error = (...a) => logs.push(['err', ...a]);
+  console.log = (...a) => logs.push(['log', ...a]);
+  try {
+    const pool = fakePool();
+    const store = await createPgStore(pool, { flushMs: 60000, schema: 'kv' });
+    pool.failing = true; // mọi query flush (dever_store/dever_meta) giờ ném lỗi
+    const origQuery = pool.query.bind(pool);
+    pool.query = async (sql, params) => {
+      if (pool.failing && (sql.includes('dever_store') || sql.includes('dever_meta'))) throw new Error('ECONNREFUSED (giả lập)');
+      return origQuery(sql, params);
+    };
+
+    store.insert('users', { id: 'u_flush_fail', username: 'x' });
+    await store.flush(); // phải thất bại nhưng KHÔNG ném lỗi ra ngoài (timer an toàn)
+    const st = store.flushStatus();
+    assert.equal(st.ok, false);
+    assert.equal(st.consecutiveFailures, 1);
+    assert.equal(st.pendingWrites, true);
+    assert.equal(st.stale, true); // chưa từng thành công + còn ghi chờ → degraded thật
+    assert.match(st.lastError, /ECONNREFUSED/);
+    const parseEvents = () => logs.map(([, o]) => { try { return typeof o === 'string' ? JSON.parse(o) : o; } catch { return null; } }).filter(Boolean);
+    const failLog = parseEvents().find((o) => o.event === 'db_flush_failed');
+    assert.ok(failLog, 'thiếu log cấu trúc db_flush_failed');
+    assert.equal(failLog.level, 'ERROR');
+    assert.equal(failLog.attempt, 1);
+    assert.equal(failLog.pending_writes, true);
+
+    pool.failing = false;
+    await store.flush(); // dirty vẫn còn → flush lại và thành công
+    const st2 = store.flushStatus();
+    assert.equal(st2.ok, true);
+    assert.equal(st2.consecutiveFailures, 0);
+    assert.equal(st2.pendingWrites, false);
+    assert.equal(st2.stale, false);
+    assert.equal(st2.lastError, null);
+    assert.ok(typeof st2.age_since_success_s === 'number');
+    assert.ok(parseEvents().some((o) => o.event === 'db_flush_recovered'), 'thiếu log db_flush_recovered');
+    await store.stop();
+  } finally {
+    console.error = origErr; console.log = origLog;
+  }
+});
+
+test('[tables] flush thành công → flushStatus ok, stale false (không flap /ready)', async () => {
+  const pool = fakePool();
+  const store = await createPgStore(pool, { flushMs: 60000 });
+  store.insert('users', { id: 'u_ok', username: 'y' });
+  await store.flush();
+  const st = store.flushStatus();
+  assert.equal(st.ok, true);
+  assert.equal(st.pendingWrites, false);
+  assert.equal(st.stale, false);
+  assert.ok(st.lastSuccessAt);
+  await store.stop();
+});
+
 // ---------- Export đối chiếu ----------
 
 test('schema exports đầy đủ để review', () => {

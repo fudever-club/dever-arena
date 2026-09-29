@@ -50,3 +50,22 @@ test('GET /api/ready kiểm tra được store', async () => {
   assert.equal(j.ready, true);
   assert.ok(typeof j.users === 'number');
 });
+
+test('GET /api/health có khối flush (persist) — lỗi không âm thầm (Vòng 36.5)', async () => {
+  const r = await fetch(`${base}/api/health`);
+  assert.equal(r.status, 200);
+  const j = await r.json();
+  assert.ok(j.flush, 'thiếu khối flush trong /health');
+  assert.equal(j.flush.ok, true);
+  assert.equal(typeof j.flush.stale, 'boolean');
+  assert.equal(j.flush.consecutive_failures, 0);
+});
+
+test('GET /api/ready có khối flush khi ổn định', async () => {
+  const r = await fetch(`${base}/api/ready`);
+  assert.equal(r.status, 200);
+  const j = await r.json();
+  assert.ok(j.flush);
+  assert.equal(j.flush.ok, true);
+  assert.equal(j.flush.stale, false);
+});

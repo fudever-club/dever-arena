@@ -382,14 +382,28 @@ route('GET', '^/api/v1/openapi\.json$', async (req, res) => {
 });
 
 // ---- Health & readiness (public, rẻ, không auth) ----
+// Flush health (Vòng 36.5): persist DB thất bại KHÔNG BAO GIỜ âm thầm nữa — trạng thái
+// flush lọt vào /health + /ready; /ready trả 503 khi degraded (ghi chờ persist > 60s).
+function readFlushStatus() {
+  try { return typeof db.flushStatus === 'function' ? db.flushStatus() : null; } catch { return null; }
+}
 route('GET', '^/api/(v1/)?health$', async (req, res) => {
-  send(res, 200, { status: 'ok', uptime_s: Math.floor((Date.now() - BOOT_TIME) / 1000), store: storeKind, time: new Date().toISOString() });
+  const fs = readFlushStatus();
+  send(res, 200, {
+    status: 'ok', uptime_s: Math.floor((Date.now() - BOOT_TIME) / 1000), store: storeKind, time: new Date().toISOString(),
+    flush: fs ? { ok: fs.ok, stale: fs.stale, consecutive_failures: fs.consecutiveFailures, pending_writes: fs.pendingWrites, last_success_at: fs.lastSuccessAt, age_since_success_s: fs.age_since_success_s, last_error: fs.lastError } : undefined,
+  });
 });
 route('GET', '^/api/(v1/)?ready$', async (req, res) => {
   try {
     const users = db.filter('users', () => true).length;
     const contests = db.filter('contests', () => true).length;
-    send(res, 200, { ready: true, store: storeKind, users, contests });
+    const fs = readFlushStatus();
+    const degraded = Boolean(fs?.stale);
+    send(res, degraded ? 503 : 200, {
+      ready: !degraded, store: storeKind, users, contests,
+      ...(degraded ? { degraded: true, reason: 'DB_FLUSH_STALE', flush: { ok: fs.ok, consecutive_failures: fs.consecutiveFailures, last_error: fs.lastError, last_success_at: fs.lastSuccessAt, age_since_success_s: fs.age_since_success_s } } : { flush: fs ? { ok: fs.ok, stale: fs.stale } : undefined }),
+    });
   } catch (e) {
     send(res, 503, { ready: false, error: String(e.message || e) });
   }
