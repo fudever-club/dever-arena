@@ -167,22 +167,22 @@ export const ContestProvider = ({ children }) => {
     broadcastProblems(PROBLEMS_DB);
   };
 
-  // Tải đề từ máy chủ, MERGE với nháp trong memory (server thắng khi trùng id,
-  // nháp chưa publish giữ lại trong phiên để không mất việc đang soạn).
+  // Tải đề từ máy chủ (TẤT CẢ các kỳ — không neo kỳ demo cũ), MERGE với nháp trong memory
+  // (server thắng khi trùng id, nháp chưa publish giữ lại trong phiên để không mất việc đang soạn).
   const loadProblemsFromServer = async () => {
     try {
-      const data = await api.getProblems({ contest_id: 'contest_dever_round1' });
+      const data = await api.getProblems({});
       if (data?.problems && Array.isArray(data.problems) && data.problems.length > 0) {
-        const localIds = new Set(data.problems.map((p) => p.id));
+        const serverIds = new Set(data.problems.map((p) => p.id));
         setProblems((prev) => {
-          const localOnly = (prev || []).filter((p) => !localIds.has(p.id));
+          // Server là nguồn thật: giữ lại CHỈ nháp local chưa từng có trên server.
+          const localOnly = (prev || []).filter((p) => !serverIds.has(p.id));
           const merged = [...data.problems, ...localOnly];
           broadcastProblems(merged);
           return merged;
         });
         return data.problems;
       }
-      return null;
     } catch {
       return null;
     }
