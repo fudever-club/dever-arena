@@ -65,8 +65,23 @@ export const ProblemWorkspace = () => {
   const { id = 'p102' } = useParams();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
-  const { getDynamicScore, formattedTime, problems = [], contestId, contestSlug, phase } = useContest();
+  const { getDynamicScore, formattedTime, problems = [], contestId: ctxContestId, contestSlug, phase } = useContest();
   const [editorialOpen, setEditorialOpen] = useState(false);
+  // contest_id của BÀI ĐANG MỞ (server là nguồn sự thật) — fallback context cho đề demo local.
+  // Tránh nộp nhầm vào kỳ hardcode trong context khi prod đã đổi kỳ thi.
+  const [problemContestId, setProblemContestId] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    setProblemContestId(null);
+    (async () => {
+      try {
+        const data = await api.getSubmissionTarget(id);
+        if (!cancelled) setProblemContestId(data?.problem?.contest_id ?? null);
+      } catch { /* fallback ctxContestId bên dưới */ }
+    })();
+    return () => { cancelled = true; };
+  }, [id]);
+  const contestId = problemContestId || ctxContestId;
 
   // Lời giải chỉ mở khi vòng thi đã kết thúc (mặc định khóa để chống lộ đề)
   useEffect(() => {
@@ -437,6 +452,7 @@ export const ProblemWorkspace = () => {
 
     try {
       if (!getToken()) throw Object.assign(new Error('Phiên đăng nhập local, chưa có token máy chủ. Hãy đăng nhập lại.'), { code: 'NO_TOKEN' });
+      if (!contestId) throw Object.assign(new Error('Không xác định được kỳ thi của bài này trên máy chủ. Bài có thể chưa thuộc kỳ thi nào đang hoạt động.'), { code: 'NO_CONTEST' });
       const data = await api.createSubmission({
         contest_id: contestId, problem_id: currentProblem.id, language, source_code: code,
       });

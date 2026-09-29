@@ -77,6 +77,8 @@ export const api = {
   updateContest: (id, patch) => req(`/api/v1/admin/contests/${encodeURIComponent(id)}`, { method: 'PUT', body: patch, auth: true }),
   // CF-parity: biến động Elo kỳ thi (công khai khi FINISHED; đang thi chỉ ADMIN/organizer).
   getRatingChanges: (slug) => req(`/api/v1/contests/${encodeURIComponent(slug)}/rating-changes`),
+  // Tra bài theo id (kèm contest_id) — workspace dùng để xác định kỳ thi của bài đang mở.
+  getSubmissionTarget: (id) => req(`/api/v1/problems/${encodeURIComponent(id)}`),
   createSubmission: (payload) => req('/api/v1/submissions', { method: 'POST', body: payload, auth: true }),
   getSubmission: (id) => req(`/api/v1/submissions/${encodeURIComponent(id)}`, { auth: true }),
   // Task 105: stats per problem của tôi (solved/attempts từ bài nộp thật)
