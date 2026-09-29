@@ -189,9 +189,9 @@ Nguyên tắc thiết kế:
 - [x] Task 125: DDL schema `server/pg_schema.js` — 10 bảng thật cột typed + `extra JSONB` catch-all per-bảng; UNIQUE username/slug; index chuẩn; idempotent; giản lược không FK/CHECK ở v2 (mirror là nguồn sự thật) — khác kế hoạch gốc: password/rating_history users ở extra, converter 2 chiều bảo toàn nghĩa `undefined` (NULL → khóa bỏ).
 - [x] Task 126: Adapter 2 mode trong `server/pg.js` — boot tự chọn `kv`/`tables` theo schema_version + dữ liệu KV (DB prod còn KV → chạy legacy an toàn tới Task 127; DB mới bật v2 ngay); flush per-row upsert + mirror DELETE per-table; facade không đổi; backup_cron schema-aware. **197/197 tests core.**
 - [ ] Task 127: Migration script `scripts/migrate_kv_to_tables.mjs` — đọc `dever_store` (KV cũ) → ghi vào bảng thật trong 1 transaction; idempotent (chạy lại không nhân đôi); tự dump JSON backup đẩy S3 trước khi migrate; đối chiếu số rows từng collection (KV vs bảng) và exit 1 nếu lệch.
-- [ ] Task 128: Tests + gate — mở rộng `tests/pg_store.test.js`: DDL đủ 10 bảng, upsert per-table đúng cột, UNIQUE/FK conflict, round-trip migration KV→bảng với pool giả, mirror DELETE per-table; cập nhật `scripts/backup_cron.mjs` + `scripts/restore.mjs` đọc/ghi bảng thật; full gate (detect 0, lint 0, build sạch, OpenAPI không đổi).
-- [ ] Task 129: Prod migration + verify — dump backup trước; chạy migration 1 lần trên prod; deploy api mới; smoke trọn vòng: health (store pg), login, nộp bài Python round-trip S3, standings, profile, rejudge; đối chiếu số rows; `dever_store` cũ giữ nguyên không xóa.
-- [ ] Task 130: Dọn dẹp có kiểm soát — sau 1–2 tuần prod ổn định: drop `dever_store`/`dever_meta` (hoặc chốt giữ archive); cập nhật `docs/DATABASE_SCHEMA.md` (schema thật là nguồn sự thật) + `docs/DEPLOYMENT_GUIDE.md`; CHANGELOG Vòng 36; sync `tasks/plan.md` + `tasks/todo.md`.
+- [x] Task 128: Tooling backup/restore v2 hoàn chỉnh — `readTablesDump()`/`restoreFromDump()` dùng chung, backup.mjs/restore_pg.mjs/backup-dump/restore-backup routes; E2E verify trên prod thật (dump → probe → restore → probe biến mất); **210/210 tests core**.
+- [x] Task 129: Prod migration đã chạy 29/9 04:53 UTC (backup S3, from:1, reload không restart) + smoke trọn vòng; cron backup verify sau 02:00 UTC 30/9.
+- [x] Task 130 (sớm theo yêu cầu): DROP dever_store trên prod (guard v2, backup S3 là phương án hồi phục); DATABASE_SCHEMA.md viết lại thành nguồn sự thật schema v2.
 
 
 

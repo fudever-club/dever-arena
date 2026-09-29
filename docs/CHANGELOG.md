@@ -513,3 +513,10 @@
 - **Prod 05:01 UTC:** `{status: dropped}` — information_schema còn đúng 11 bảng (10 domain + `dever_meta`), `dever_store` biến mất.
 - **`docs/DATABASE_SCHEMA.md` viết lại hoàn toàn:** nguồn sự thật schema v2 đang chạy (thay ERD thiết kế 12 bảng UUID cũ): kiến trúc mirror+flush+mirror DELETE, 10 bảng với cột + extra JSONB + index, quan hệ logic không FK, vận hành (migrate/drop/backup/schema tự tạo). Server tự đọc TABLES_SQL từ pg_schema.js — tài liệu và code cùng một nguồn.
 - Phase 36 còn lại: Task 128 (backup.mjs/restore.mjs v2 + gate cuối) — phần lớn đã đi kèm Task 126–127.
+
+## Vòng 36.4: Task 128 — backup/restore v2 hoàn chỉnh + ĐÓNG PHASE 36 (29/9/2026)
+
+- **Tooling dùng chung** (`server/pg_migrate.js`): `readTablesDump()` (10 bảng, ts→ISO, kèm dever_meta) + `restoreFromDump()` (validate cấu trúc dump, **pre-restore snapshot lên S3 TRƯỚC khi TRUNCATE**, nạp per-row typed + extra, phục hồi `seq`, nhận cả dump mode kv legacy).
+- **Entry points:** `backup.mjs` v2 dump JSON cùng định dạng backup_cron (v1 vẫn pg_dump); CLI mới `scripts/restore_pg.mjs`; routes ADMIN `GET /admin/backup-dump` (backup on-demand) + `POST /admin/restore-backup` (restore + `reloadFromTables()` không restart).
+- **E2E verify trên prod thật:** dump (users:1, seq 7) → tạo user `restore_probe` → restore về dump (`{status: restored, preRestoreKey: backups/pre-restore-…json, reload mode=tables}`) → probe biến mất (login 401), COUNT users = 1, admin 200. Snapshot pre-restore trên S3 cho phép đảo ngược restore.
+- **Gate cuối Phase 36:** **210/210 tests core (pg_migrate 13 tests)**, detect 0, lint 0, build 245ms. Phase 36 HOÀN THÀNH: KV `dever_store` → 10 bảng PostgreSQL thật, migration không downtime, backup/restore schema v2 trọn vòng, docs nguồn sự thật. Mục còn theo dõi: cron backup lần chạy lịch đầu 02:00 UTC 30/9.
