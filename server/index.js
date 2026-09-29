@@ -752,6 +752,9 @@ route('POST', '^/api/v1/submissions$', async (req, res, url, m, user) => {
     language: normalizeLanguage(language), verdict: passed ? 'AC' : judged.verdict,
     points_awarded: pts, time_ms: judged.results[0]?.timeMs ?? null,
     elapsed_min: elapsedMinutes(c), detail: judged.message, submitted_at: new Date().toISOString(),
+    // CF-parity: passedTestCount — số test pass/total hiện cả trên bài WA (cột Status của CF)
+    passed_tests: (judged.results || []).filter((r) => r.verdict === 'AC').length,
+    total_tests: (judged.results || []).length,
     is_upsolve: isUpsolve || undefined, per_test,
   };
   if (sourceKey) subRow.source_key = sourceKey;
@@ -956,6 +959,30 @@ route('POST', '^/api/v1/admin/restore-backup$', async (req, res) => {
   }
 }, { auth: true, admin: true });
 
+// ---- CF-parity: rating changes của kỳ thi (chuẩn /contest/{id}/ratingChanges của CF) ----
+// Công thức dùng đúng engine đã test (rating.js calculateContestRatingChanges).
+// Đang thi: chỉ ADMIN/organizer xem preview (chống đoán điểm nhau); FINISHED: công khai.
+route('GET', '^/api/v1/contests/([^/]+)/rating-changes$', async (req, res, url, m, user) => {
+  const c = findContest(decodeURIComponent(m[1]));
+  if (!c) { send(res, 404, { error: 'CONTEST_NOT_FOUND' }); return; }
+  const isManager = user && (user.role === 'ADMIN' || canManageContest(user, c.id));
+  if (c.status !== 'FINISHED' && !isManager) {
+    send(res, 403, { error: 'NOT_FINISHED', message: 'Rating changes công khai sau khi kỳ thi kết thúc.' }); return;
+  }
+  if (!c.is_rated) { send(res, 200, { contest_id: c.id, is_rated: false, changes: [] }); return; }
+  const rows = computeStandings(c);
+  const changes = calculateContestRatingChanges(rows.map((r) => ({ id: r.user_id, name: r.username, oldRating: r.rating, points: r.total })));
+  const byUser = Object.fromEntries(rows.map((r) => [r.user_id, r]));
+  send(res, 200, {
+    contest_id: c.id, is_rated: true, finished: c.status === 'FINISHED',
+    changes: changes.map((ch) => ({
+      user_id: ch.id, username: ch.name,
+      old_rating: ch.oldRating, new_rating: ch.newRating, delta: ch.delta,
+      rank: byUser[ch.id]?.rank ?? null, solved: byUser[ch.id] ? Object.values(byUser[ch.id].problems).filter((p) => p.status === 'AC').length : 0,
+    })).sort((a, b) => (a.rank ?? 9e9) - (b.rank ?? 9e9)),
+  });
+}, { auth: true });
+
 // ---- Admin: cập nhật kỳ thi (Task 124) — title/slug/start/duration/rated/rating window/organizer ----
 route('PUT', '^/api/v1/admin/contests/([^/]+)$', async (req, res, url, m, user) => {
   const c = db.find('contests', (x) => x.id === decodeURIComponent(m[1]));
@@ -1071,6 +1098,8 @@ route('POST', '^/api/v1/admin/rejudge$', async (req, res) => {
   db.update('submissions', (x) => x.id === s.id, {
     verdict: r.verdict,
     points_awarded: pts, time_ms: r.results[0]?.timeMs ?? s.time_ms,
+    passed_tests: (r.results || []).filter((x) => x.verdict === 'AC').length,
+    total_tests: (r.results || []).length,
     detail: `Rejudge: ${r.message}`, rejudged_at: new Date().toISOString(),
   });
   broadcast(c.id, 'EVENT_STANDINGS_UPDATE', { standings: computeStandings(c) });

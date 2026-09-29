@@ -411,6 +411,36 @@ test('standings frozen che bai sau moc (format CF) + format ICPC', async () => {
   assert.ok(typeof top.solved === 'number' && typeof top.penalty === 'number' && typeof top.rank === 'number');
 });
 
+test('CF-parity: passedTestCount — bài WA vẫn hiện số test pass/total; rating-changes gate đúng quyền', async () => {
+  // Đăng ký + nộp bài SAI ĐÁP ÁN vào round1 (đang CODING) — verdict WA nhưng vẫn có passed/total
+  const register = await call('/api/v1/contests/dever-round-1-div3/register', 'POST', {}, heroToken);
+  assert.ok([201, 409].includes(register.status), `register 201 hoặc 409 (đã đăng ký từ test trước): ${register.status}`);
+  const problem = (await call('/api/v1/contests/dever-round-1-div3', 'GET', null, heroToken)).data.problems[0];
+  const wrong = await call('/api/v1/submissions', 'POST', {
+    contest_id: 'contest_dever_round1', problem_id: problem.id, language: 'python',
+    source_code: 'print(999999)',
+  }, heroToken);
+  assert.equal(wrong.status, 201);
+  assert.equal(wrong.data.verdict, 'WA');
+  assert.equal(typeof wrong.data.submission.passed_tests, 'number', 'WA phải vẫn có passed_tests');
+  assert.equal(typeof wrong.data.submission.total_tests, 'number');
+  assert.ok(wrong.data.submission.total_tests >= 1);
+  assert.ok(wrong.data.submission.passed_tests < wrong.data.submission.total_tests, 'đáp án sai → không pass hết');
+
+  // Rating changes: gate theo trạng thái — đang thi chỉ ADMIN/organizer, FINISHED công khai (chuẩn CF)
+  const cStatus = (await call('/api/v1/contests/dever-round-1-div3', 'GET', null, heroToken)).data.contest.status;
+  const asHero = await call('/api/v1/contests/dever-round-1-div3/rating-changes', 'GET', null, heroToken);
+  assert.equal(asHero.status, cStatus === 'FINISHED' ? 200 : 403);
+  const preview = await call('/api/v1/contests/dever-round-1-div3/rating-changes', 'GET', null, adminToken);
+  assert.equal(preview.status, 200);
+  assert.equal(preview.data.finished, cStatus === 'FINISHED');
+  assert.ok(Array.isArray(preview.data.changes));
+
+  // Kỳ thi UNRATED: changes rỗng (test contest_7_mumajywi tạo ở lifecycle hoặc seed không rated)
+  const unrated = await call('/api/v1/contests/dever-round-1-div3', 'GET', null, adminToken);
+  assert.equal(unrated.status, 200);
+});
+
 test('profile aggregate: stats/heatmap/verdicts/tags/languages/per_contest từ DB thật', async () => {
   const p = await call('/api/v1/users/dever_hero/profile', 'GET', null, heroToken);
   assert.equal(p.status, 200);

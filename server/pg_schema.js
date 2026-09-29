@@ -92,6 +92,8 @@ export const TABLES_SQL = [
      source_code TEXT,
      source_key TEXT,
      per_test JSONB,
+     passed_tests INTEGER,
+     total_tests INTEGER,
      detail TEXT,
      is_upsolve BOOLEAN NOT NULL DEFAULT false,
      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -100,6 +102,9 @@ export const TABLES_SQL = [
   `CREATE INDEX IF NOT EXISTS idx_sub_contest_user_problem ON submissions (contest_id, user_id, problem_id, submitted_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_sub_submitted_at ON submissions (submitted_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_sub_user ON submissions (user_id)`,
+  // Nâng cấp CF-parity: passedTestCount cho cả bài WA (bảng Status của CF hiển thị "passed X/Y") — idempotent cho bảng có sẵn.
+  `ALTER TABLE submissions ADD COLUMN IF NOT EXISTS passed_tests INTEGER`,
+  `ALTER TABLE submissions ADD COLUMN IF NOT EXISTS total_tests INTEGER`,
 
   `CREATE TABLE IF NOT EXISTS participants (
      id TEXT PRIMARY KEY,
@@ -185,6 +190,7 @@ export const TABLE_COLUMNS = {
     user_id: 'text', contest_id: 'text', problem_id: 'text', language: 'text',
     verdict: 'text', points_awarded: 'float', time_ms: 'int', elapsed_min: 'int',
     submitted_at: 'ts', source_code: 'text', source_key: 'text', per_test: 'jsonb',
+    passed_tests: 'int', total_tests: 'int',
     detail: 'text', is_upsolve: 'bool',
   },
   participants: {
