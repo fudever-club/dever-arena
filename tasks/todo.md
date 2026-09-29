@@ -207,8 +207,8 @@
 
 ## Phase 34: Backlog sau khi CLB dùng thật (Task 113–113.1 done; 114 half-done qua Specific; 114–115 → Phase 35)
 - [x] Task 113: A11y audit — `tests/a11y_axe.test.js` (axe-core 4.13 trong Chromium, quét 10 trang, gate serious/critical = 0 + test focus-visible) + `scripts/a11y_scan.mjs` dump node/contrast; fix: @theme override slate-400/500/600 ≥4.5:1, CTA nền cam chữ đen #010102 (2.93→7.4:1) + badge Standings #ffb066 + Monaco theme dever-dark comment #6fa856, aria-label 3 textarea, h4→p login, h2→h1 workspace; +3 tests → **184/184 (30 suites)**.- [x] Task 113.1: Polish 3 trang compare/virtual/summary theo taste skill + Linear tokens: typography (h1 28px/-0.6px, card-title 22px/-0.4px, eyebrow 13px/+0.4px uppercase, thead cùng style), spacing p-6/py-3 px-4, viền hairline #23252a + surface ladder, em-dash hiển thị → text thay thế, emoji → badge mono/SVG, podium responsive, error box p-4; verify computed-style qua preview + **184/184 tests**, detect 0, lint 0 errors, build 244ms.
-- [ ] Task 114: Postgres production thật (bỏ store JSON, migration script) + object storage cho source_code.
-- [ ] Task 115: Phân quyền multi-organizer (admin tạo admin, quản lý kỳ thi theo người phụ trách).
+- [x] Task 114: Postgres production thật (bỏ store JSON, migration script) + object storage cho source_code. — ĐÓNG trong Phase 35 (Task 118 + 122): postgres "main" + storage "sources" trên Specific, prod live.
+- [x] Task 115: Phân quyền multi-organizer (admin tạo admin, quản lý kỳ thi theo người phụ trách). — ĐÓNG trong Phase 35 (Task 119).
 
 
 ## Phase 35: Hoàn thiện hạ tầng Specific + phân quyền organizer (Completed 28/9/2026)
@@ -219,3 +219,11 @@
 - [x] Task 122: Gate Vòng 35 — 189/189 tests (24 suites), detect 0, lint 0 errors, build 294ms; prod smoke health/login/CORS/web/DB(120 rows)/S3 round-trip toàn xanh; CHANGELOG Vòng 35.1–35.3; đóng Task 114 + 115.
 - [x] Task 123: Quản trị dữ liệu thật — DEVER_SEED_DEMO=0 trên prod, POST /admin/reset-demo + DELETE /admin/users/:id, UI Vùng nguy hiểm 2 bước; vá pg flush mirror DELETE (chống hồi sinh dữ liệu); prod verify users:1, submissions:0.
 - [x] Task 124: Admin sửa kỳ thi — PUT /admin/contests/:id (title/start/duration/rated/rating window/organizer) + EditContestPanel UI; OpenAPI 47 ops/41 paths; 193/193 tests (25 suites).
+
+## Phase 36: Schema bảng PostgreSQL thật + migration từ KV (Planned)
+- [ ] Task 125: DDL schema `server/pg_schema.js` — 10 bảng thật (users, contests, problems, testcases, submissions, participants, virtual_sessions, clans, clarifications, announcements): cột typed, UNIQUE username/slug, CHECK rating/duration, FK problems→contests, testcases→problems, submissions→users/contests/problems, participants UNIQUE(contest_id, user_id); index submissions(contest_id, user_id, problem_id, submitted_at DESC) + GIN tags + submissions(submitted_at DESC); idempotent.
+- [ ] Task 126: Adapter ghi per-row trong `server/pg.js` — flush() INSERT … ON CONFLICT (id) DO UPDATE per-table với cột thật + mirror DELETE per-table; boot nạp từ bảng thật; giữ nguyên facade find/filter/insert/update và shape `data.*` (JSONB giữ cho per_test/statistics/settings).
+- [ ] Task 127: Migration script `scripts/migrate_kv_to_tables.mjs` — đọc dever_store (KV cũ) → ghi bảng thật trong 1 transaction; idempotent; backup JSON đẩy S3 trước khi migrate; đối chiếu số rows KV vs bảng, exit 1 nếu lệch.
+- [ ] Task 128: Tests + gate — mở rộng tests/pg_store.test.js (DDL 10 bảng, upsert per-table, UNIQUE/FK conflict, round-trip migration pool giả, mirror DELETE per-table); backup_cron.mjs + restore.mjs đọc/ghi bảng thật; full gate detect 0 + lint 0 + build sạch.
+- [ ] Task 129: Prod migration + verify — backup trước, chạy migration 1 lần, deploy api mới, smoke trọn vòng (health/login/nộp bài S3/standings/profile/rejudge), đối chiếu rows, giữ dever_store cũ làm archive.
+- [ ] Task 130: Dọn dẹp có kiểm soát — sau 1–2 tuần ổn định: drop dever_store/dever_meta (hoặc chốt giữ archive); DATABASE_SCHEMA.md thành nguồn sự thật; CHANGELOG Vòng 36; sync plan/todo.

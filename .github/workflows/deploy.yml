@@ -1,0 +1,39 @@
+name: dever-arena-deploy
+
+on:
+  workflow_run:
+    workflows: [dever-arena-ci]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Chỉ deploy khi push lên main XONG CI, và CI phải xanh toàn bộ (verify + browser)
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Deploy đúng commit đã qua kiểm tra, không phải HEAD mới hơn
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Specific CLI
+        run: npm i -g @specific.dev/cli
+
+      - name: Deploy
+        env:
+          SPECIFIC_API_KEY: ${{ secrets.SPECIFIC_API_KEY }}
+        run: specific check && specific deploy --project proj_01ef6anqh48m80y2

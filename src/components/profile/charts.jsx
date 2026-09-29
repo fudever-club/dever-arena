@@ -40,7 +40,7 @@ export const verdictBadge = (verdict) => {
   if (v === 'AC' || v === 'ACCEPTED') {
     return 'px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono font-bold';
   }
-  if (['WA', 'TLE', 'RE', 'MLE', 'CE'].includes(v)) {
+  if (['WA', 'TLE', 'RTE', 'MLE', 'CE'].includes(v)) {
     return 'px-2 py-0.5 rounded bg-red-500/15 border border-red-500/30 text-red-400 font-mono font-bold';
   }
   return 'px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 font-mono font-bold';
@@ -230,7 +230,7 @@ export const VerdictBars = ({ verdicts = {} }) => {
   const entries = Object.entries(verdicts).sort((a, b) => b[1] - a[1]);
   if (!entries.length) return <p className="px-5 py-6 text-xs text-slate-500">{EMPTY_HINT}</p>;
   const max = Math.max(...entries.map(([, n]) => n));
-  const colorOf = (v) => (v === 'AC' ? 'bg-emerald-500' : ['WA', 'TLE', 'RE', 'MLE', 'CE'].includes(v) ? 'bg-red-500' : 'bg-slate-500');
+  const colorOf = (v) => (v === 'AC' ? 'bg-emerald-500' : ['WA', 'TLE', 'RTE', 'MLE', 'CE'].includes(v) ? 'bg-red-500' : 'bg-slate-500');
   return (
     <div className="px-5 py-4 space-y-2.5">
       {entries.map(([v, n]) => (

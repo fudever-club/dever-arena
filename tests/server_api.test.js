@@ -432,7 +432,7 @@ test('profile aggregate: stats/heatmap/verdicts/tags/languages/per_contest từ 
 
   // Verdict map chỉ chứa verdict chuẩn
   for (const key of Object.keys(verdicts)) {
-    assert.ok(['AC', 'WA', 'TLE', 'RE', 'CE', 'MLE', 'PENDING'].includes(key), `verdict lạ: ${key}`);
+    assert.ok(['AC', 'WA', 'TLE', 'RTE', 'CE', 'MLE', 'PENDING'].includes(key), `verdict lạ: ${key}`);
   }
 
   // Tags: solved <= attempted, có data từ đề seed

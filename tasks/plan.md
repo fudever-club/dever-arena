@@ -176,6 +176,23 @@ Xây dựng nền tảng thi đấu giải thuật nội bộ của CLB FU-DEVER
 - [x] Task 123: Quản trị dữ liệu thật (yêu cầu chủ dự án) — `DEVER_SEED_DEMO=0` trên prod (DB mới chỉ seed admin), `POST /admin/reset-demo` (demo/all) + `DELETE /admin/users/:id` (cấm tự xóa/dever_admin, dọn submissions+participants); UI "Vùng nguy hiểm" xác nhận 2 bước + nút Xóa user; **vá pg flush mirror DELETE** (chống hồi sinh dữ liệu sau restart); prod verify DB còn users:1, submissions:0.
 - [x] Task 124: Admin sửa kỳ thi — `PUT /admin/contests/:id` (title/start/duration 5–600/is_rated/min-max rating/organizer) + gate organizer; UI `EditContestPanel` (chọn kỳ thi, datetime-local, lưu tức thì). OpenAPI 47 ops/41 paths; **193/193 tests (25 suites)**.
 
+### Phase 36: Schema bảng PostgreSQL thật + migration từ KV (Planned — đã chốt phương án với chủ dự án)
+
+Mục tiêu: thay 1 bảng KV generic `dever_store(collection, id, payload JSONB)` bằng **10 bảng relational thật** với cột typed, ràng buộc và index — nhưng **giữ nguyên facade đồng bộ** (`find/filter/insert/update` + mirror bộ nhớ + flush write-through) nên `server/index.js` không phải refactor lớn.
+
+Nguyên tắc thiết kế:
+- Cột typed thật cho mọi trường cần lọc/join/unique (username, contest_id, verdict, submitted_at…); **JSONB giữ lại cho blob động ít cấu trúc** (`submissions.per_test`, `users.statistics`, `contests.settings`) — không giả vờ cột hóa hết.
+- `id` giữ TEXT (tương thích id hiện tại `u_1_x`, `sub_2_y`) — không chuyển UUID để tránh break liên kết dữ liệu cũ.
+- Bảng `dever_store` + `dever_meta` cũ **giữ nguyên làm archive/safety-net** sau khi chuyển; chỉ drop khi prod chạy ổn định (Task 130).
+- Ràng buộc tham chiếu từ `docs/DATABASE_SCHEMA.md` giản lược theo payload thật (đối chiếu `server/index.js` khi làm Task 125; clans là di sản — bảng tối giản chỉ để dump/restore).
+
+- [ ] Task 125: DDL schema `server/pg_schema.js` — 10 bảng thật (users, contests, problems, testcases, submissions, participants, virtual_sessions, clans, clarifications, announcements): UNIQUE username + slug kỳ thi, CHECK rating/duration, FK problems→contests, testcases→problems, submissions→users/contests/problems, participants UNIQUE(contest_id, user_id); index theo mục 3 của DATABASE_SCHEMA (submissions(contest_id, user_id, problem_id, submitted_at DESC), problems USING GIN (tags), submissions(submitted_at DESC) cho live stream); idempotent CREATE TABLE IF NOT EXISTS.
+- [ ] Task 126: Adapter ghi per-row trong `server/pg.js` — flush() viết INSERT … ON CONFLICT (id) DO UPDATE per-table với cột thật (thay upsert JSONB), mirror DELETE per-table; boot nạp dữ liệu từ bảng thật; giữ API facade và shape `data.*` không đổi cho index.js.
+- [ ] Task 127: Migration script `scripts/migrate_kv_to_tables.mjs` — đọc `dever_store` (KV cũ) → ghi vào bảng thật trong 1 transaction; idempotent (chạy lại không nhân đôi); tự dump JSON backup đẩy S3 trước khi migrate; đối chiếu số rows từng collection (KV vs bảng) và exit 1 nếu lệch.
+- [ ] Task 128: Tests + gate — mở rộng `tests/pg_store.test.js`: DDL đủ 10 bảng, upsert per-table đúng cột, UNIQUE/FK conflict, round-trip migration KV→bảng với pool giả, mirror DELETE per-table; cập nhật `scripts/backup_cron.mjs` + `scripts/restore.mjs` đọc/ghi bảng thật; full gate (detect 0, lint 0, build sạch, OpenAPI không đổi).
+- [ ] Task 129: Prod migration + verify — dump backup trước; chạy migration 1 lần trên prod; deploy api mới; smoke trọn vòng: health (store pg), login, nộp bài Python round-trip S3, standings, profile, rejudge; đối chiếu số rows; `dever_store` cũ giữ nguyên không xóa.
+- [ ] Task 130: Dọn dẹp có kiểm soát — sau 1–2 tuần prod ổn định: drop `dever_store`/`dever_meta` (hoặc chốt giữ archive); cập nhật `docs/DATABASE_SCHEMA.md` (schema thật là nguồn sự thật) + `docs/DEPLOYMENT_GUIDE.md`; CHANGELOG Vòng 36; sync `tasks/plan.md` + `tasks/todo.md`.
+
 
 
 

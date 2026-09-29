@@ -233,7 +233,7 @@ export const ProfilePage = () => {
         <div className="px-5 py-4 border-b border-[#23252a] flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-sm font-semibold text-white">Bài nộp gần nhất</h2>
           <div className="flex items-center gap-1.5">
-            {['ALL', 'AC', 'WA', 'TLE', 'RE', 'CE'].map((v) => (
+            {['ALL', 'AC', 'WA', 'TLE', 'RTE', 'CE'].map((v) => (
               <button
                 key={v}
                 onClick={() => setFilter(v)}

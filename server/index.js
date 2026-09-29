@@ -176,7 +176,7 @@ function seed() {
   ];
   const pids = PROBLEMS_DB.map((p) => p.id);
   const langs = ['python', 'cpp20', 'java', 'js'];
-  const VERDICT_POOL = ['AC', 'AC', 'AC', 'AC', 'AC', 'WA', 'WA', 'TLE', 'RE', 'CE'];
+  const VERDICT_POOL = ['AC', 'AC', 'AC', 'AC', 'AC', 'WA', 'WA', 'TLE', 'RTE', 'CE'];
   let lcg = 42;
   const rand = () => { lcg = (lcg * 1103515245 + 12345) % 2147483648; return lcg / 2147483648; };
   let pseq = 0;
