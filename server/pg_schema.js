@@ -221,7 +221,11 @@ export function rowToValues(table, payload) {
     if (key === 'id') continue;
     const type = colMap[key];
     if (type === undefined) { extra[key] = value; continue; }
-    if (value === null || value === undefined) { cols[key] = null; continue; }
+    if (value === null || value === undefined) {
+      // Cột bool NOT NULL DEFAULT false: thiếu giá trị → false (không bao giờ NULL).
+      cols[key] = type === 'bool' ? false : null;
+      continue;
+    }
     switch (type) {
       case 'ts': {
         const d = value instanceof Date ? value : new Date(value);
