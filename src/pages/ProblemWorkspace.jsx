@@ -1075,7 +1075,7 @@ export const ProblemWorkspace = () => {
                       <button
                         key={tc.id}
                         onClick={() => setActiveCaseIndex(idx)}
-                        className={`px-2 py-0.5 rounded text-[11px] font-semibold transition border ${
+                        className={`px-1.5 py-px rounded text-[11px] font-semibold transition border ${
                           activeCaseIndex === idx
                             ? 'bg-[#ff6600] text-white border-[#ff6600]'
                             : runAll?.[idx]
@@ -1091,36 +1091,39 @@ export const ProblemWorkspace = () => {
                     ))}
                     <button
                       onClick={handleAddTestCase}
-                      className="px-2 py-0.5 rounded text-[11px] bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition"
+                      className="px-1.5 py-px rounded text-[11px] bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition"
                       title="Thêm testcase tùy biến"
                     >
-                      + Thêm Case
+                      + Thêm
                     </button>
                     <button
                       onClick={handleRunAll}
                       disabled={runAllBusy || isRunning}
-                      className="px-2 py-0.5 rounded text-[11px] bg-[#141516] hover:bg-[#18191a] border border-[#34343a] text-slate-200 transition disabled:opacity-50"
+                      className="px-1.5 py-px rounded text-[11px] bg-[#141516] hover:bg-[#18191a] border border-[#34343a] text-slate-200 transition disabled:opacity-50"
                       title="Chạy hết testcase"
                     >
-                      {runAllBusy ? 'Đang chạy...' : 'Chạy hết'}
+                      {runAllBusy ? 'Đang chạy…' : 'Chạy hết'}
                     </button>
                     <button
                       onClick={handleLoadSample}
-                      className="px-2 py-0.5 rounded text-[11px] bg-[#0f1011] hover:bg-[#18191a] border border-[#23252a] text-slate-300 transition"
+                      className="px-1.5 py-px rounded text-[11px] bg-[#0f1011] hover:bg-[#18191a] border border-[#23252a] text-slate-300 transition"
                       title="Copy sampleInput của đề vào input của case đang chọn"
                     >
-                      Nạp mẫu vào console
+                      Nạp mẫu
                     </button>
                   </div>
                 )}
               </div>
 
-              <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                <span className="hidden sm:inline">Phím tắt: <kbd className="px-1 py-0.5 rounded bg-white/10 text-[10px] font-mono">Ctrl + '</kbd> Chạy thử • <kbd className="px-1 py-0.5 rounded bg-white/10 text-[10px] font-mono">Ctrl + Enter</kbd> Nộp bài</span>
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                <span className="hidden md:inline" title="Ctrl + ' : Chạy thử • Ctrl + Enter : Nộp bài">
+                  <kbd className="px-1 py-px rounded bg-white/10 text-[10px] font-mono">Ctrl + '</kbd>
+                  <kbd className="ml-1 px-1 py-px rounded bg-white/10 text-[10px] font-mono">Ctrl + ⏎</kbd>
+                </span>
                 <button
                   type="button"
                   onClick={() => setShowShortcuts(true)}
-                  className="w-6 h-6 rounded-full bg-[#0f1011] border border-[#23252a] text-slate-300 hover:text-white hover:bg-[#18191a] transition text-xs font-bold"
+                  className="w-5 h-5 rounded-full bg-[#0f1011] border border-[#23252a] text-slate-300 hover:text-white hover:bg-[#18191a] transition text-[11px] font-bold"
                   title="Xem phím tắt (?)"
                   aria-label="Mở bảng phím tắt"
                 >
