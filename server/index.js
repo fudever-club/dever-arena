@@ -53,6 +53,12 @@ const PORT = Number(process.env.PORT || 8787);
 import { openStore } from './pg.js';
 import { putObject as s3Put, getObject as s3Get, objectStoreActive } from './objectStore.js';
 const { store: db, kind: storeKind } = await openStore();
+// Pool Postgres dùng chung cho migration schema (Task 127); null khi chạy JSON local.
+let pool = null;
+if (storeKind === 'pg') {
+  const { Pool } = await import('pg');
+  pool = new Pool({ connectionString: process.env.DEVER_DATABASE_URL });
+}
 console.log(`[dever-api] store: ${storeKind}`);
 
 // ============================ SECURITY ============================
@@ -884,6 +890,25 @@ route('POST', '^/api/v1/admin/reset-demo$', async (req, res, url, m, user) => {
       problems: db.data.problems.length, submissions: db.data.submissions.length,
     },
   });
+}, { auth: true, admin: true });
+
+// Task 127 (Phase 36): migration KV → 10 bảng typed, chạy ngay trên server đang sống.
+// Xóa dever_store KHÔNG xảy ra ở đây (giữ archive, dọn ở Task 130). Re-run an toàn (idempotent).
+route('POST', '^/api/v1/admin/migrate-schema$', async (req, res) => {
+  if (storeKind !== 'pg') { send(res, 422, { error: 'NOT_PG', message: 'Local JSON store không cần migration.' }); return; }
+  try {
+    const { migrateKvToTables } = await import('./pg_migrate.js');
+    const report = await migrateKvToTables(pool, { s3Backup: s3Put });
+    if (report.status === 'migrated') {
+      // Server đang chạy giữ mirror kv trong bộ nhớ → nạp lại từ bảng + flip mode ngay.
+      const reload = await db.reloadFromTables();
+      send(res, 200, { ...report, reload });
+    } else {
+      send(res, 200, report);
+    }
+  } catch (e) {
+    send(res, 500, { error: 'MIGRATE_FAILED', message: String(e?.message || e) });
+  }
 }, { auth: true, admin: true });
 
 // ---- Admin: cập nhật kỳ thi (Task 124) — title/slug/start/duration/rated/rating window/organizer ----

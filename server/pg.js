@@ -80,6 +80,16 @@ export async function createPgStore(pool, opts = {}) {
   const data = { seq: 1 };
   for (const col of COLLECTIONS) data[col] = [];
 
+  /** Nạp mirror bộ nhớ từ 10 bảng thật (thay thế nội dung data[col], giữ tham chiếu object data). */
+  async function loadTables() {
+    for (const col of COLLECTIONS) {
+      const { rows } = await pool.query(`SELECT * FROM ${col}`);
+      data[col] = (rows || []).map((row) => rowToPayload(col, row));
+    }
+    const { rows: seqRows2 } = await pool.query(`SELECT value FROM dever_meta WHERE key = 'seq'`);
+    if (seqRows2?.[0]) data.seq = Number(seqRows2[0].value) || 1;
+  }
+
   if (mode === 'tables') {
     for (const sql of TABLES_SQL) await pool.query(sql);
     await pool.query(
@@ -87,10 +97,7 @@ export async function createPgStore(pool, opts = {}) {
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
       [SCHEMA_VERSION]
     );
-    for (const col of COLLECTIONS) {
-      const { rows } = await pool.query(`SELECT * FROM ${col}`);
-      for (const row of rows || []) data[col].push(rowToPayload(col, row));
-    }
+    await loadTables();
   } else {
     for (const sql of MIGRATE_SQL) await pool.query(sql);
     const { rows } = await pool.query('SELECT collection, id, payload FROM dever_store');
@@ -175,6 +182,20 @@ export async function createPgStore(pool, opts = {}) {
   return {
     data,
     mode,
+    /** Task 127: server đang chạy nạp lại mirror từ bảng thật + chuyển mode tables (sau migration). */
+    reloadFromTables: async () => {
+      if (mode !== 'tables') {
+        for (const sql of TABLES_SQL) await pool.query(sql);
+        await pool.query(
+          `INSERT INTO dever_meta (key, value) VALUES ('schema_version', $1)
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+          [SCHEMA_VERSION]
+        );
+        mode = 'tables';
+      }
+      await loadTables();
+      return { mode };
+    },
     save: () => { markDirty(); },
     nextId: (prefix) => { const id = `${prefix}_${data.seq++}_${Date.now().toString(36)}`; markDirty(); return id; },
     find: (col, pred) => (data[col] || []).find(pred),
