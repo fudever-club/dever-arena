@@ -1070,7 +1070,7 @@ export const ProblemWorkspace = () => {
                 </button>
 
                 {isConsoleOpen && (
-                  <div className="flex items-center gap-1 ml-4">
+                  <div className="flex items-center gap-1 ml-4 whitespace-nowrap">
                     {testCases.map((tc, idx) => (
                       <button
                         key={tc.id}

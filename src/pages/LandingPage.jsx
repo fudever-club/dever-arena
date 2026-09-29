@@ -114,7 +114,7 @@ export const LandingPage = () => {
         </h1>
 
         <p className="mt-5 text-sm sm:text-base text-slate-400 max-w-2xl mx-auto leading-relaxed">
-          Nền tảng thi đấu giải thuật của CLB FU-DEVER: làm bài 120 phút, bẻ khóa bài đối thủ cùng phòng, chấm lại toàn bộ test ẩn và xếp hạng Elo.
+          Nền tảng thi đấu giải thuật của CLB FU-DEVER: làm bài 120 phút theo thể thức ICPC, chấm full-suite nhận verdict cuối cùng, freeze bảng điểm 30 phút cuối giờ và xếp hạng Elo.
         </p>
 
         {/* CTAs */}
