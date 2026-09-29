@@ -75,6 +75,8 @@ export const api = {
   resetDemo: (mode = 'demo') => req('/api/v1/admin/reset-demo', { method: 'POST', body: { mode }, auth: true }),
   // Task 124: admin/organizer sửa thông tin kỳ thi đã tạo.
   updateContest: (id, patch) => req(`/api/v1/admin/contests/${encodeURIComponent(id)}`, { method: 'PUT', body: patch, auth: true }),
+  // CF-parity: biến động Elo kỳ thi (công khai khi FINISHED; đang thi chỉ ADMIN/organizer).
+  getRatingChanges: (slug) => req(`/api/v1/contests/${encodeURIComponent(slug)}/rating-changes`),
   createSubmission: (payload) => req('/api/v1/submissions', { method: 'POST', body: payload, auth: true }),
   getSubmission: (id) => req(`/api/v1/submissions/${encodeURIComponent(id)}`, { auth: true }),
   // Task 105: stats per problem của tôi (solved/attempts từ bài nộp thật)

@@ -165,6 +165,14 @@ export const ContestHub = () => {
             Tổng kết
           </button>
         )}
+        {c.status === 'FINISHED' && c.is_rated && (
+          <button
+            onClick={() => navigate(`/contest/${c.slug}/rating`)}
+            className="px-3 py-1.5 rounded-lg bg-[#141516] hover:bg-[#18191a] border border-[#34343a] text-slate-200 font-medium text-xs transition"
+          >
+            Rating ±
+          </button>
+        )}
       </div>
     </div>
   );

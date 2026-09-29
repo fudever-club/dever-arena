@@ -449,6 +449,10 @@ export const ProblemWorkspace = () => {
         points: passed ? s.points_awarded : 0,
         upsolve: Boolean(data.is_upsolve),
         perTest: Array.isArray(data.per_test) ? data.per_test : null,
+        // CF-parity: số test pass/tổng — hiện cả trên bài WA
+        passedXofY: (typeof s.passed_tests === 'number' && typeof s.total_tests === 'number' && s.total_tests > 0)
+          ? { passed: s.passed_tests, total: s.total_tests }
+          : null,
       });
       setActiveTab('submissions');
     } catch (err) {
@@ -823,6 +827,14 @@ export const ProblemWorkspace = () => {
                         <span className={`text-xs font-bold block ${submissionVerdict.ok ? 'text-emerald-300' : 'text-red-300'}`}>
                           {submissionVerdict.upsolve && <span className="mr-1.5 px-1.5 py-0.5 rounded bg-blue-500/20 border border-blue-500/30 text-blue-300 text-[10px] font-mono align-middle">UPSOLVE</span>}
                           {submissionVerdict.verdict}
+                          {/* CF-parity: badge pass X/Y — WA vẫn hiện số test pass */}
+                          {submissionVerdict.passedXofY && (
+                            <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-mono align-middle border ${
+                              submissionVerdict.ok
+                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                            }`}>{submissionVerdict.passedXofY.passed}/{submissionVerdict.passedXofY.total} passed</span>
+                          )}
                         </span>
                         <span className="text-[11px] opacity-80">{submissionVerdict.detail}</span>
                         {/* Task 104: chi tiết per-test — chỉ hiển thị khi server trả per_test (contest FINISHED/upsolve/practice) */}

@@ -16,6 +16,7 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage.jsx').then(m => ({ de
 const ComparePage = lazy(() => import('./pages/ComparePage.jsx').then(m => ({ default: m.ComparePage })));
 const VirtualContestPage = lazy(() => import('./pages/VirtualContestPage.jsx').then(m => ({ default: m.VirtualContestPage })));
 const ContestSummaryPage = lazy(() => import('./pages/ContestSummaryPage.jsx').then(m => ({ default: m.ContestSummaryPage })));
+const RatingChangesPage = lazy(() => import('./pages/RatingChangesPage.jsx').then(m => ({ default: m.RatingChangesPage })));
 const ProblemsetPage = lazy(() => import('./pages/ProblemsetPage.jsx').then(m => ({ default: m.ProblemsetPage })));
 
 const PageFallback = () => (
@@ -66,6 +67,7 @@ export function App() {
                 <Route path="/compare" element={<Suspense fallback={<PageFallback />}><ComparePage /></Suspense>} />
                 <Route path="/virtual/:slug" element={<Suspense fallback={<PageFallback />}><VirtualContestPage /></Suspense>} />
                 <Route path="/contest/:slug/summary" element={<Suspense fallback={<PageFallback />}><ContestSummaryPage /></Suspense>} />
+                <Route path="/contest/:slug/rating" element={<Suspense fallback={<PageFallback />}><RatingChangesPage /></Suspense>} />
                 <Route path="/problemset" element={<Suspense fallback={<PageFallback />}><ProblemsetPage /></Suspense>} />
               </Route>
             </Route>
