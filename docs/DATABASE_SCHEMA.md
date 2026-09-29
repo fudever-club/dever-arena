@@ -1,213 +1,105 @@
-# THIẾT KẾ CƠ SỞ DỮ LIỆU CHUẨN DOANH NGHIỆP (DATABASE ARCHITECTURE & ERD)
-> **Hệ quản trị CSDL đề xuất:** PostgreSQL 16+ với các phần mở rộng `uuid-ossp`, `pg_trgm` (Full-Text Search) và `btree_gist`.
-> **Lưu ý Phase 15+:** tính năng Clan Wars đã xóa khỏi UI/server/tests; tài khoản thi đấu là cá nhân hoặc đội (`team`, `members`) do admin cấp. Bảng `CLANS` / cột `users.clan_id` / store IndexedDB `clans` trong ERD dưới đây là **di sản frozen** (giữ để tương thích seed cũ, không dùng cho tính năng mới). Adapter Postgres thật: `server/pg.js` (KV + meta, write-through + flush).
+# THIẾT KẾ CƠ SỞ DỮ LIỆU — SCHEMA v2 (NGUỒN SỰ THẬT)
+> **Tài liệu này mô tả đúng schema PostgreSQL đang chạy trên production** (Phase 36, schema v2 từ 29/9/2026).
+> Nguồn sự thật kỹ thuật: `server/pg_schema.js` (DDL + map cột) và `server/pg.js` (adapter).
+> Lịch sử: v1 là 1 bảng KV generic `dever_store(collection, id, payload JSONB)` — đã migrate sang v2 ngày 29/9/2026 và **DROP** (bản dump trước migration nằm trên S3: `backups/pre-migration-*.json`). ERD "chuẩn doanh nghiệp" 12 bảng (UUID, hack_events, discussions…) cũ của tài liệu này là thiết kế tham chiếu, đã thay bằng schema thực tế dưới đây.
 
 ---
 
-## 1. SƠ ĐỒ THỰC THỂ MỐI QUAN HỆ (DATABASE ERD)
+## 1. KIẾN TRÚC LƯU TRỮ (PHIÊN BẢN ĐANG CHẠY)
 
-```mermaid
-erDiagram
-    CLANS ||--o{ USERS : "belongs_to"
-    USERS ||--o{ CONTEST_PARTICIPANTS : "registers"
-    CONTESTS ||--o{ CONTEST_PARTICIPANTS : "has_members"
-    CONTESTS ||--o{ PROBLEMS : "contains"
-    PROBLEMS ||--o{ TESTCASES : "has"
-    USERS ||--o{ SUBMISSIONS : "submits"
-    PROBLEMS ||--o{ SUBMISSIONS : "target_of"
-    SUBMISSIONS ||--o{ SUBMISSION_TEST_RESULTS : "evaluated_by"
-    USERS ||--o{ HACK_EVENTS : "initiator_of"
-    SUBMISSIONS ||--o{ HACK_EVENTS : "target_of"
-    PROBLEMS ||--o{ DISCUSSIONS : "has_threads"
-    USERS ||--o{ DISCUSSIONS : "creates"
-    DISCUSSIONS ||--o{ DISCUSSION_COMMENTS : "contains"
-    USERS ||--o{ DISCUSSION_COMMENTS : "authors"
+- **Mirror bộ nhớ + flush write-through:** server giữ toàn bộ dữ liệu trong mirror đồng bộ (`db.data.*`), facade `find/filter/insert/update/nextId` đọc/ghi bộ nhớ tức thì; mỗi 5 giây `flush()` upsert per-row vào Postgres + **mirror DELETE** (row bị xóa khỏi memory biến mất khỏi DB — chống "hồi sinh" dữ liệu).
+- **Cột typed + `extra JSONB`:** mọi trường cần lọc/join/unique là cột thật; mỗi bảng có cột `extra JSONB DEFAULT '{}'` làm catch-all cho trường lạ (dữ liệu cũ, trường tương lai) — **flush không bao giờ mất dữ liệu**.
+- **Không FK/CHECK ở v2:** mirror bộ nhớ là nguồn sự thật; ràng buộc chặt sẽ thêm ở phase sau khi dữ liệu sạch.
+- **`id` là TEXT** (`u_1_lx3k`, `sub_2_abc`…): tương thích id hiện có, không chuyển UUID.
+- **JSONB giữ cho blob động:** `submissions.per_test`, `problems.tags/bounds`, `users.rating_history/password` (trong extra).
+- **`dever_meta`:** bảng meta (`seq` — counter ID, `schema_version` — cờ mode adapter). Boot tự chọn mode: `schema_version >= 2` → bảng thật; còn dữ liệu KV → mode legacy (không còn relevant sau khi đã drop).
 
-    USERS {
-        uuid id PK
-        varchar username UK
-        varchar email UK
-        varchar password_hash
-        varchar full_name
-        uuid clan_id FK
-        int rating
-        int max_rating
-        varchar rank_tier
-        jsonb statistics
-        timestamptz created_at
-    }
+## 2. 10 BẢNG DOMAIN
 
-    CLANS {
-        uuid id PK
-        varchar name UK
-        varchar tag UK
-        varchar clan_type "cohort_or_specialty"
-        int total_rating
-        uuid leader_id FK
-    }
+### 2.1. `users` — tài khoản (thí sinh / organizer / admin)
+| Cột | Kiểu | Ghi chú |
+| :-- | :-- | :-- |
+| `id` | TEXT PK | |
+| `username` | TEXT NOT NULL | **UNIQUE** (`idx_users_username`) |
+| `email` | TEXT | nullable |
+| `password_hash` | TEXT | bcrypt-style hash (`hashPassword`) |
+| `full_name` | TEXT | |
+| `role` | TEXT | `PARTICIPANT \| ORGANIZER \| ADMIN` |
+| `rating` / `max_rating` | INTEGER | Elo, default 1200 |
+| `team` | TEXT | tên đội (nullable) |
+| `created_at` | TIMESTAMPTZ | default now() |
+| `extra` | JSONB | `members[]`, `rating_history[]`, `password` (legacy seed)… |
 
-    CONTESTS {
-        uuid id PK
-        varchar title
-        varchar slug UK
-        varchar contest_format "CODEFORCES | ICPC | IOI"
-        timestamptz start_time
-        int duration_minutes
-        int hack_duration_minutes
-        varchar status "PENDING | CODING | HACK | SYSTEM_TEST | FINISHED"
-        boolean is_rated
-        int min_rating "Division constraint"
-        int max_rating "Division constraint"
-        jsonb settings
-    }
+### 2.2. `contests` — kỳ thi
+| Cột | Kiểu | Ghi chú |
+| :-- | :-- | :-- |
+| `id` | TEXT PK | |
+| `slug` | TEXT NOT NULL | **UNIQUE** (`idx_contests_slug`) |
+| `title` | TEXT NOT NULL | |
+| `contest_format` | TEXT | `ICPC \| CODEFORCES \| IOI` |
+| `start_time` | TIMESTAMPTZ | |
+| `duration_minutes` | INTEGER | 15–600 (kẹp ở API) |
+| `status` | TEXT | `REGISTRATION → CODING → FINISHED` (ADR-005) |
+| `is_rated` | BOOLEAN | |
+| `min_rating` / `max_rating` | INTEGER | cửa sổ phân hạng (nullable) |
+| `organizer_id` | TEXT | tham chiếu logic `users.id` (multi-organizer Task 119) |
+| `extra` | JSONB | trường mở rộng |
 
-    VIRTUAL_SESSIONS {
-        varchar id PK
-        uuid contest_id FK
-        uuid user_id FK
-        timestamptz start_time
-        int duration_minutes
-        varchar status "ACTIVE | FINISHED"
-    }
+### 2.3. `problems` — đề bài
+`id` PK · `contest_id` (tham chiếu logic contests) · `code` (A/B/C…) · `title` · `rating`/`base_points` INTEGER · `tags JSONB` · `solved_count` · `workflow_status` (`DRAFT→IN_TESTING→APPROVED`) · `extra` (statement, editorial, sampleInput/Output, bounds, timeLimit, memoryLimit, tester_id, test_reports…)
+Index: `idx_problems_contest (contest_id)`, `idx_problems_rating (base_points)`.
 
-    ANALYTICS {
-        varchar id PK
-        varchar event_type
-        timestamptz timestamp
-        jsonb metadata
-    }
+### 2.4. `testcases` — bộ test
+`id` PK · `problem_id` NOT NULL · `order_index` · `stdin` · `expected_stdout` · `is_sample` · `is_pretest` · `extra`. Index: `idx_testcases_problem (problem_id, order_index)`.
 
-    PROBLEMS {
-        uuid id PK
-        uuid contest_id FK
-        varchar code "A, B, C, D"
-        varchar title
-        text statement_markdown
-        text editorial_markdown
-        int time_limit_ms
-        int memory_limit_kb
-        int base_points
-        varchar[] tags
-        int solved_count
-    }
+### 2.5. `submissions` — bài nộp (bảng lớn nhất)
+| Cột | Kiểu | Ghi chú |
+| :-- | :-- | :-- |
+| `id` | TEXT PK | |
+| `user_id` / `contest_id` / `problem_id` | TEXT | tham chiếu logic; `contest_id NULL` = bài luyện tập |
+| `language` | TEXT | `js \| python \| java \| cpp20` |
+| `verdict` | TEXT | `AC \| WA \| TLE \| MLE \| RTE \| CE \| PENDING \| SKIP` |
+| `points_awarded` | DOUBLE PRECISION | |
+| `time_ms` / `elapsed_min` | INTEGER | |
+| `submitted_at` | TIMESTAMPTZ | |
+| `source_code` | TEXT | fallback KV; prod lưu S3 (object store `sources`) |
+| `source_key` | TEXT | key S3 `submissions/<id>.txt` (Task 118) |
+| `per_test` | JSONB | `[{index, verdict, time_ms}]` — mở sau FINISHED |
+| `detail` | TEXT | thông điệp judge |
+| `is_upsolve` | BOOLEAN | upsolve sau FINISHED, 0 điểm |
+| `extra` | JSONB | trường mở rộng |
 
-    TESTCASES {
-        uuid id PK
-        uuid problem_id FK
-        int order_index
-        text stdin
-        text expected_stdout
-        boolean is_sample
-        boolean is_pretest
-        int subtask_id
-    }
+Index: `idx_sub_contest_user_problem (contest_id, user_id, problem_id, submitted_at DESC)` cho standings · `idx_sub_submitted_at DESC` cho live stream · `idx_sub_user` cho profile.
 
-    SUBMISSIONS {
-        uuid id PK
-        uuid user_id FK
-        uuid problem_id FK
-        uuid contest_id FK
-        varchar language "CPP20 | PYTHON3 | JAVA17 | JS"
-        text source_code
-        varchar verdict "AC | WA | TLE | MLE | RTE | CE | HACKED"
-        int execution_time_ms
-        int memory_used_kb
-        int points_awarded
-        boolean is_hacked
-        timestamptz submitted_at
-    }
+### 2.6. `participants` — đăng ký kỳ thi
+`id` PK · `contest_id` NOT NULL · `user_id` NOT NULL · `registered_at` · `extra`. Index: `idx_part_contest_user (contest_id, user_id)`. (Tính duy nhất theo cặp do API kiểm tra — thêm UNIQUE constraint ở phase sau.)
 
-    HACK_EVENTS {
-        uuid id PK
-        uuid contest_id FK
-        uuid hacker_id FK
-        uuid target_submission_id FK
-        text input_payload
-        boolean is_successful
-        int points_delta
-        timestamptz executed_at
-    }
+### 2.7. `virtual_sessions` — thi ảo
+`id` PK (`vs_…`) · `contest_id` · `user_id` · `start_time` · `duration_minutes` · `status` (`ACTIVE|FINISHED`) · `extra`. Index: `idx_vs_user`.
 
-    DISCUSSIONS {
-        uuid id PK
-        uuid problem_id FK
-        uuid author_id FK
-        varchar title
-        text content
-        int upvotes
-        timestamptz created_at
-    }
+### 2.8. `clans` — di sản frozen
+Tính năng Clan Wars đã xóa từ Phase 15; bảng tối giản (`id`, `name`, `tag`, `extra`) chỉ để dump/restore dữ liệu cũ. Không có tính năng mới ghi vào đây.
 
-    DISCUSSION_COMMENTS {
-        uuid id PK
-        uuid discussion_id FK
-        uuid author_id FK
-        text content
-        int upvotes
-        timestamptz created_at
-    }
+### 2.9. `clarifications` — hỏi đáp thi
+`id` PK · `contest_id` NOT NULL · `problem_id` (nullable) · `asker_id` · `question` NOT NULL · `answer` · `answered_by` · `answered_at` · `extra`. Index: `idx_clar_contest (contest_id, created_at)`.
+
+### 2.10. `announcements` — thông báo
+`id` PK · `contest_id` NOT NULL · `message` NOT NULL · `created_by` · `extra`. Index: `idx_ann_contest (contest_id, created_at)`. Push real-time qua SSE `EVENT_ANNOUNCEMENT`.
+
+## 3. QUAN HỆ (LOGICAL — KHÔNG FK Ở v2)
+
+```
+users 1─n contests (organizer_id)
+users 1─n participants n─1 contests
+contests 1─n problems 1─n testcases
+users 1─n submissions n─1 problems, n─1 contests (NULL = practice)
+users 1─n virtual_sessions n─1 contests
+contests 1─n clarifications / announcements (users = asker/answerer/creator)
 ```
 
----
+## 4. VẬN HÀNH
 
-## 2. ĐẶC TẢ CHI TIẾT CÁC BẢNG & RÀNG BUỘC (DATA DICTIONARY)
-
-### 2.1. Bảng `users` (Tài khoản & Hồ sơ Coder)
-| Trường dữ liệu | Kiểu dữ liệu | Ràng buộc | Mô tả |
-| :--- | :--- | :--- | :--- |
-| `id` | `UUID` | `PRIMARY KEY, DEFAULT gen_random_uuid()` | Khóa chính |
-| `username` | `VARCHAR(50)` | `UNIQUE, NOT NULL` | Tên tài khoản hiển thị |
-| `email` | `VARCHAR(255)` | `UNIQUE, NOT NULL` | Email sinh viên FPT (`@fpt.edu.vn`) |
-| `clan_id` | `UUID` | `REFERENCES clans(id) ON DELETE SET NULL` | Khóa học hoặc ban chuyên môn |
-| `rating` | `INTEGER` | `DEFAULT 1200, CHECK (rating >= 0)` | Điểm Elo hiện tại |
-| `max_rating` | `INTEGER` | `DEFAULT 1200` | Điểm Elo cao nhất từng đạt |
-| `rank_tier` | `VARCHAR(30)` | `DEFAULT 'Newbie'` | Tên cấp bậc (Pupil, Specialist,...) |
-
-### 2.2. Bảng `contests` (Quản lý Kỳ thi)
-* Hỗ trợ 3 thể thức qua cột `contest_format`:
-  * `CODEFORCES`: Điểm giảm theo phút + 15p Hack Phase + System Test.
-  * `ICPC`: Tính điểm theo số bài AC + Penalty time (thời gian AC + $20 \times W$).
-  * `IOI`: Điểm thành phần theo từng Subtask (0-100).
-* Cột `status`: `REGISTRATION` ➔ `CODING` ➔ `HACK_PHASE` ➔ `SYSTEM_TESTING` ➔ `FINISHED`.
-* Cột `min_rating` & `max_rating`: Ràng buộc điều kiện tham gia phân hạng (Division Eligibility Gate - Div.1, Div.2, Div.3, Beginner Cup).
-
-### 2.3. Bảng `submissions` & `hack_events`
-* `submissions` lưu trữ mã nguồn, kết quả chấm, CPU time, Memory và cờ `is_hacked`.
-* `hack_events` lưu lịch sử bẻ khóa: Input độc hại, kết quả hack (`is_successful`), điểm thưởng/phạt.
-
-### 2.4. Bảng `virtual_sessions` (Phiên Thi Đấu Ảo)
-| Trường dữ liệu | Kiểu dữ liệu | Ràng buộc | Mô tả |
-| :--- | :--- | :--- | :--- |
-| `id` | `VARCHAR(100)` | `PRIMARY KEY` | Khóa chính phiên thi ảo (`vs_<uuid>`) |
-| `contest_id` | `VARCHAR(100)` | `NOT NULL, REFERENCES contests(id)` | Mã kỳ thi quá khứ được thi lại |
-| `user_id` | `VARCHAR(100)` | `NOT NULL, REFERENCES users(id)` | Thí sinh tham gia thi ảo |
-| `start_time` | `TIMESTAMPTZ` | `NOT NULL` | Thời điểm bắt đầu phiên thi ảo cá nhân |
-| `duration_minutes` | `INTEGER` | `NOT NULL, DEFAULT 120` | Thời lượng làm bài (phút) |
-| `status` | `VARCHAR(20)` | `DEFAULT 'ACTIVE'` | Trạng thái: `ACTIVE` hoặc `FINISHED` |
-
-### 2.5. Bảng `analytics` (Giám Sát & Đo Lường Nền Tảng)
-| Trường dữ liệu | Kiểu dữ liệu | Ràng buộc | Mô tả |
-| :--- | :--- | :--- | :--- |
-| `id` | `VARCHAR(100)` | `PRIMARY KEY` | Khóa chính sự kiện |
-| `event_type` | `VARCHAR(50)` | `NOT NULL` | Loại sự kiện (`PAGE_VIEW`, `SUBMISSION`, `HACK_ATTEMPT`) |
-| `timestamp` | `TIMESTAMPTZ` | `NOT NULL` | Thời điểm ghi nhận |
-| `metadata` | `JSONB` | `DEFAULT '{}'` | Chi tiết payload telemetry |
-
----
-
-## 3. CHIẾN LƯỢC CHỈ MỤC & TỐI ƯU HÓA TRUY VẤN (INDEXING STRATEGY)
-
-```sql
--- Tối ưu hóa truy vấn Bảng xếp hạng Contest thời gian thực (Standings)
-CREATE INDEX idx_submissions_contest_user ON submissions (contest_id, user_id, problem_id, submitted_at DESC);
-
--- Tối ưu hóa tìm kiếm bài toán theo Tags và Độ khó Elo
-CREATE INDEX idx_problems_tags ON problems USING GIN (tags);
-CREATE INDEX idx_problems_rating ON problems (base_points);
-
--- Tối ưu hóa truy vấn luồng nộp bài toàn hệ thống (Live Status Stream)
-CREATE INDEX idx_submissions_live_stream ON submissions (submitted_at DESC) INCLUDE (verdict, execution_time_ms);
-
--- Tối ưu hóa truy vấn phòng Hack Room
-CREATE INDEX idx_hack_events_contest_room ON hack_events (contest_id, executed_at DESC);
-```
+- **Migration v1→v2 (đã chạy trên prod 29/9/2026):** `POST /admin/migrate-schema` (ADMIN) hoặc `node scripts/migrate_kv_to_tables.mjs` — backup S3 trước, đối chiếu COUNT per-table, flip `schema_version=2`, reload không restart. Idempotent.
+- **Dọn KV archive (đã chạy 29/9/2026):** `POST /admin/drop-legacy-kv` — guard: chỉ DROP khi schema v2; dữ liệu còn trong backup pre-migration trên S3.
+- **Backup hằng ngày:** cron `db-backup` 02:00 UTC (09:00 VN) — `scripts/backup_cron.mjs` dump theo mode (v2: SELECT * từ 10 bảng) → JSON → bucket S3 `backups/db-<stamp>.json`.
+- **Tạo bảng cho DB mới:** tự động lần đầu kết nối (`CREATE TABLE IF NOT EXISTS`) — không cần script tay.
