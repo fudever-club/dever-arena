@@ -923,6 +923,39 @@ route('POST', '^/api/v1/admin/drop-legacy-kv$', async (req, res) => {
   }
 }, { auth: true, admin: true });
 
+// Task 128 (Phase 36): tải dump JSON hiện tại (backup on-demand) — nguồn cho restore-backup.
+route('GET', '^/api/v1/admin/backup-dump$', async (req, res) => {
+  if (storeKind !== 'pg') { send(res, 422, { error: 'NOT_PG', message: 'Local JSON store dùng npm run backup (file).' }); return; }
+  try {
+    const { readTablesDump } = await import('./pg_migrate.js');
+    const { data, meta } = await readTablesDump(pool);
+    send(res, 200, { at: new Date().toISOString(), schema_mode: 'tables', meta, data });
+  } catch (e) {
+    send(res, 500, { error: 'DUMP_FAILED', message: String(e?.message || e) });
+  }
+}, { auth: true, admin: true });
+
+// Task 128 (Phase 36): restore DB từ dump JSON backup (backup_cron / backup.mjs / pre-migration).
+// Body: { dump: <object JSON backup>, reload: true } — TRUNCATE + nạp lại; snapshot pre-restore lên S3.
+route('POST', '^/api/v1/admin/restore-backup$', async (req, res) => {
+  if (storeKind !== 'pg') { send(res, 422, { error: 'NOT_PG', message: 'Local JSON store dùng npm run restore (file).' }); return; }
+  try {
+    const body = await readBody(req);
+    const dump = typeof body.dump === 'string' ? JSON.parse(body.dump) : body.dump;
+    if (!dump || typeof dump !== 'object') { send(res, 422, { error: 'BAD_DUMP', message: 'Thiếu dump JSON.' }); return; }
+    const { restoreFromDump } = await import('./pg_migrate.js');
+    const report = await restoreFromDump(pool, dump, { s3Backup: s3Put });
+    if (body.reload !== false) {
+      const reload = await db.reloadFromTables();
+      send(res, 200, { ...report, reload });
+    } else {
+      send(res, 200, report);
+    }
+  } catch (e) {
+    send(res, 500, { error: 'RESTORE_FAILED', message: String(e?.message || e) });
+  }
+}, { auth: true, admin: true });
+
 // ---- Admin: cập nhật kỳ thi (Task 124) — title/slug/start/duration/rated/rating window/organizer ----
 route('PUT', '^/api/v1/admin/contests/([^/]+)$', async (req, res, url, m, user) => {
   const c = db.find('contests', (x) => x.id === decodeURIComponent(m[1]));

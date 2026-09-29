@@ -5,7 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { migrateKvToTables, dropLegacyKv } from '../server/pg_migrate.js';
+import { migrateKvToTables, dropLegacyKv, readTablesDump, restoreFromDump } from '../server/pg_migrate.js';
 
 /** Pool giả: dever_store đầu vào → ghi vào "bảng" in-memory, COUNT theo nội dung đã ghi. */
 function fakePool(kvRows = [], { countOverride = null, hasKvTable = true } = {}) {
@@ -146,4 +146,109 @@ test('dropLegacyKv: v2 + dever_store không tồn tại → already', async () =
   await pool.query(`INSERT INTO dever_meta (key, value) VALUES ('schema_version', '2') ON CONFLICT (key) DO UPDATE`, ['2']);
   const report = await dropLegacyKv(pool);
   assert.equal(report.status, 'already');
+});
+
+// ---------- Task 128: readTablesDump + restoreFromDump ----------
+
+/** Pool giả v2: lưu row vào bảng, SELECT * trả về row đã ghi; TRUNCATE xóa trắng. */
+function fakePoolV2(seed = {}) {
+  const tables = Object.fromEntries(['users', 'contests', 'problems', 'testcases', 'submissions', 'participants', 'virtual_sessions', 'clans', 'clarifications', 'announcements'].map((c) => [c, seed[c] ? [...seed[c]] : []]));
+  const meta = [{ key: 'seq', value: 9 }, { key: 'schema_version', value: 2 }];
+  const queries = [];
+  return {
+    queries, tables,
+    async query(sql, params) {
+      queries.push({ sql, params });
+      if (sql === 'SELECT key, value FROM dever_meta') return { rows: meta.map((m) => ({ ...m })) };
+      if (sql.includes("dever_meta WHERE key = 'schema_version'")) return { rows: [{ value: '2' }] };
+      if (sql.startsWith('SELECT * FROM ')) {
+        const t = sql.slice('SELECT * FROM '.length);
+        return { rows: (tables[t] || []).map((r) => ({ ...r })) };
+      }
+      if (/^TRUNCATE (\w+)$/.test(sql)) {
+        tables[sql.slice('TRUNCATE '.length)] = [];
+        return { rows: [] };
+      }
+      const m = sql.match(/^INSERT INTO (\w+) \(/);
+      if (m && m[1] !== 'dever_meta') {
+        const t = m[1];
+        const idx = tables[t].findIndex((r) => r.id === params[0]);
+        const row = { id: params[0] };
+        if (idx >= 0) tables[t][idx] = row;
+        else tables[t].push(row);
+        return { rows: [] };
+      }
+      if (/^INSERT INTO dever_meta/.test(sql)) {
+        // Key có thể là literal trong SQL (VALUES ('seq', $1)) hoặc param (VALUES ($1, $2))
+        const keyMatch = sql.match(/VALUES \('([^']+)',/);
+        const key = keyMatch ? keyMatch[1] : params?.[0];
+        const value = keyMatch ? params?.[0] : params?.[1];
+        const i = meta.findIndex((x) => x.key === key);
+        if (i >= 0) meta[i] = { key, value };
+        else meta.push({ key, value });
+        return { rows: [] };
+      }
+      if (/^SELECT COUNT\(\*\)/.test(sql)) {
+        const t = sql.match(/FROM (\w+)$/)[1];
+        return { rows: [{ n: (tables[t] || []).length }] };
+      }
+      return { rows: [] };
+    },
+    async end() {},
+  };
+}
+
+test('readTablesDump: dump 10 collection với ts → ISO, kèm meta', async () => {
+  const pool = fakePoolV2({
+    users: [{ id: 'u_1', username: 'hero', created_at: new Date('2026-09-29T00:00:00Z') }],
+  });
+  const { data, meta } = await readTablesDump(pool);
+  assert.equal(Object.keys(data).length, 10);
+  assert.equal(data.users[0].created_at, '2026-09-29T00:00:00.000Z');
+  assert.ok(meta.some((m) => m.key === 'seq'));
+});
+
+test('restoreFromDump: round-trip tables dump → TRUNCATE + nạp lại đúng số rows', async () => {
+  const pool = fakePoolV2({
+    users: [{ id: 'u_1', username: 'hero', rating: 1500, extra: { password: 'h' } }],
+    contests: [{ id: 'c_1', slug: 'r1' }],
+    submissions: [],
+  });
+  const { data, meta } = await readTablesDump(pool);
+  // Thêm 1 row lạ sau dump — restore phải xóa nó (TRUNCATE thay thế toàn bộ)
+  pool.tables.users.push({ id: 'u_ghost' });
+  const s3Calls = [];
+  const report = await restoreFromDump(pool, { schema_mode: 'tables', meta, data }, {
+    s3Backup: async (key) => { s3Calls.push(key); return 'ok'; },
+  });
+  assert.equal(report.status, 'restored');
+  assert.equal(report.counts.users, 1);
+  assert.equal(report.counts.contests, 1);
+  assert.equal(pool.tables.users.length, 1); // ghost bị xóa
+  assert.equal(pool.tables.users[0].id, 'u_1');
+  assert.match(s3Calls[0], /^backups\/pre-restore-/);
+  // seq được phục hồi từ meta (key literal 'seq', value = params[0])
+  const seq = pool.queries.find((q) => q.sql.includes("VALUES ('seq', $1)"));
+  assert.equal(seq.params[0], 9);
+});
+
+test('restoreFromDump: dump mode kv (payload memory) → nạp trực tiếp', async () => {
+  const pool = fakePoolV2();
+  const report = await restoreFromDump(pool, {
+    schema_mode: 'kv',
+    meta: [{ key: 'seq', value: '3' }],
+    data: { users: [{ id: 'u_old', username: 'legacy', password: 'h' }], contests: [] },
+  });
+  assert.equal(report.mode, 'kv');
+  assert.equal(report.counts.users, 1);
+  assert.equal(pool.tables.users[0].id, 'u_old');
+});
+
+test('restoreFromDump: dump sai cấu trúc → throw, không TRUNCATE gì', async () => {
+  const pool = fakePoolV2({ users: [{ id: 'u_1' }] });
+  await assert.rejects(() => restoreFromDump(pool, { data: { users: 'không-phải-mảng' } }), /phải là mảng/);
+  await assert.rejects(() => restoreFromDump(pool, { data: { khong_la_collection: [] } }), /Collection lạ/);
+  await assert.rejects(() => restoreFromDump(pool, {}), /thiếu trường data/);
+  assert.equal(pool.tables.users.length, 1, 'dữ liệu gốc không bị đụng đến');
+  assert.equal(pool.queries.some((q) => q.sql.startsWith('TRUNCATE')), false);
 });

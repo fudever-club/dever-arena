@@ -1,8 +1,8 @@
 /**
  * DEVER Arena — cron backup hằng ngày (Task 120, schema-aware từ Phase 36).
  * Dump toàn bộ DB → JSON → đẩy lên object store (S3).
- *  - Mode kv (schema v1): dump dever_store + dever_meta.
- *  - Mode tables (schema v2): dump 10 bảng thật + dever_meta.
+ *  - Mode tables (schema v2): dùng readTablesDump() chung với backup.mjs / restore.
+ *  - Mode kv (schema v1, legacy): dump dever_store + dever_meta.
  * Chạy trên Specific qua cron "db-backup" (same build với api, có pg + S3 env).
  * Không có DEVER_DATABASE_URL → thoát 0 với thông báo (chạy local JSON mode không cần backup này).
  *
@@ -24,29 +24,22 @@ const { putObject } = await import('../server/objectStore.js');
 const pool = new Pool({ connectionString: url });
 
 try {
-  // Xác định schema mode: dever_meta.schema_version >= 2 → tables, ngược lại kv.
   const meta = await pool.query(`SELECT key, value FROM dever_meta`);
   const ver = Number(meta.rows.find((r) => r.key === 'schema_version')?.value) || 1;
   const mode = ver >= 2 ? 'tables' : 'kv';
 
-  const dump = { users: [], contests: [], problems: [], testcases: [], submissions: [], participants: [], virtual_sessions: [], clans: [], clarifications: [], announcements: [] };
-
+  let dump, data;
   if (mode === 'tables') {
-    for (const table of Object.keys(dump)) {
-      const { rows } = await pool.query(`SELECT * FROM ${table}`);
-      // row → payload gần shape bộ nhớ: ts ISO, jsonb là object sẵn (pg tự parse).
-      dump[table] = rows.map((r) => ({
-        ...r,
-        submitted_at: iso(r.submitted_at), start_time: iso(r.start_time),
-        registered_at: iso(r.registered_at), answered_at: iso(r.answered_at),
-        created_at: iso(r.created_at),
-      }));
-    }
+    const { readTablesDump } = await import('../server/pg_migrate.js');
+    ({ data } = await readTablesDump(pool));
+    dump = data;
   } else {
     const { rows } = await pool.query('SELECT collection, id, payload FROM dever_store');
+    data = {};
     for (const r of rows) {
-      if (dump[r.collection]) dump[r.collection].push(r.payload);
+      (data[r.collection] = data[r.collection] || []).push(r.payload);
     }
+    dump = data;
   }
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -65,9 +58,4 @@ try {
   process.exitCode = 1;
 } finally {
   await pool.end();
-}
-
-function iso(v) {
-  if (v == null) return null;
-  return v instanceof Date ? v.toISOString() : String(v);
 }

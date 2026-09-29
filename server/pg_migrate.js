@@ -12,7 +12,7 @@
  *  - Đối chiếu số rows KV vs bảng theo từng collection — lệch → ném lỗi (exit 1 / HTTP 500).
  *  - KHÔNG xóa dever_store (giữ làm archive — dọn ở Task 130 khi prod ổn định).
  */
-import { TABLES_SQL, rowToValues } from './pg_schema.js';
+import { TABLES_SQL, rowToValues, rowToPayload } from './pg_schema.js';
 import { COLLECTIONS } from './pg.js';
 
 const BOOT_META_SQL = [
@@ -102,6 +102,100 @@ export async function migrateKvToTables(pool, { s3Backup = null } = {}) {
   );
 
   return { status: 'migrated', from: totalKv, counts, backupKey, seq };
+}
+
+/**
+ * Task 128: dump toàn bộ 10 bảng (row shape, ts → ISO) + dever_meta — dùng chung cho
+ * backup_cron (S3), backup.mjs (file) và pre-restore snapshot.
+ */
+const TS_COLS = ['submitted_at', 'start_time', 'registered_at', 'answered_at', 'created_at'];
+
+function isoVal(v) {
+  if (v == null) return null;
+  return v instanceof Date ? v.toISOString() : String(v);
+}
+
+export async function readTablesDump(pool) {
+  const data = {};
+  for (const col of COLLECTIONS) {
+    const { rows } = await pool.query(`SELECT * FROM ${col}`);
+    data[col] = (rows || []).map((r) => {
+      const o = { ...r };
+      for (const k of TS_COLS) if (k in o) o[k] = isoVal(o[k]);
+      return o;
+    });
+  }
+  const { rows: metaRows } = await pool.query('SELECT key, value FROM dever_meta');
+  return { data, meta: metaRows || [] };
+}
+
+/**
+ * Task 128: phục hồi DB từ dump JSON (định dạng backup_cron/pre-migration/backup.mjs):
+ *   { schema_mode: 'tables'|'kv', meta: [{key,value}], data: { <collection>: [row|payload] } }
+ * TRUNCATE từng bảng rồi nạp lại (restore là thay thế toàn bộ — rows không có trong dump bị bỏ).
+ * Chuẩn hóa: dump 'tables' là row shape (SELECT *) → rowToPayload; dump 'kv' là payload memory → dùng trực tiếp.
+ * Idempotent: chạy lại cho cùng kết quả. Pre-restore snapshot đẩy S3 TRƯỚC khi TRUNCATE (nếu có S3).
+ * Không bọc transaction (pool query có thể đổi connection) — lỗi giữa chừng thì chạy lại sau khi sửa nguyên nhân.
+ */
+export async function restoreFromDump(pool, dump, { s3Backup = null } = {}) {
+  const mode = String(dump?.schema_mode || 'tables');
+  const data = dump?.data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error('Dump thiếu trường data (object {<collection>: [...]}).');
+  }
+  for (const k of Object.keys(data)) {
+    if (!COLLECTIONS.includes(k)) throw new Error(`Collection lạ trong dump: ${k}`);
+    if (!Array.isArray(data[k])) throw new Error(`data.${k} phải là mảng.`);
+  }
+
+  // Snapshot hiện trạng TRƯỚC khi TRUNCATE — an toàn phục hồi ngược.
+  let preRestoreKey = null;
+  if (s3Backup) {
+    const current = await readTablesDump(pool);
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    preRestoreKey = `backups/pre-restore-${stamp}.json`;
+    const body = JSON.stringify({
+      at: new Date().toISOString(), schema_mode: 'tables', phase: 'pre-restore',
+      meta: current.meta, data: current.data,
+    }, null, 2);
+    const out = await s3Backup(preRestoreKey, body);
+    if (out !== 'ok') {
+      console.warn('[restore] S3 pre-restore snapshot không thành công — vẫn tiếp tục restore.');
+      preRestoreKey = null;
+    }
+  }
+
+  const counts = {};
+  for (const col of COLLECTIONS) {
+    await pool.query(`TRUNCATE ${col}`);
+    let n = 0;
+    for (const raw of data[col] || []) {
+      const payload = mode === 'tables' ? rowToPayload(col, raw) : raw;
+      const id = String(payload.id ?? JSON.stringify(payload).slice(0, 64));
+      const { cols, extra } = rowToValues(col, payload);
+      const names = ['id', ...Object.keys(cols), 'extra'];
+      const vals = [id, ...Object.values(cols), JSON.stringify(extra)];
+      const ph = names.map((_, i) => `$${i + 1}`).join(', ');
+      const updates = names.slice(1).map((nm, i) => `${nm} = $${i + 2}`).join(', ');
+      await pool.query(
+        `INSERT INTO ${col} (${names.join(', ')}) VALUES (${ph})
+         ON CONFLICT (id) DO UPDATE SET ${updates}`,
+        vals
+      );
+      n += 1;
+    }
+    counts[col] = n;
+  }
+  const meta = Array.isArray(dump?.meta) ? dump.meta : [];
+  const seqRow = meta.find((m) => m?.key === 'seq');
+  if (seqRow) {
+    await pool.query(
+      `INSERT INTO dever_meta (key, value) VALUES ('seq', $1)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [Number(seqRow.value) || 1]
+    );
+  }
+  return { status: 'restored', mode, counts, preRestoreKey };
 }
 
 /**
