@@ -5,6 +5,7 @@ on:
     workflows: [dever-arena-ci]
     types: [completed]
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: deploy-production
@@ -20,6 +21,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
+    # OIDC federation cho Specific CLI (không cần static secret);
+    # SPECIFIC_API_KEY là phương án dự phòng.
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
