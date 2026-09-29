@@ -23,6 +23,7 @@ export const ContestProvider = ({ children }) => {
   const [serverOnline, setServerOnline] = useState(false);
 
   // Đồng bộ đồng hồ + phase từ máy chủ (backend là nguồn thật khi online)
+  // Đề server nạp ĐỘC LẬP với getContest — prod không có kỳ demo slug này vẫn phải nạp đề thật.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -39,8 +40,12 @@ export const ContestProvider = ({ children }) => {
           try { localStorage.setItem('dever_contest_phase', c.status); } catch {}
         }
         setServerOnline(true);
-        // Online: đề thi lấy từ máy chủ làm chuẩn (merge giữ nháp local)
-        loadProblemsFromServer().catch(() => {});
+      } catch { /* giữ fallback demo cho timer */ }
+    })();
+    (async () => {
+      try {
+        await loadProblemsFromServer();
+        if (!cancelled) setServerOnline(true);
       } catch { /* giữ fallback demo */ }
     })();
     return () => { cancelled = true; };
