@@ -683,6 +683,153 @@
         }
       }
     },
+    "/api/v1/admin/migrate-schema": {
+      "post": {
+        "summary": "POST /api/v1/admin/migrate-schema",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/drop-legacy-kv": {
+      "post": {
+        "summary": "POST /api/v1/admin/drop-legacy-kv",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/backup-dump": {
+      "get": {
+        "summary": "GET /api/v1/admin/backup-dump",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN."
+      }
+    },
+    "/api/v1/admin/restore-backup": {
+      "post": {
+        "summary": "POST /api/v1/admin/restore-backup",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Yêu cầu quyền ADMIN.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/contests/{param1}/rating-changes": {
+      "get": {
+        "summary": "GET /api/v1/contests/{param1}/rating-changes",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thành công"
+          },
+          "401": {
+            "description": "Thiếu/sai token (nếu route yêu cầu auth)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "param1",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/v1/admin/contests/{param1}": {
       "put": {
         "summary": "PUT /api/v1/admin/contests/{param1}",
