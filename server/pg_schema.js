@@ -171,44 +171,45 @@ export const TABLES_SQL = [
 export const TABLE_COLUMNS = {
   users: {
     username: 'text', email: 'text', password_hash: 'text', full_name: 'text',
-    role: 'text', rating: 'int', max_rating: 'int', team: 'text',
+    role: 'text', rating: 'int', max_rating: 'int', team: 'text', created_at: 'ts',
   },
   contests: {
     slug: 'text', title: 'text', contest_format: 'text', start_time: 'ts',
     duration_minutes: 'int', status: 'text', is_rated: 'bool',
-    min_rating: 'int', max_rating: 'int', organizer_id: 'text',
+    min_rating: 'int', max_rating: 'int', organizer_id: 'text', created_at: 'ts',
   },
   problems: {
     contest_id: 'text', code: 'text', title: 'text', rating: 'int',
     base_points: 'int', tags: 'jsonb', solved_count: 'int', workflow_status: 'text',
+    created_at: 'ts',
   },
   testcases: {
     problem_id: 'text', order_index: 'int', stdin: 'text', expected_stdout: 'text',
-    is_sample: 'bool', is_pretest: 'bool',
+    is_sample: 'bool', is_pretest: 'bool', created_at: 'ts',
   },
   submissions: {
     user_id: 'text', contest_id: 'text', problem_id: 'text', language: 'text',
     verdict: 'text', points_awarded: 'float', time_ms: 'int', elapsed_min: 'int',
     submitted_at: 'ts', source_code: 'text', source_key: 'text', per_test: 'jsonb',
     passed_tests: 'int', total_tests: 'int',
-    detail: 'text', is_upsolve: 'bool',
+    detail: 'text', is_upsolve: 'bool', created_at: 'ts',
   },
   participants: {
-    contest_id: 'text', user_id: 'text', registered_at: 'ts',
+    contest_id: 'text', user_id: 'text', registered_at: 'ts', created_at: 'ts',
   },
   virtual_sessions: {
     contest_id: 'text', user_id: 'text', start_time: 'ts',
-    duration_minutes: 'int', status: 'text',
+    duration_minutes: 'int', status: 'text', created_at: 'ts',
   },
   clans: {
-    name: 'text', tag: 'text',
+    name: 'text', tag: 'text', created_at: 'ts',
   },
   clarifications: {
     contest_id: 'text', problem_id: 'text', asker_id: 'text', question: 'text',
-    answer: 'text', answered_by: 'text', answered_at: 'ts',
+    answer: 'text', answered_by: 'text', answered_at: 'ts', created_at: 'ts',
   },
   announcements: {
-    contest_id: 'text', message: 'text', created_by: 'text',
+    contest_id: 'text', message: 'text', created_by: 'text', created_at: 'ts',
   },
 };
 
@@ -296,6 +297,9 @@ export function buildUpsert(table, payload) {
 /**
  * Chuyển 1 row Postgres (từ SELECT) → payload bộ nhớ đúng shape cũ.
  * Ngược với rowToValues: gộp extra vào, ts trả ISO string, jsonb trả object.
+ * QUAN TRỌNG (bài học restore-drill 29/9): GIỮ `created_at` — nếu bỏ, mọi đường đi qua
+ * rowToPayload (restore, migrate, flush vòng) đều mất timestamp gốc và DB điền NOW(),
+ * khiến dữ liệu sau restore sai toàn bộ created_at (rò rỉ thời điểm restore).
  */
 export function rowToPayload(table, row) {
   const colMap = TABLE_COLUMNS[table] || {};
@@ -303,7 +307,7 @@ export function rowToPayload(table, row) {
   const extras = row.extra && typeof row.extra === 'object' ? row.extra : {};
   const seen = new Set();
   for (const [key, value] of Object.entries(row)) {
-    if (key === 'id' || key === 'extra' || key === 'created_at') { seen.add(key); continue; }
+    if (key === 'id' || key === 'extra') { seen.add(key); continue; }
     seen.add(key);
     if (value === null || value === undefined) {
       // NULL có nghĩa "không có / bị truncate" — chỉ khôi phục nếu extra giữ bản gốc.

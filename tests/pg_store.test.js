@@ -242,13 +242,25 @@ test('rowToValues: ts không hợp lệ → NULL, int NaN → NULL', () => {
   assert.equal(cols.duration_minutes, null);
 });
 
-test('rowToPayload: round-trip ngược — ts ISO, extra gộp, created_at bỏ qua', () => {
+test('rowToPayload: round-trip ngược — ts ISO, extra gộp, created_at GIỮ NGUYÊN (bài học restore-drill)', () => {
   const row = {
     id: 'a_1', contest_id: 'c1', message: 'hi', created_at: new Date('2026-09-29T00:00:00Z'),
     extra: { pinned: true },
   };
   const payload = rowToPayload('announcements', row);
-  assert.deepEqual(payload, { id: 'a_1', contest_id: 'c1', message: 'hi', pinned: true });
+  assert.deepEqual(payload, { id: 'a_1', contest_id: 'c1', message: 'hi', pinned: true, created_at: '2026-09-29T00:00:00.000Z' });
+});
+
+test('restore round-trip: created_at sống qua rowToPayload → rowToValues (không mất timestamp gốc)', () => {
+  const dumpRow = { id: 'sub_x', problem_id: 'p1', verdict: 'AC', is_upsolve: false, created_at: '2026-09-29T07:29:09.059Z' };
+  const payload = rowToPayload('submissions', dumpRow);
+  const { cols } = rowToValues('submissions', payload);
+  assert.equal(cols.created_at, '2026-09-29T07:29:09.059Z');
+});
+
+test('flush thường: payload KHÔNG có created_at → bỏ khỏi INSERT, DEFAULT now() áp dụng', () => {
+  const { names } = buildUpsert('users', { id: 'u_1', username: 'x', role: 'PARTICIPANT' });
+  assert.ok(!names.includes('created_at'));
 });
 
 test('rowToPayload: NULL có bản gốc trong extra → trả lại giá trị gốc (chống truncate)', () => {
