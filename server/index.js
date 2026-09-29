@@ -911,6 +911,18 @@ route('POST', '^/api/v1/admin/migrate-schema$', async (req, res) => {
   }
 }, { auth: true, admin: true });
 
+// Task 130 (Phase 36): dọn KV archive sau khi v2 ổn định — DROP dever_store (guard: schema phải v2).
+route('POST', '^/api/v1/admin/drop-legacy-kv$', async (req, res) => {
+  if (storeKind !== 'pg') { send(res, 422, { error: 'NOT_PG', message: 'Local JSON store không có KV legacy.' }); return; }
+  try {
+    const { dropLegacyKv } = await import('./pg_migrate.js');
+    const report = await dropLegacyKv(pool);
+    send(res, 200, report);
+  } catch (e) {
+    send(res, 500, { error: 'DROP_FAILED', message: String(e?.message || e) });
+  }
+}, { auth: true, admin: true });
+
 // ---- Admin: cập nhật kỳ thi (Task 124) — title/slug/start/duration/rated/rating window/organizer ----
 route('PUT', '^/api/v1/admin/contests/([^/]+)$', async (req, res, url, m, user) => {
   const c = db.find('contests', (x) => x.id === decodeURIComponent(m[1]));

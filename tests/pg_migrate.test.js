@@ -5,10 +5,10 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { migrateKvToTables } from '../server/pg_migrate.js';
+import { migrateKvToTables, dropLegacyKv } from '../server/pg_migrate.js';
 
 /** Pool giả: dever_store đầu vào → ghi vào "bảng" in-memory, COUNT theo nội dung đã ghi. */
-function fakePool(kvRows = [], { countOverride = null } = {}) {
+function fakePool(kvRows = [], { countOverride = null, hasKvTable = true } = {}) {
   const tables = {};   // table -> [{id, ...}]
   const queries = [];
   let schemaVersion = 1;
@@ -18,6 +18,11 @@ function fakePool(kvRows = [], { countOverride = null } = {}) {
       queries.push({ sql, params });
       if (sql.includes("dever_meta WHERE key = 'schema_version'")) {
         return { rows: [{ value: String(schemaVersion) }] };
+      }
+      if (sql.includes('information_schema.tables')) return { rows: [{ ok: hasKvTable }] };
+      if (/^DROP TABLE/.test(sql)) {
+        delete tables.dever_store;
+        return { rows: [] };
       }
       if (sql.startsWith('SELECT collection')) return { rows: kvRows };
       if (sql.includes("dever_meta WHERE key = 'seq'")) return { rows: [{ value: 7 }] };
@@ -117,5 +122,28 @@ test('migrate: re-run sau khi migrated thành công → already (idempotent end-
   await migrateKvToTables(pool);
   pool.queries.length = 0;
   const report = await migrateKvToTables(pool);
+  assert.equal(report.status, 'already');
+});
+
+// ---------- Task 130: dropLegacyKv ----------
+
+test('dropLegacyKv: schema chưa v2 → throw, không DROP', async () => {
+  const pool = fakePool(KV, { hasKvTable: true });
+  await assert.rejects(() => dropLegacyKv(pool), /chưa ở v2/);
+  assert.equal(pool.queries.some((q) => q.sql.startsWith('DROP TABLE')), false);
+});
+
+test('dropLegacyKv: v2 + dever_store tồn tại → dropped', async () => {
+  const pool = fakePool(KV, { hasKvTable: true });
+  await pool.query(`INSERT INTO dever_meta (key, value) VALUES ('schema_version', '2') ON CONFLICT (key) DO UPDATE`, ['2']);
+  const report = await dropLegacyKv(pool);
+  assert.equal(report.status, 'dropped');
+  assert.ok(pool.queries.some((q) => q.sql === 'DROP TABLE dever_store'));
+});
+
+test('dropLegacyKv: v2 + dever_store không tồn tại → already', async () => {
+  const pool = fakePool([], { hasKvTable: false });
+  await pool.query(`INSERT INTO dever_meta (key, value) VALUES ('schema_version', '2') ON CONFLICT (key) DO UPDATE`, ['2']);
+  const report = await dropLegacyKv(pool);
   assert.equal(report.status, 'already');
 });

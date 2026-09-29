@@ -103,3 +103,25 @@ export async function migrateKvToTables(pool, { s3Backup = null } = {}) {
 
   return { status: 'migrated', from: totalKv, counts, backupKey, seq };
 }
+
+/**
+ * Task 130: dọn KV archive — DROP dever_store SAU khi schema v2 chạy ổn định.
+ * Guard: chỉ cho phép khi schema_version >= 2 (chưa migrate thì từ chối).
+ * An toàn: dữ liệu KV vẫn còn nguyên trong backup S3 pre-migration (Task 127 đã dump).
+ */
+export async function dropLegacyKv(pool) {
+  const { rows: verRows } = await pool.query(`SELECT value FROM dever_meta WHERE key = 'schema_version'`);
+  const version = Number(verRows?.[0]?.value) || 1;
+  if (version < 2) {
+    throw new Error('Schema chưa ở v2 — chạy migrate-schema trước khi dọn KV archive.');
+  }
+  const { rows: exists } = await pool.query(
+    `SELECT EXISTS (SELECT 1 FROM information_schema.tables
+      WHERE table_schema = current_schema() AND table_name = 'dever_store') AS ok`
+  );
+  if (!exists?.[0]?.ok) {
+    return { status: 'already', message: 'dever_store không tồn tại — đã dọn trước đó.' };
+  }
+  await pool.query('DROP TABLE dever_store');
+  return { status: 'dropped', message: 'Đã DROP dever_store (dữ liệu còn trong backup pre-migration trên S3).' };
+}
