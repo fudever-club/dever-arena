@@ -228,9 +228,13 @@ export function rowToValues(table, payload) {
         cols[key] = Number.isNaN(d.getTime()) ? null : d.toISOString();
         break;
       }
-      case 'jsonb':
-        cols[key] = typeof value === 'string' ? safeParse(value, value) : value;
+      case 'jsonb': {
+        // QUAN TRỌNG: luôn gửi CHUỖI JSON cho cột jsonb — nếu truyền mảng/object trực tiếp,
+        // driver pg biến mảng thành Postgres array literal {a,b} → "invalid input syntax for type json".
+        const parsed = typeof value === 'string' ? safeParse(value, value) : value;
+        cols[key] = JSON.stringify(parsed);
         break;
+      }
       case 'int': {
         const n = Number(value);
         cols[key] = Number.isFinite(n) ? Math.trunc(n) : null;

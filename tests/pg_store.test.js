@@ -191,8 +191,8 @@ test('[tables] cập nhật verdict bài nộp giữ nguyên id — upsert ghi �
   assert.equal(v('id'), id);
   assert.equal(v('verdict'), 'AC');
   assert.equal(v('points_awarded'), 450.5);
-  // pg driver tự JSON-serialize object/array cho cột jsonb → param là object, không phải chuỗi
-  assert.deepEqual(v('per_test'), [{ index: 0, verdict: 'AC', time_ms: 12 }]);
+  // jsonb luôn gửi chuỗi JSON (mảng trực tiếp → pg biến thành array literal {…} → lỗi)
+  assert.equal(v('per_test'), '[{"index":0,"verdict":"AC","time_ms":12}]');
   await store.stop();
 });
 
@@ -204,13 +204,21 @@ test('rowToValues: ts/jsonb/int/bool coerce + undefined → NULL + null giữ nu
     time_ms: '123', is_upsolve: 1, detail: null, source_code: undefined, weird_field: { a: 1 },
   });
   assert.equal(cols.submitted_at, '2026-09-29T00:00:00.000Z');
-  assert.deepEqual(cols.per_test, [1, 2]);
+  // jsonb LUÔN là chuỗi JSON — mảng truyền trực tiếp bị pg driver biến thành {1,2} (invalid json)
+  assert.equal(cols.per_test, '[1,2]');
   assert.equal(cols.time_ms, 123);
   assert.equal(cols.is_upsolve, true);
   assert.equal(cols.detail, null);
   assert.equal(cols.source_code, null); // undefined → NULL cột
   assert.deepEqual(extra.weird_field, { a: 1 });
   assert.equal(extra.id, undefined);
+});
+
+test('rowToValues: REGRESSION — mảng/object cho cột jsonb phải ra chuỗi JSON (không phải Postgres array literal)', () => {
+  const { cols } = rowToValues('problems', { id: 'p_1', tags: ['math', 'implementation'] });
+  assert.equal(cols.tags, '["math","implementation"]');
+  const { cols: c2 } = rowToValues('submissions', { id: 's_2', per_test: [{ index: 0, verdict: 'AC', time_ms: 12 }] });
+  assert.equal(c2.per_test, '[{"index":0,"verdict":"AC","time_ms":12}]');
 });
 
 test('rowToValues: ts không hợp lệ → NULL, int NaN → NULL', () => {
