@@ -77,7 +77,7 @@ const TestingQueue = () => {
 };
 
 export const ContestHub = () => {
-  const { phase, formattedTime, getDynamicScore, problems = [] } = useContest();
+  const { phase, formattedTime, getDynamicScore, problems = [], activeContest } = useContest();
   const navigate = useNavigate();
 
   const [contests, setContests] = useState(null);
@@ -213,7 +213,7 @@ export const ContestHub = () => {
             </div>
 
             <h1 className="text-2xl lg:text-3xl font-semibold text-[#f7f8f8] tracking-tight">
-              DEVER Round #1 (Div. 3) — đấu trường thuật toán
+              {activeContest?.title || 'DEVER Arena — đấu trường thuật toán'}
             </h1>
 
             <p className="text-slate-400 text-xs sm:text-sm mt-1.5 max-w-xl">
@@ -223,12 +223,14 @@ export const ContestHub = () => {
 
           <div className="flex items-center gap-4 bg-[#010102] p-4 rounded-xl border border-[#23252a] shrink-0">
             <div className="text-right min-w-[120px]">
-              <span className="text-[11px] text-slate-400 font-medium block">Thời gian còn lại</span>
+              <span className="text-[11px] text-slate-400 font-medium block">
+                {phase === 'CODING' ? 'Thời gian còn lại' : phase === 'REGISTRATION' ? 'Bắt đầu sau' : 'Đã kết thúc'}
+              </span>
               <span className="font-mono text-2xl font-bold text-[#ff6600] tracking-wider">
                 {formattedTime}
               </span>
               {(() => {
-                const hc = live[0];
+                const hc = activeContest && activeContest.status === 'CODING' ? activeContest : (live[0] || null);
                 if (!hc) return null;
                 const total = (Number(hc.duration_minutes) || 1) * 60000;
                 const pct = Math.max(0, Math.min(100, ((now - new Date(hc.start_time).getTime()) / total) * 100));
@@ -241,7 +243,7 @@ export const ContestHub = () => {
             </div>
             <div className="h-8 border-r border-[#23252a]"></div>
             <Link
-              to="/problem/p102"
+              to={problems[0] ? `/problem/${problems[0].id}` : '/problemset'}
               className="px-4 py-2 rounded-lg bg-[#ff6600] hover:bg-[#ff771a] font-medium text-xs text-white transition"
             >
               Vào Workspace →

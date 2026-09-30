@@ -14,33 +14,55 @@ export const ContestProvider = ({ children }) => {
   });
 
   // Problems: server-only. Khởi đầu từ đề mẫu bundle, mount effect sẽ
-  // thay bằng đề máy chủ khi online (merge giữ nháp local chưa publish).
+  // thay bằng đề máy chủ khi online. NHÁP local (tạo trong phiên qua Studio) được giữ
+  // qua nhápIds (Set) — Vòng 37.3: merge cũ giữ MỌI bài không có trên server → bài legacy
+  // ma sống lại vô hạn sau khi admin dọn dữ liệu thật.
   const [problems, setProblems] = useState(() => PROBLEMS_DB);
+  const nhapIds = React.useRef(new Set());
 
   // Contest timer in seconds (fallback demo khi chưa nối backend)
   const [remainingSeconds, setRemainingSeconds] = useState(4890);
   const [elapsedMinutes, setElapsedMinutes] = useState(38);
   const [serverOnline, setServerOnline] = useState(false);
+  // Kỳ thi đang hiển thị (Vòng 37.3): lấy từ danh sách kỳ THẬT, không còn slug demo cứng.
+  const [activeContest, setActiveContest] = useState(null);
 
-  // Đồng bộ đồng hồ + phase từ máy chủ (backend là nguồn thật khi online)
-  // Đề server nạp ĐỘC LẬP với getContest — prod không có kỳ demo slug này vẫn phải nạp đề thật.
+  // Đồng bộ đồng hồ + phase từ máy chủ (backend là nguồn thật khi online):
+  // ưu tiên kỳ CODING → REGISTRATION gần nhất → FINISHED mới nhất.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const data = await api.getContest(CONTEST_SLUG);
-        if (cancelled || !data?.contest) return;
-        const c = data.contest;
-        const totalSecs = (c.duration_minutes || 135) * 60;
-        const elapsedSecs = Math.max(0, Math.floor((Date.now() - new Date(c.start_time).getTime()) / 1000));
-        setRemainingSeconds(Math.max(0, totalSecs - elapsedSecs));
-        setElapsedMinutes(Math.floor(elapsedSecs / 60));
-        if (c.status && c.status !== phase) {
+        const list = await api.getContests();
+        const all = Array.isArray(list?.contests) ? list.contests : [];
+        if (cancelled) return;
+        const live = all.find((c) => c.status === 'CODING') || null;
+        const upcoming = all.filter((c) => c.status === 'REGISTRATION')
+          .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))[0] || null;
+        const finished = all.filter((c) => c.status === 'FINISHED')
+          .sort((a, b) => new Date(b.start_time) - new Date(a.start_time))[0] || null;
+        const c = live || upcoming || finished;
+        if (c) {
+          setActiveContest(c);
           setPhase(c.status);
           try { localStorage.setItem('dever_contest_phase', c.status); } catch {}
+          const start = new Date(c.start_time).getTime();
+          const end = start + (Number(c.duration_minutes) || 120) * 60000;
+          const nowMs = Date.now();
+          if (live) {
+            setRemainingSeconds(Math.max(0, Math.floor((end - nowMs) / 1000)));
+            setElapsedMinutes(Math.floor((nowMs - start) / 60000));
+          } else if (upcoming) {
+            // Đếm ngược tới giờ thi (hero hiển thị "Bắt đầu sau").
+            setRemainingSeconds(Math.max(0, Math.floor((start - nowMs) / 1000)));
+            setElapsedMinutes(0);
+          } else {
+            setRemainingSeconds(0);
+            setElapsedMinutes(0);
+          }
+          setServerOnline(true);
         }
-        setServerOnline(true);
-      } catch { /* giữ fallback demo cho timer */ }
+      } catch { /* offline → giữ fallback demo cho timer */ }
     })();
     (async () => {
       try {
@@ -128,7 +150,8 @@ export const ContestProvider = ({ children }) => {
     changePhase(newPhase);
     if (!getToken()) return { ok: false, error: 'Cần đăng nhập tài khoản giám khảo để đổi phase trên máy chủ.' };
     try {
-      await api.setPhase(CONTEST_ID, newPhase);
+      // Kỳ thi thật đang active (fallback id cũ nếu chưa nạp được danh sách).
+      await api.setPhase(activeContest?.id || CONTEST_ID, newPhase);
       return { ok: true };
     } catch (err) {
       return { ok: false, error: err?.message || 'Không đổi được phase trên máy chủ.' };
@@ -150,6 +173,9 @@ export const ContestProvider = ({ children }) => {
   };
 
   const addProblem = (newProb) => {
+    // Đăng ký nháp mới vào phiên — loadProblemsFromServer chỉ giữ nháp có trong nhapIds
+    // (bài không đăng ký = đã có trên server hoặc legacy → server thắng).
+    try { if (newProb?.id) nhapIds.current.add(newProb.id); } catch {}
     const updated = [...problems, newProb];
     setProblems(updated);
     broadcastProblems(updated);
@@ -178,10 +204,10 @@ export const ContestProvider = ({ children }) => {
     try {
       const data = await api.getProblems({});
       if (data?.problems && Array.isArray(data.problems) && data.problems.length > 0) {
-        const serverIds = new Set(data.problems.map((p) => p.id));
         setProblems((prev) => {
-          // Server là nguồn thật: giữ lại CHỈ nháp local chưa từng có trên server.
-          const localOnly = (prev || []).filter((p) => !serverIds.has(p.id));
+          // Server là nguồn thật: chỉ giữ lại nháp ĐƯỢC TẠO TRONG PHIÊN NÀY (nhapIds).
+          // Bài legacy không có trên server = dữ liệu đã bị admin dọn → KHÔNG hồi sinh.
+          const localOnly = (prev || []).filter((p) => nhapIds.current.has(p.id));
           const merged = [...data.problems, ...localOnly];
           broadcastProblems(merged);
           return merged;
@@ -212,8 +238,9 @@ export const ContestProvider = ({ children }) => {
       frozen,
       toggleFrozen,
       serverOnline,
-      contestId: CONTEST_ID,
-      contestSlug: CONTEST_SLUG,
+      contestId: activeContest?.id || CONTEST_ID,
+      contestSlug: activeContest?.slug || CONTEST_SLUG,
+      activeContest,
       problems,
       addProblem,
       updateProblem,
