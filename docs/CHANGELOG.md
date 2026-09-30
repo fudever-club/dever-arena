@@ -558,3 +558,12 @@
 - **A8:** toolbar workspace 390px verified DOM thật (0 wrap/overflow) + banner "Ngoài giờ Coding (409 REGISTRATION)" trung thực.
 - **A5:** draft fanpage 2 đợt + checklist: `docs/marketing/round2-fanpage.md`.
 - Gate: 221/221 tests, detect 0, lint 0; probe xanh. Sprint 1b A1–A8: chỉ còn A1 verify cron 09:00 VN 1/10.
+
+## Vòng 37.4: Tổng diễn tập trọn vòng bằng thí sinh thật + bug 9–11 (30/9/2026)
+
+- **Tổng diễn tập prod:** tạo ts_duyet → đăng ký Round #2 → gate 409 trước CODING ✓ → flip CODING → nộp Python **AC 14/14 (+800đ)** bài A + **WA 0/1** bài B (CF-parity) → standings ICPC đúng (rank 1, penalty, wrongAttempts) → **UI Standings LIVE API** hiển thị ts_duyet + badge "Bạn" → profile aggregate đúng (2 submissions, 1 AC, best_rank 1) → dọn sạch bằng light restore + rebuild suite (59 testcases).
+- **Bug 9 — Standings demo local:** slug cứng `dever-round-1-div3` → 404 → user ma dever_hero/hacker_pro. Fix: slug từ `activeContest` (context); verified UI sau deploy.
+- **Bug 10 — Header standings cứng** "DEVER Round #1 (Div. 3)" → tên kỳ thi thật.
+- **Bug 11 — Nghiêm trọng, vận hành: restore HOÀN NGUYÊN xoay mật khẩu** (dump cũ chứa hash cũ). Phát hiện khi rebuild 401; xoay lại thành công; light-reset tái tạo từ dump TƯƠI sau xoay (hash hiện hành). **Bài học ghi runbook: mọi restore về dump cũ PHẢI xoay lại secret hoặc cập nhật hash user vào dump sau khi restore.**
+- Quirk UI: nút "Đăng Nhập Vào Arena" click playwright không nổ submit; `form.requestSubmit()` chạy đúng — ghi nhận cho E2E.
+- Gate: 221/221 tests; probe xanh; prod sạch REGISTRATION + 4 bài APPROVED + 59 testcases.
