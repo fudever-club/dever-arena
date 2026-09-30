@@ -55,7 +55,8 @@ function hasTool(cmd) {
 function compileCpp(dir, file) {
   if (!hasTool('g++')) return 'Thiếu toolchain g++ trên máy chấm (cần Isolate production hoặc cài g++).';
   const out = process.platform === 'win32' ? 'solution.exe' : 'solution';
-  const r = spawnSync('g++', ['-O2', '-std=c++20', '-o', out, file], { cwd: dir, timeout: 10000, windowsHide: true });
+  // 30s: lần compile ĐẦU trên container lạnh có thể > 10s (nạp trang bộ nhớ) — probe prod 30/9 bắt được.
+  const r = spawnSync('g++', ['-O2', '-std=c++20', '-o', out, file], { cwd: dir, timeout: 30000, windowsHide: true });
   if (r.error || r.status !== 0) {
     const err = ((r.stderr || Buffer.alloc(0)).toString('utf8') || r.error?.message || '').slice(0, MAX_COMPILE_ERR);
     return `Compilation Error:\n${err}`;
@@ -96,6 +97,15 @@ export function languageReady(lang) {
 
 export function supportedLanguages() {
   return Object.keys(RUNNERS);
+}
+
+/**
+ * Hệ số TL theo ngôn ngữ: JVM khởi động ~0.5–1s nên TL của đề (định cho C++) là bất khả thi
+ * cho Java. Quy ước phổ biến của judge: nhân TL cho ngôn ngữ chậm khởi động (probe prod 30/9
+ * bắt được Java TLE ở đúng 1.0s dù bài chạy ~0.3s sau khi JVM lên).
+ */
+export function langTimeFactor(language) {
+  return normalizeLanguage(language) === 'java' ? 3 : 1;
 }
 
 /**

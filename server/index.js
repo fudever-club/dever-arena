@@ -7,7 +7,7 @@
  */
 import { createServer } from 'node:http';
 import { hashPassword, signToken, bearerUser } from './auth.js';
-import { normalizeLanguage, languageReady } from './judge.js';
+import { normalizeLanguage, languageReady, langTimeFactor } from './judge.js';
 import { judgeQueue, shutdownJudge } from './queue.js';
 import { PROBLEMS_DB } from '../src/data/problems.js';
 import { createScheduler } from './scheduler.js';
@@ -747,7 +747,8 @@ route('POST', '^/api/v1/submissions$', async (req, res, url, m, user) => {
   const notReady = languageReady(normalizeLanguage(language));
   if (notReady) { send(res, 422, { error: 'TOOLCHAIN_MISSING', message: notReady }); return; }
   const priorWA = db.filter('submissions', (s) => s.contest_id === c.id && s.user_id === user.id && s.problem_id === prob.id && s.verdict !== 'AC').length;
-  const timeLimitMs = parseFloat(prob.timeLimit) * 1000 || 1000;
+  // TL của đề định cho C++; Java được nhân hệ số (JVM boot) — probe prod 30/9 bắt được TLE ảo.
+  const timeLimitMs = (parseFloat(prob.timeLimit) * 1000 || 1000) * langTimeFactor(language);
   // Chuẩn quốc tế: chấm full-suite ngay — verdict trả về là kết quả cuối cùng (ADR-005).
   // Task 104: truyền memoryLimit của đề để ràng buộc heap/rlimit.
   const judged = await judgeQueue.judgeTests({ language, source: source_code, tests: judgeSuiteOf(prob.id), timeLimitMs, memoryLimit: prob.memoryLimit || '256 MB' });
@@ -1105,7 +1106,7 @@ route('POST', '^/api/v1/admin/rejudge$', async (req, res) => {
   const prob = db.find('problems', (p) => p.id === s.problem_id);
   if (!c || !prob) { send(res, 404, { error: 'NOT_FOUND' }); return; }
   // Rejudge dùng đúng một code path với submit: full-suite, verdict cuối (ADR-005)
-  const timeLimitMs = parseFloat(prob?.timeLimit) * 1000 || 1000;
+  const timeLimitMs = (parseFloat(prob?.timeLimit) * 1000 || 1000) * langTimeFactor(s.language);
   // Task 118: source có thể nằm trên object store (S3) — fetch khi cần.
   let src = s.source_code;
   if (src === undefined && s.source_key) src = await s3Get(s.source_key);
