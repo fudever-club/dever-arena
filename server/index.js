@@ -216,10 +216,13 @@ function send(res, code, obj) {
   res.end(body);
 }
 
+// Cap body 8MB: testcase lớn (n=2·10^5 số ≈ 2MB JSON) phải nạp được qua admin API.
+// (Vòng 37.2: cap cũ 1MB chặn nạp testcases stress cho bài cỡ n=200k.)
+const MAX_BODY_BYTES = 8 * 1024 * 1024;
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let raw = '';
-    req.on('data', (c) => { raw += c; if (raw.length > 1024 * 1024) { reject(new Error('Body quá lớn')); req.destroy(); } });
+    req.on('data', (c) => { raw += c; if (raw.length > MAX_BODY_BYTES) { reject(new Error('Body quá lớn')); req.destroy(); } });
     req.on('end', () => { try { resolve(raw ? JSON.parse(raw) : {}); } catch { reject(new Error('JSON không hợp lệ')); } });
     req.on('error', reject);
   });
