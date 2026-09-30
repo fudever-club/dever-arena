@@ -3,8 +3,10 @@ import { calculateProblemScore } from '../core/scoring.js';
 import { PROBLEMS_DB } from '../data/problems.js';
 import { api, getToken } from '../lib/apiClient';
 
-const CONTEST_SLUG = 'dever-round-1-div3';
-const CONTEST_ID = 'contest_dever_round1';
+// Fallback chỉ dùng khi CHƯA nạp được danh sách kỳ (offline). Id demo cũ đã xóa —
+// changePhaseRemote chủ động dùng activeContest.id; 2 hằng này chỉ để giữ API shape.
+const CONTEST_SLUG = '';
+const CONTEST_ID = '';
 
 const ContestContext = createContext(null);
 

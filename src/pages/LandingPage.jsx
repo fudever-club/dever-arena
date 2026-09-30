@@ -32,7 +32,7 @@ function getWinProbability(ratingA, ratingB) {
 }
 
 const prob = getWinProbability(1742, 1600);
-console.log("Xác suất dever_hero (1742) thắng:", (prob * 100).toFixed(1) + "%");`
+console.log("Xác suất thí sinh 1742 thắng 1600:", (prob * 100).toFixed(1) + "%");`
 };
 
 export const LandingPage = () => {
@@ -127,7 +127,7 @@ export const LandingPage = () => {
           </Link>
 
           <Link
-            to="/problem/p102"
+            to="/problemset"
             className="px-6 py-3 rounded-lg bg-[#0f1011] hover:bg-[#141516] text-slate-200 hover:text-white font-medium text-sm transition border border-[#23252a]"
           >
             Mở Workspace Làm Bài

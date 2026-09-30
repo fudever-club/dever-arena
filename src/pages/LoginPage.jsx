@@ -14,11 +14,16 @@ export const LoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleFastSwitch = async (roleKey) => {
-    const loggedUser = await loginWithPreset(roleKey);
-    if (loggedUser?.role === 'ADMIN') {
-      navigate('/admin');
-    } else {
-      navigate(redirectUrl);
+    try {
+      setError('');
+      const loggedUser = await loginWithPreset(roleKey);
+      if (loggedUser?.role === 'ADMIN') {
+        navigate('/admin');
+      } else {
+        navigate(redirectUrl);
+      }
+    } catch (e) {
+      setError(e?.message || 'Đăng nhập nhanh thất bại.');
     }
   };
 
@@ -131,8 +136,8 @@ export const LoginPage = () => {
                 onClick={() => handleFastSwitch('PARTICIPANT')}
                 className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 hover:border-orange-500/50 transition group text-center"
               >
-                <span className="text-xs font-bold text-orange-400 group-hover:text-orange-300">dever_hero</span>
-                <span className="text-[10px] text-orange-400/70 mt-0.5">Thí sinh — làm bài</span>
+                <span className="text-xs font-bold text-orange-400 group-hover:text-orange-300">Thí sinh</span>
+                <span className="text-[10px] text-orange-400/70 mt-0.5">Đăng nhập nhanh (test)</span>
               </button>
 
               <button
@@ -140,8 +145,8 @@ export const LoginPage = () => {
                 onClick={() => handleFastSwitch('ADMIN')}
                 className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 transition group text-center"
               >
-                <span className="text-xs font-bold text-red-400 group-hover:text-red-300">dever_admin</span>
-                <span className="text-[10px] text-red-400/70 mt-0.5">Giám khảo — quản trị</span>
+                <span className="text-xs font-bold text-red-400 group-hover:text-red-300">Giám khảo</span>
+                <span className="text-[10px] text-red-400/70 mt-0.5">Đăng nhập nhanh (test)</span>
               </button>
             </div>
           </div>

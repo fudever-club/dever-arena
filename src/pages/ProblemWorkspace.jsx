@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
-import { PROBLEMS_DB } from '../data/problems.js';
 import { useAuth } from '../context/AuthContext';
 import { useContest } from '../context/ContestContext';
 import { MathRenderer } from '../components/common/MathRenderer';
@@ -62,7 +61,7 @@ rl.on('line', (line) => {
 };
 
 export const ProblemWorkspace = () => {
-  const { id = 'p102' } = useParams();
+  const { id } = useParams();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const { getDynamicScore, formattedTime, problems = [], contestId: ctxContestId, contestSlug, phase } = useContest();
@@ -88,6 +87,7 @@ export const ProblemWorkspace = () => {
     let cancelled = false;
     (async () => {
       try {
+        if (!contestSlug) return;
         const data = await api.getContest(contestSlug);
         if (!cancelled && data?.contest?.status === 'FINISHED') setEditorialOpen(true);
       } catch { /* giữ khóa */ }
@@ -95,8 +95,8 @@ export const ProblemWorkspace = () => {
     return () => { cancelled = true; };
   }, [contestSlug]);
 
-  // Find problem or fallback to p102
-  const currentProblem = problems.find((p) => p.id === id) || problems[0] || PROBLEMS_DB[1];
+  // Find problem; không có thì lấy bài đầu từ server (không fallback đề demo)
+  const currentProblem = problems.find((p) => p.id === id) || problems[0];
   const problemIndex = problems.findIndex((p) => p.id === currentProblem.id);
   const prevProblem = problemIndex > 0 ? problems[problemIndex - 1] : null;
   const nextProblem = problemIndex < problems.length - 1 ? problems[problemIndex + 1] : null;

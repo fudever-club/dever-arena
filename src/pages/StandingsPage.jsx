@@ -4,94 +4,11 @@ import { useContest } from '../context/ContestContext';
 import { api, getToken } from '../lib/apiClient';
 import { Link } from 'react-router-dom';
 
-const INITIAL_STANDINGS = [
-  {
-    id: 'u1',
-    rank: 1,
-    username: 'dever_hero',
-    name: 'Nguyễn Anh Tuấn',
-    team: null,
-    rating: 1742,
-    role: 'PARTICIPANT',
-    problems: {
-      A: { points: 480, status: 'AC', attempts: 1 },
-      B: { points: 940, status: 'AC', attempts: 1 },
-      C: { points: 1420, status: 'AC', attempts: 1 },
-      D: { points: 0, status: 'FROZEN', attempts: 2 }, // Pending reveal
-      E: { points: 0, status: 'UNATTEMPTED', attempts: 0 }
-    }
-  },
-  {
-    id: 'u2',
-    rank: 2,
-    username: 'hacker_pro',
-    name: 'Lê Hoàng Nam',
-    team: null,
-    rating: 1680,
-    role: 'PARTICIPANT',
-    problems: {
-      A: { points: 460, status: 'AC', attempts: 1 },
-      B: { points: 910, status: 'AC', attempts: 2 },
-      C: { points: 0, status: 'FROZEN', attempts: 3 }, // Pending reveal
-      D: { points: 0, status: 'WA', attempts: 2 },
-      E: { points: 0, status: 'UNATTEMPTED', attempts: 0 }
-    }
-  },
-  {
-    id: 'u3',
-    rank: 3,
-    username: 'alice_ninja',
-    name: 'Trần Thị Mai',
-    team: null,
-    rating: 1540,
-    role: 'PARTICIPANT',
-    problems: {
-      A: { points: 490, status: 'AC', attempts: 1 },
-      B: { points: 0, status: 'FROZEN', attempts: 1 }, // Pending reveal
-      C: { points: 0, status: 'UNATTEMPTED', attempts: 0 },
-      D: { points: 0, status: 'UNATTEMPTED', attempts: 0 },
-      E: { points: 0, status: 'UNATTEMPTED', attempts: 0 }
-    }
-  },
-  {
-    id: 'u4',
-    rank: 4,
-    username: 'buggy_coder',
-    name: 'Phạm Quốc Bảo',
-    team: null,
-    rating: 1490,
-    role: 'PARTICIPANT',
-    problems: {
-      A: { points: 440, status: 'AC', attempts: 2 },
-      B: { points: 0, status: 'WA', attempts: 1 },
-      C: { points: 0, status: 'UNATTEMPTED', attempts: 0 },
-      D: { points: 0, status: 'UNATTEMPTED', attempts: 0 },
-      E: { points: 0, status: 'UNATTEMPTED', attempts: 0 }
-    }
-  },
-  {
-    id: 'u5',
-    rank: 5,
-    username: 'newbie_fpt',
-    name: 'Đặng Minh Khôi',
-    team: null,
-    rating: 1180,
-    role: 'PARTICIPANT',
-    problems: {
-      A: { points: 0, status: 'FROZEN', attempts: 4 }, // Pending reveal
-      B: { points: 0, status: 'WA', attempts: 3 },
-      C: { points: 0, status: 'UNATTEMPTED', attempts: 0 },
-      D: { points: 0, status: 'UNATTEMPTED', attempts: 0 },
-      E: { points: 0, status: 'UNATTEMPTED', attempts: 0 }
-    }
-  }
-];
-
 export const StandingsPage = () => {
   const { user } = useAuth();
   const { frozen, activeContest } = useContest();
 
-  const [standings, setStandings] = useState(INITIAL_STANDINGS);
+  const [standings, setStandings] = useState([]); // server-only — hết bảng giả (Vòng 37.5)
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 20;
@@ -287,7 +204,7 @@ export const StandingsPage = () => {
   const handleReset = () => {
     setIsAutoPlaying(false);
     clearInterval(autoPlayTimerRef.current);
-    setStandings(INITIAL_STANDINGS);
+    setStandings([]);
     setUnfreezeMessage('');
   };
 

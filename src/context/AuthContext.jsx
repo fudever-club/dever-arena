@@ -16,13 +16,13 @@ export const PRESET_USERS = {
     avatar: LOCAL_AVATAR
   },
   PARTICIPANT: {
-    id: 'u_dever_hero',
-    username: 'dever_hero',
-    name: 'Nguyễn Anh Tuấn (K19)',
-    rating: 1742,
+    id: 'u_participant',
+    username: 'thi_sinh',
+    name: 'Thí Sinh',
+    rating: 1200,
     role: 'PARTICIPANT',
-    rank: 'Expert',
-    clan: 'House of Buggy (K19)',
+    rank: 'Newbie',
+    clan: '',
     avatar: LOCAL_AVATAR
   },
   ADMIN: {
@@ -45,7 +45,7 @@ export const AuthProvider = ({ children }) => {
     } catch (e) {
       console.error('Error loading saved auth user:', e);
     }
-    return PRESET_USERS.PARTICIPANT; // Default to dever_hero for seamless demo
+    return PRESET_USERS.GUEST; // chưa đăng nhập = khách (Vòng 37.5: hết mặc định demo user)
   });
 
   // Setup BroadcastChannel for cross-tab realtime sync
@@ -94,16 +94,24 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Mật khẩu demo khớp seed backend (dever_hero/hero123, dever_admin/admin123).
-  // Fast-switch thử đăng nhập backend thật trước (có JWT → profile/API auth đầy đủ);
-  // backend rớt mạng mới fallback user demo local (không token → các API auth sẽ báo lỗi rõ).
-  const PRESET_PASSWORDS = { PARTICIPANT: 'hero123', ADMIN: 'admin123' };
+  // Fast-switch: nút GUEST/PARTICIPANT/ADMIN thử đăng nhập BACKEND THẬT bằng tài khoản
+  // test chung (dever_ts/dever_ts123 — chỉ tồn tại trên môi trường dev/test có seed demo).
+  // Sai/hết tài khoản → báo lỗi trung thực, không fallback user ảo (Vòng 37.5).
+  const PRESET_PASSWORDS = { PARTICIPANT: 'dever_ts123', ADMIN: 'dever_ts123' };
+  const PRESET_USERNAME_OF = { PARTICIPANT: 'dever_ts', ADMIN: 'dever_admin' };
   const loginWithPreset = async (roleKey) => {
+    if (roleKey === 'GUEST') {
+      const guest = PRESET_USERS.GUEST;
+      setCurrentUser(guest);
+      broadcastAuthChange(guest);
+      return guest;
+    }
     const user = PRESET_USERS[roleKey] || PRESET_USERS.PARTICIPANT;
     const pw = PRESET_PASSWORDS[roleKey];
+    const username = PRESET_USERNAME_OF[roleKey] || user.username;
     if (pw) {
       try {
-        const data = await api.login(user.username, pw);
+        const data = await api.login(username, pw);
         saveToken(data.accessToken || data.token);
         const u = data.user;
         const backendUser = {
@@ -119,7 +127,10 @@ export const AuthProvider = ({ children }) => {
         setCurrentUser(backendUser);
         broadcastAuthChange(backendUser);
         return backendUser;
-      } catch { /* backend offline → fallback dưới */ }
+      } catch (e) {
+        // Không fallback user ảo — ném lỗi trung thực để UI hiển thị (Vòng 37.5).
+        throw new Error(e?.message || 'Đăng nhập nhanh thất bại — tài khoản test chưa có trên máy chủ này.');
+      }
     }
     setCurrentUser(user);
     broadcastAuthChange(user);

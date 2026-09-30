@@ -86,12 +86,12 @@ export const ComparePage = () => {
       <div className="bg-[#0f1011] border border-[#23252a] rounded-xl p-6 flex flex-col sm:flex-row gap-4 items-stretch sm:items-end">
         <div className="flex-1">
           <label htmlFor="cmp-a" className="text-[13px] font-medium tracking-[0.4px] uppercase text-slate-400 block mb-1.5">Thí sinh A</label>
-          <input id="cmp-a" value={aName} onChange={(e) => setAName(e.target.value.trim())} placeholder="dever_hero"
+          <input id="cmp-a" value={aName} onChange={(e) => setAName(e.target.value.trim())} placeholder="username A"
             className="w-full px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-white placeholder-slate-500 outline-none font-mono text-sm focus-visible:ring-2 focus-visible:ring-[#ff6600]/60" />
         </div>
         <div className="flex-1">
           <label htmlFor="cmp-b" className="text-[13px] font-medium tracking-[0.4px] uppercase text-slate-400 block mb-1.5">Thí sinh B</label>
-          <input id="cmp-b" value={bName} onChange={(e) => setBName(e.target.value.trim())} placeholder="hacker_pro"
+          <input id="cmp-b" value={bName} onChange={(e) => setBName(e.target.value.trim())} placeholder="username B"
             className="w-full px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-white placeholder-slate-500 outline-none font-mono text-sm focus-visible:ring-2 focus-visible:ring-[#ff6600]/60" />
         </div>
         <button

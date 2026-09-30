@@ -192,7 +192,7 @@ const OverviewPanel = ({ phase, onJump }) => {
       try {
         const cData = await api.getContests();
         const contests = Array.isArray(cData?.contests) ? cData.contests : [];
-        const main = contests.find((c) => c.id === 'contest_dever_round1') || contests[0] || null;
+        const main = contests[0] || null;
         if (!main) { if (!cancelled) setLoading(false); return; }
         if (!cancelled) setContestTitle(main.title || main.slug || main.id);
         const [pData, sData, stData] = await Promise.all([
@@ -419,7 +419,7 @@ export const AdminLayout = ({ children }) => {
       try {
         const data = await api.getContests();
         const list = Array.isArray(data?.contests) ? data.contests : [];
-        const main = list.find((c) => c.id === 'contest_dever_round1') || list[0] || null;
+        const main = list[0] || null;
         if (!cancelled) setOrganizerLabel(main?.organizer_username || '');
       } catch { /* offline */ }
     })();
@@ -440,7 +440,7 @@ export const AdminLayout = ({ children }) => {
   const [polygonNotification, setPolygonNotification] = useState(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  const [targetContestId, setTargetContestId] = useState('contest_dever_round1');
+  const [targetContestId, setTargetContestId] = useState(''); // chọn từ danh sách kỳ thật khi nạp
   const [contestOptions, setContestOptions] = useState([]);
   // Thanh gửi duyệt / duyệt đề (blind-tester workflow)
   const [reviewBar, setReviewBar] = useState(null); // { mode:'assign'|'review', problem, users, testerId, decision, note, busy, msg }
@@ -614,7 +614,7 @@ export const AdminLayout = ({ children }) => {
 
     let backendOnline = false;
     try {
-      await api.getProblems({ contest_id: 'contest_dever_round1' });
+      await api.getProblems({});
       backendOnline = true;
     } catch {
       backendOnline = false;
@@ -703,7 +703,7 @@ export const AdminLayout = ({ children }) => {
         <div className="p-3 bg-[#010102] border-b border-[#23252a] text-xs space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-slate-400">Vòng thi:</span>
-            <span className="font-semibold text-slate-200">DEVER Round #1</span>
+            <span className="font-semibold text-slate-200">{contestTitle || '—'}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-slate-400">Pha:</span>
@@ -1267,8 +1267,8 @@ export const AdminLayout = ({ children }) => {
                           onChange={(e) => setTargetContestId(e.target.value)}
                           className="w-full px-3 py-2 rounded-lg bg-[#141516] border border-white/15 text-white text-xs font-semibold focus:border-[#ff6600] outline-none"
                         >
-                          <option value="contest_dever_round1">DEVER Round #1 (mặc định)</option>
-                          {contestOptions.filter((c) => c.id !== 'contest_dever_round1').map((c) => (
+                          <option value="">— Chọn kỳ thi —</option>
+                          {contestOptions.map((c) => (
                             <option key={c.id} value={c.id}>{c.title} ({c.status})</option>
                           ))}
                         </select>
@@ -1726,13 +1726,13 @@ const TelemetryPanel = () => {
   const [confirmRejudgeId, setConfirmRejudgeId] = useState(null);
   const [notice, setNotice] = useState('');
   const [contests, setContests] = useState([]);
-  const [contestId, setContestId] = useState('contest_dever_round1');
+  const [contestId, setContestId] = useState('');
 
   const load = async (cid) => {
     const id = cid || contestId;
     try {
       const contest = contests.find((c) => c.id === id);
-      const slug = contest?.slug || (id === 'contest_dever_round1' ? 'dever-round-1-div3' : null);
+      const slug = contest?.slug || null;
       const [subs, st] = await Promise.all([
         api.listSubmissions(id),
         slug ? api.getStandings(slug) : Promise.resolve({ standings: [] }),
@@ -1803,7 +1803,7 @@ const TelemetryPanel = () => {
             onChange={(e) => setContestId(e.target.value)}
             className="px-3 py-2 rounded-lg bg-[#141516] border border-[#23252a] text-white outline-none"
           >
-            {contests.length === 0 && <option value={contestId}>DEVER Round #1 (mặc định)</option>}
+            {contests.length === 0 && <option value="">— Chưa có kỳ thi —</option>}
             {contests.map((c) => (
               <option key={c.id} value={c.id}>{c.title || c.slug || c.id} ({c.status})</option>
             ))}

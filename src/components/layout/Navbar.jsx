@@ -85,7 +85,7 @@ export const Navbar = () => {
             </Link>
 
             <Link
-              to="/problem/p102"
+              to="/problemset"
               className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
                 location.pathname.startsWith('/problem')
                   ? 'bg-white/10 text-white'
