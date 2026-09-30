@@ -242,13 +242,17 @@
 > Quyết định CEO: (1) Round #2 **RATED** — kích hoạt Elo thật; (2) lịch thi **Tối T4 7/10/2026, 19:00–21:00 VN (12:00–14:00 UTC)**, 120 phút; (3) scope **trọn gói A1–A8**; hạn sprint 2/10.
 - [ ] A1: Verify cron backup lần chạy lịch 02:00 UTC 30/9 — dump lên S3, đối chiếu khớp prod bằng drill script (SRE-Backup). **PREP XONG 30/9:** backup_cron ghi marker `last_cron_backup_at` vào dever_meta; `node scripts/verify_cron_backup.mjs` (tuổi < 26h + đối chiếu counts) — chạy lúc 09:00 VN.
 - [x] A2: Reset trắng prod — reset-demo mode `all` 30/9 02:10 UTC: users:1 (dever_admin), 0 contests/problems/submissions; Round #1 lưu trong `backups/pre-reset-round1-*.json` + snapshot S3 restore-drill (SRE + PO-Contest).
-- [ ] A3: Soạn bộ bài Round #2 — 4 bài ICPC rating 800–1300, workflow DRAFT→IN_TESTING→APPROVED, stress test + testcases đầy đủ (PO-Contest + Eng-Judge).
-- [ ] A4: Mở kỳ Round #2 — contest is_rated=true, start 2026-10-07T12:00:00Z, 120 phút, REGISTRATION mở sớm; verify đăng ký hoạt động (PO-Contest).
+- [x] A3: Soạn bộ bài Round #2 — 4 bài ICPC rating 800–1300, workflow DRAFT→IN_TESTING→APPROVED, stress test + testcases đầy đủ (PO-Contest + Eng-Judge). XONG 30/9: 4 bài APPROVED, 59 testcases, solver AC toàn bộ.
+- [x] A4: Mở kỳ Round #2 — contest is_rated=true, start 2026-10-07T12:00:00Z, 120 phút, REGISTRATION mở sớm; verify đăng ký hoạt động (PO-Contest). XONG 30/9: contest_25_munhjlk5 REGISTRATION; diễn tập trọn vòng thí sinh thật (Vòng 37.4).
 - [x] A5: Bài đăng fanpage — draft 2 đợt đăng + checklist truyền thông: `docs/marketing/round2-fanpage.md`, chờ Design banner + CEO duyệt (PM + Design).
 - [x] A6: Probe monitor — `scripts/probe_monitor.mjs` + cron Specific `probe-monitor` (* * * * *): /health + /ready + web, alert khi flush.stale / 503 / api xuống; probe xanh trên prod (SRE-Lead).
 - [x] A7: Runbook prod 1 trang `docs/ops/PROD_RUNBOOK.md` (restore đã kiểm chứng, flush fail, cron, live ops 7/10) + **XOAY SECRET ADMIN 30/9** (`scripts/rotate_admin_password.mjs` tự kiểm chứng cũ-401/mới-200; credentials trong `dever-admin-credentials.secret` gitignored) + drill định kỳ hằng tháng + `backups/` gitignored (dump chứa hash, repo public).
 - [x] A8: Verify toolbar nowrap 390px — DOM thật trên prod: 0 wrap/overflow; kèm fix bug 7–8 (hero/timer/phase lấy từ kỳ thi thật, 5 bài legacy ma biến mất — verify DOM sau deploy).
 - [ ] A1: Verify cron backup 09:00 VN 1/10 (cron 30/9 chạy trước khi có marker → lần đầu verify được là 1/10).
+
+### Bổ sung Vòng 37.5 — Audit bundle + repair chuỗi deploy (30/9)
+- [x] Audit legacy/demo khỏi source: 12 pattern 18 hit → 0 (AuthContext GUEST-first + preset backend thật, StandingsPage bỏ 5 user ma, AdminLayout bỏ id kỳ cứng, ContestContext bỏ slug/id cứng, ProblemWorkspace bỏ fallback p102, Navbar/Landing/app.html hết chữ Round #1/Hack Room) — verified prod sau deploy: **0 hit trên 5 asset JS + app.html**.
+- [x] Repair deploy fail 3 lớp (git exit 127 → MODULE_NOT_FOUND → generic web build của platform): postinstall `node -e` try/catch skip khi thiếu script (an toàn mọi image); Dockerfile.api COPY `setup_git_hooks.mjs` trước `npm ci`; vá 2 lỗi lint chặn CI (judge.js no-redeclare, AdminLayout `contestTitle` → `activeContest?.title`). Deploy `cce51e6` ACTIVE, probe xanh.
 
 ### Giai đoạn B — Ngày thi 7/10 + hậu kỳ (đã lên lịch)
 - [ ] Live ops: dashboard real-time, freeze 20' cuối, announcements, trực SRE trong 2 giờ thi.
@@ -256,7 +260,7 @@
 - [ ] Retro 24h sau thi; drill lại restore với khối lượng dữ liệu thật (100+ submissions).
 
 ### Giai đoạn C — Backlog sau Round #2 (PM ưu tiên)
-- [ ] Verify chấm C++/Java trong container prod (toolchain auto-detect).
+- [x] Verify chấm C++/Java trong container prod — probe prod: cpp AC 9.6s / java AC 16.1s (Vòng 37.2, sớm hơn kế hoạch).
 - [ ] Backup retention 30 ngày + drill khối lượng thật.
 - [ ] Multi-organizer thật: cấp tài khoản BTC CLB, bỏ phụ thuộc dever_admin (key-person risk).
 - [ ] Anti-cheat AST diff chạy đại trà trên bài nộp thật.

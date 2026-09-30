@@ -27,6 +27,7 @@ specific deploy                    # build + đẩy lên Specific Cloud (free ti
 ```
 
 * Đang live: web `https://web-elegant-horse.spcf.app` • API `https://api-elegant-horse.spcf.app` — quản trị tại https://dashboard.specific.dev (logs, metrics, DB browser, secrets).
+* **Postinstall an toàn container (Vòng 37.5):** `package.json` postinstall là `node -e` inline try/catch — tự bỏ qua khi `scripts/setup_git_hooks.mjs` vắng mặt (build web là Dockerfile generic do platform sinh từ `build "web"`, không COPY scripts/). `Dockerfile.api` COPY file này trước `npm ci`. Quy tắc: đừng gọi `git` trực tiếp trong postinstall (container không có git → exit 127), đừng để postinstall bắt buộc file ngoài package.json + lockfile.
 * Postgres managed tự cấp qua `DEVER_DATABASE_URL`; `server/pg.js` tự tạo bảng (`dever_store`/`dever_meta`) lần đầu kết nối — không cần migration script cho KV store.
 * JWT secret: `secret "dever_jwt_secret" { generated = true }` — tự sinh, không cần .env.
 * CORS tự khóa theo domain web: `DEVER_CORS_ORIGIN = "https://${service.web.public_url}"` trong `specific.hcl` — tự theo domain khi deploy, không cần hardcode.

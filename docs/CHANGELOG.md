@@ -567,3 +567,14 @@
 - **Bug 11 — Nghiêm trọng, vận hành: restore HOÀN NGUYÊN xoay mật khẩu** (dump cũ chứa hash cũ). Phát hiện khi rebuild 401; xoay lại thành công; light-reset tái tạo từ dump TƯƠI sau xoay (hash hiện hành). **Bài học ghi runbook: mọi restore về dump cũ PHẢI xoay lại secret hoặc cập nhật hash user vào dump sau khi restore.**
 - Quirk UI: nút "Đăng Nhập Vào Arena" click playwright không nổ submit; `form.requestSubmit()` chạy đúng — ghi nhận cho E2E.
 - Gate: 221/221 tests; probe xanh; prod sạch REGISTRATION + 4 bài APPROVED + 59 testcases.
+
+## Vòng 37.5: Audit sạch bundle prod + repair chuỗi deploy fail (30/9/2026)
+
+- **Audit legacy/demo ra khỏi source (18 hit/12 pattern → 0):** AuthContext mặc định GUEST + preset switch dùng backend thật (`dever_ts`/`dever_admin`, sai thì throw — hết fallback user ảo); LoginPage nhãn trung thực; StandingsPage bỏ 5 user ma (server-only); AdminLayout bỏ 5 chỗ id kỳ cứng `contest_dever_round1`; ContestContext bỏ slug/id cứng; ProblemWorkspace bỏ fallback `p102`/PROBLEMS_DB; Navbar/Landing link `/problem/p102` → `/problemset`; app.html og:description ICPC thật. Commit `8c61b86`.
+- **Chuỗi deploy fail & fix 3 lớp:**
+  1. postinstall gọi git trực tiếp → exit 127 trong container (không có git): tách `scripts/setup_git_hooks.mjs` tự exit 0 khi không phải repo (`6fd386d`).
+  2. postinstall chạy TRƯỚC khi Dockerfile COPY scripts/ → MODULE_NOT_FOUND: `Dockerfile.api` COPY `scripts/setup_git_hooks.mjs` trước `npm ci` (`9a449bb`).
+  3. Build web là Dockerfile generic do platform sinh từ `build "web" { base = "node" }` trong specific.hcl — không kiểm soát được COPY → postinstall thành `node -e` inline try/catch `ERR_MODULE_NOT_FOUND`, skip an toàn trên mọi image (`cce51e6`).
+- **Vá kèm 2 lỗi lint chặn CI (hậu Vòng 37.2/37.4):** `judge.js` no-redeclare `prepared` (var trong if/else → let); AdminLayout ticker dùng `contestTitle` không tồn tại sau khi bỏ id cứng → `activeContest?.title`.
+- **Verify prod sau deploy `cce51e6` (ACTIVE):** tải toàn bộ 5 asset JS + app.html của web prod, quét 12 pattern → **0 hit**; probe xanh (health/ready/flush OK); Round #2 nguyên vẹn: REGISTRATION, rated, start 7/10 19:00 VN, 4 bài APPROVED.
+- Gate: 221/221 tests, detect 0, lint 0 errors, build sạch.
