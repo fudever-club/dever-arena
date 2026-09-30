@@ -1,6 +1,9 @@
 # DEVER Arena Web — build SPA rồi phục vụ bằng nginx, proxy /api sang api.
 FROM node:22-alpine AS build
 WORKDIR /app
+# setup_git_hooks.mjs phải có sẵn TRƯỚC npm ci (postinstall gọi nó) — file này
+# tự exit 0 trong container nên không ảnh hưởng runtime, chỉ để npm ci không chết.
+COPY scripts/setup_git_hooks.mjs ./scripts/setup_git_hooks.mjs
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
