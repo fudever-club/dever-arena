@@ -9,6 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { checkSecurity, compareOutputs } from '../src/engine/isolateRunner.js';
 
 const MAX_SOURCE = 100 * 1024; // 100KB
@@ -70,12 +71,47 @@ function compileJava(dir, source) {
   const cls = m ? m[1] : 'Solution';
   const file = join(dir, `${cls}.java`);
   writeFileSync(file, source);
-  const r = spawnSync('javac', [file], { cwd: dir, timeout: 10000, windowsHide: true });
+  // 60s: javac lần đầu trên container lạnh có thể chậm — probe prod 30/9.
+  const r = spawnSync('javac', [file], { cwd: dir, timeout: 60000, windowsHide: true });
   if (r.error || r.status !== 0) {
     const err = ((r.stderr || Buffer.alloc(0)).toString('utf8') || r.error?.message || '').slice(0, MAX_COMPILE_ERR);
     return `Compilation Error:\n${err}`;
   }
   return { exe: cls, useClasspath: dir };
+}
+
+/**
+ * Cache binary theo hash (ngôn ngữ + source + memoryLimit): judgeTests chạy N test → N lần
+ * executeOne → KHÔNG được compile N lần (probe prod 30/9: C++/Java 504 vì 14× compile trong
+ * 1 bài nộp). Cache cũng giúp stress (model/brute compile 1 lần cho cả suite) và nộp lại.
+ */
+const COMPILE_CACHE = new Map(); // key → { cmd, args, dir }
+const COMPILE_CACHE_MAX = 32;
+function compileCached(lang, source, memoryLimit) {
+  const key = createHash('sha1').update(`${lang}|${memoryLimit}|${source}`).digest('hex');
+  const hit = COMPILE_CACHE.get(key);
+  if (hit) return hit;
+  const dir = mkdtempSync(join(tmpdir(), 'dever-judge-'));
+  let compiled;
+  if (lang === 'cpp') {
+    const file = join(dir, 'solution.cpp');
+    writeFileSync(file, source);
+    compiled = compileCpp(dir, file);
+    if (typeof compiled === 'string') { try { rmSync(dir, { recursive: true, force: true }); } catch {} return compiled; }
+    var prepared = { cmd: compiled.exe, args: [], dir };
+  } else {
+    compiled = compileJava(dir, source);
+    if (typeof compiled === 'string') { try { rmSync(dir, { recursive: true, force: true }); } catch {} return compiled; }
+    var prepared = { cmd: 'java', args: ['-cp', compiled.useClasspath, compiled.exe], dir };
+  }
+  COMPILE_CACHE.set(key, prepared);
+  if (COMPILE_CACHE.size > COMPILE_CACHE_MAX) {
+    const oldest = COMPILE_CACHE.keys().next().value;
+    const evict = COMPILE_CACHE.get(oldest);
+    COMPILE_CACHE.delete(oldest);
+    try { rmSync(evict.dir, { recursive: true, force: true }); } catch {}
+  }
+  return prepared;
 }
 
 export function normalizeLanguage(lang) {
@@ -125,20 +161,40 @@ export function executeOne({ language, source, stdin = '', timeLimitMs = 1000, m
   if (blocked) return { verdict: 'CE', stdout: '', timeMs: 0, message: `Security Policy Violation: ${blocked}` };
 
   const runner = RUNNERS[lang];
+  // Compiled (cpp/java): binary cached theo hash — executeOne được gọi per-test, compile 1 lần.
+  // Interpreted (py/js): vẫn ghi file tạm per-call như cũ.
+  if (runner.kind === 'compiled') {
+    const prepared = compileCached(lang, source, memoryLimit);
+    if (typeof prepared === 'string') return { verdict: 'CE', stdout: '', timeMs: 0, message: prepared };
+    const t0 = Date.now();
+    const res = spawnSync(prepared.cmd, prepared.args, {
+      input: stdin,
+      timeout: timeLimitMs,
+      maxBuffer: MAX_STDOUT + 1024,
+      killSignal: 'SIGKILL',
+      windowsHide: true,
+    });
+    const timeMs = Date.now() - t0;
+    if (res.error && res.error.code === 'ETIMEDOUT') {
+      return { verdict: 'TLE', stdout: '', timeMs, message: `Time Limit Exceeded (> ${timeLimitMs}ms)` };
+    }
+    if (res.error) {
+      return { verdict: 'RTE', stdout: '', timeMs, message: `Runtime Error: ${String(res.error.message).slice(0, 200)}` };
+    }
+    if (res.status !== 0) {
+      const err = (res.stderr || Buffer.alloc(0)).toString('utf8').slice(0, MAX_COMPILE_ERR);
+      if (MLE_PATTERNS.test(err)) {
+        return { verdict: 'MLE', stdout: '', timeMs, message: `Memory Limit Exceeded (${memoryLimit}): ${err.slice(0, 200)}` };
+      }
+      return { verdict: 'RTE', stdout: '', timeMs, message: err || `Exit code ${res.status}` };
+    }
+    return { verdict: 'OK', stdout: (res.stdout || Buffer.alloc(0)).toString('utf8').slice(0, MAX_STDOUT), timeMs, message: 'OK' };
+  }
+
   const dir = mkdtempSync(join(tmpdir(), 'dever-judge-'));
   try {
     let cmd, args;
-    if (runner.kind === 'compiled' && lang === 'cpp') {
-      const file = join(dir, 'solution.cpp');
-      writeFileSync(file, source);
-      const compiled = compileCpp(dir, file);
-      if (typeof compiled === 'string') return { verdict: 'CE', stdout: '', timeMs: 0, message: compiled };
-      cmd = compiled.exe; args = [];
-    } else if (runner.kind === 'compiled' && lang === 'java') {
-      const compiled = compileJava(dir, source);
-      if (typeof compiled === 'string') return { verdict: 'CE', stdout: '', timeMs: 0, message: compiled };
-      cmd = 'java'; args = ['-cp', compiled.useClasspath, compiled.exe];
-    } else {
+    {
       const file = join(dir, `solution.${runner.ext}`);
       writeFileSync(file, source);
       cmd = runner.cmd;
