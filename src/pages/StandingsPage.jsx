@@ -407,7 +407,7 @@ export const StandingsPage = () => {
             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-500/20 text-[#ff6600] border border-orange-500/30">
               Live Standings
             </span>
-            <span className="text-xs text-slate-400">DEVER Round #1 (Div. 3)</span>
+            <span className="text-xs text-slate-400">{activeContest?.title || 'DEVER Arena'}</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${dataSource === 'demo' ? 'bg-white/5 text-slate-400 border-white/10' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'}`}>
               {dataSource === 'demo' ? 'Demo local' : dataSource === 'live' ? '● LIVE API' : 'Backend API'}
             </span>
