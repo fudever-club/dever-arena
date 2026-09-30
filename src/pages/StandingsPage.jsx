@@ -89,7 +89,7 @@ const INITIAL_STANDINGS = [
 
 export const StandingsPage = () => {
   const { user } = useAuth();
-  const { frozen } = useContest();
+  const { frozen, activeContest } = useContest();
 
   const [standings, setStandings] = useState(INITIAL_STANDINGS);
   const [searchTerm, setSearchTerm] = useState('');
@@ -144,7 +144,11 @@ export const StandingsPage = () => {
 
   const fetchBoard = async () => {
     try {
-      const data = await api.getStandings('dever-round-1-div3', frozen ? { frozen: 1 } : {});
+      // Kỳ thi THẬT đang active từ context (CODING → REGISTRATION → FINISHED) — hết slug demo cứng
+      // (bug 9, Vòng 37.4: slug cũ 404 sau khi dọn prod → trang rơi về demo local với user ma).
+      const slug = activeContest?.slug;
+      if (!slug) return null;
+      const data = await api.getStandings(slug, frozen ? { frozen: 1 } : {});
       if (!data?.standings?.length) return null;
       setStandings(data.standings.map(mapBackendRow));
       setBoardFormat(data.format || 'CODEFORCES');
@@ -175,7 +179,7 @@ export const StandingsPage = () => {
       }
     })();
     return () => { cancelled = true; try { es?.close(); } catch {} };
-  }, [frozen]);
+  }, [frozen, activeContest?.slug]);
 
   // Tự làm mới 30s (tạm dừng khi đóng băng để giữ bảng freeze)
   useEffect(() => {
