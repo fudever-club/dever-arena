@@ -69,7 +69,9 @@ export function validateInput(stdin, rules = {}) {
     const allTokens = [];
     for (let i = 1; i < lines.length; i++) {
       const lineTokens = lines[i].trim().split(/\s+/).filter(Boolean);
-      allTokens.push(...lineTokens);
+      // KHÔNG dùng spread push(...lineTokens): dòng 200k token vượt giới hạn spread của V8
+      // → "Maximum call stack size exceeded" (bug bắt được khi nạp test thật Round #2, Vòng 37.2).
+      for (const t of lineTokens) allTokens.push(t);
     }
 
     // Kiểm tra số lượng phần tử
