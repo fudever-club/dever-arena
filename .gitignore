@@ -60,3 +60,6 @@ specific.local
 # Admin prod credentials (xoay định kỳ — KHÔNG commit)
 dever-admin-credentials.secret
 dever_token.tmp
+
+# DB dumps (chứa password hash + dữ liệu người dùng — KHÔNG bao giờ lên git)
+backups/
