@@ -269,6 +269,7 @@
 ### Bổ sung Vòng 37.5 — Audit bundle + repair chuỗi deploy (30/9)
 - [x] Audit legacy/demo khỏi source: 12 pattern 18 hit → 0 (AuthContext GUEST-first + preset backend thật, StandingsPage bỏ 5 user ma, AdminLayout bỏ id kỳ cứng, ContestContext bỏ slug/id cứng, ProblemWorkspace bỏ fallback p102, Navbar/Landing/app.html hết chữ Round #1/Hack Room) — verified prod sau deploy: **0 hit trên 5 asset JS + app.html**.
 - [x] Repair deploy fail 3 lớp (git exit 127 → MODULE_NOT_FOUND → generic web build của platform): postinstall `node -e` try/catch skip khi thiếu script (an toàn mọi image); Dockerfile.api COPY `setup_git_hooks.mjs` trước `npm ci`; vá 2 lỗi lint chặn CI (judge.js no-redeclare, AdminLayout `contestTitle` → `activeContest?.title`). Deploy `cce51e6` ACTIVE, probe xanh.
+- [x] **Bug 12 (Vòng 37.7): mất dữ liệu khi redeploy** — flushTables upsert-trước-DELETE chết khi replace-by-unique + không có SIGTERM flush → vá cả 2 + regression test; verified trên prod bằng chính kịch bản gây sự cố (delete+recreate ts_test + đăng ký persist qua flush, DB thấy row). Deploy `e5aec74`.
 
 ### Giai đoạn B — Ngày thi 7/10 + hậu kỳ (đã lên lịch)
 - [ ] Live ops: dashboard real-time, freeze 20' cuối, announcements, trực SRE trong 2 giờ thi.

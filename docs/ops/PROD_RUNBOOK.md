@@ -19,10 +19,13 @@ curl -s https://api-elegant-horse.spcf.app/api/ready   # ready:true + users/cont
 
 ## 2. Persist DB lỗi (flush thất bại / /ready 503)
 - Dấu hiệu: log JSON `{"event":"db_flush_failed",...}`, `flush.ok:false` trên `/health`.
-- Dữ liệu KHÔNG mất (mirror RAM giữ, tự retry) — nhưng không nên để quá 15 phút:
+- Dữ liệu KHÔNG mất trong lúc process còn sống (mirror RAM giữ, tự retry) — nhưng không nên để quá 15 phút:
   1. Log api: tìm `db_flush_failed` → `error` field là nguyên nhân (thường DB restart/timeout).
   2. Khi Postgres khỏe lại: flush tự phục hồi + log `db_flush_recovered`.
   3. Không phục hồi sau 15': Redeploy api (mirror nạp lại từ DB — dữ liệu đã persist an toàn).
+- ⚠️ **Bug 12 (Vòng 37.7):** nếu flush kẹt vô hạn VÀ container restart, batch trong RAM MẤT. Đã vá 2 tầng:
+  flushTables xóa-trước-upsert (không còn kẹt replace-by-unique `idx_users_username`) + SIGTERM flush tường minh trước khi thoát.
+- ⚠️ **Blind spot monitor:** `/health` `ok:true` nhưng `last_success_at:null` + uptime lớn = flush chưa TỪNG thành công sau boot — coi như degraded, kiểm tra logs `db_flush_failed` dù `/ready` xanh.
 
 ## 3. Restore DB (quy trình ĐÃ KIỂM CHỨNG — drill PASS 5/5 29/9)
 ```bash
@@ -53,15 +56,17 @@ node scripts/rotate_admin_password.mjs "<mật-khẩu-mới>"
 - JWT secret đổi trên Specific dashboard (service api → env `DEVER_JWT_SECRET`) — làm ngoài giờ thi, mọi token cũ hết hạn ngay.
 
 ## 5. Kỳ thi LIVE (7/10 19:00–21:00 VN)
+- Checklist chi tiết từng mốc: `docs/ops/LIVE_OPS_ROUND2.md`.
 - Trước 30': `node scripts/probe_monitor.mjs` xanh + dashboard telemetry.
-- Trong thi: theo dõi `/api/ready` mỗi 5'; standings qua UI; TẮT freeze 20' cuối (admin).
+- Trong thi: theo dõi `/api/ready` mỗi 5'; standings qua UI. Freeze ICPC CHƯA có (chỉ CODEFORCES — gap Phase 39): phương án không công bố standings 20' cuối.
 - Sự cố chấm: `POST /api/v1/admin/rejudge {submission_id}`; toolchain probe: `node scripts/probe_toolchain.mjs <slug>`.
 - Sự cố nghiêm trọng: KHÔNG restore trong giờ thi — ghi nhận, xử lý sau FINISHED.
 
 ## 6. Cron tự động trên Specific
 | Cron | Lịch | Việc | Kiểm chứng |
 |---|---|---|---|
-| `db-backup` | 02:00 UTC (09:00 VN) | dump → S3 + marker `last_cron_backup_at` | `node scripts/verify_cron_backup.mjs` |
+| `db-backup` | 02:00 UTC (09:00 VN) | dump → S3 + marker `last_cron_backup_at` | tự động bởi `backup-verify` |
+| `backup-verify` | 02:30 UTC (09:30 VN) | đọc marker trực tiếp Postgres, FAIL → exit 1 | logs cron trên dashboard (A1 tự động hóa, Vòng 37.6) |
 | `probe-monitor` | mỗi phút | health/ready/web + flush | log JSON `verdict:OK/ALERT` |
 
 ## 7. Liên hệ leo thang

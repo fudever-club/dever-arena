@@ -588,3 +588,11 @@
 - **Roadmap khép:** Phase 38 (hậu kỳ + rating thật, 7–10/10) · Phase 39 (cứng hóa, 10–16/10) · Phase 40 (bàn giao v1.0 + tag + khép ~19/10) — ghi chi tiết `tasks/todo.md`.
 - Prod state: users:3 (dever_admin, dever_btc, ts_test) · Round #2 REGISTRATION + 4 bài + 59 testcases · 1 đăng ký (ts_test).
 - Gate: specific check xanh, 221/221 tests, detect 0, lint 0.
+
+## Vòng 37.7: Bug 12 — mất dữ liệu prod khi redeploy (flush kẹt + không SIGTERM flush) (30/9/2026)
+
+- **Phát hiện qua truy vấn Postgres trực tiếp sau báo cáo "prod vẫn lỗi":** DB quay ngược thời gian — `ts_test` bản sạch (u_236) + đăng ký Round #2 biến mất, bản mojibake (u_235) đã xóa sống lại; `seq`=236 vẫn tăng (RAM tiến, DB không).
+- **Root cause 1 — flushTables upsert-TRƯỚC-DELETE chết khi replace-by-unique:** xóa u_235 + tạo u_236 cùng username `ts_test` trong 1 chu kỳ flush → INSERT u_236 đụng unique `idx_users_username` của row u_235 chưa bị xóa (DELETE chạy sau) → `duplicate key` cả batch, lặp vô hạn (logs: 20+ lần `db_flush_failed`, /ready 503 DB_FLUSH_STALE). Ghi trong RAM chờ persist → **redeploy restart container = mất sạch batch** (không có handler SIGTERM). Health vẫn `ok:true` (KHÔNG stale) nếu flush thành công đúng 1 lần sau boot — blind spot của monitor.
+- **Fix:** (1) `flushTables` mirror DELETE chạy TRƯỚC upsert mỗi bảng; (2) `server/index.js` cài SIGTERM/SIGINT/uncaughtException → flush tường minh trước khi thoát (timeout cứng 5s); (3) regression test `[tables] replace-by-unique` khẳng định thứ tự DELETE < INSERT trong cùng batch.
+- **Verify trên prod (kịch bản từng giết dữ liệu giờ qua mới):** delete u_235 + recreate u_236 → flush OK (last_success cập nhật), DB giữ user sạch; đăng ký Round #2 → row xuất hiện trong bảng `participants` sau 1 chu kỳ flush; login UI trả đúng u_236.
+- Gate: **222/222 tests (+1)**, detect 0, lint 0; deploy `e5aec74` ACTIVE.
