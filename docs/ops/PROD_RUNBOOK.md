@@ -35,6 +35,13 @@ curl -s -X POST https://api-elegant-horse.spcf.app/api/v1/admin/restore-backup \
   --data-binary @backups/<file>.json
 # 3. Server tự reload mirror — không restart. Snapshot pre-restore tự đẩy S3 (luôn đảo ngược được).
 ```
+
+> ⚠️ **SAU MỌI RESTORE VỀ DUMP CŨ — XOAY LẠI MẬT KHẨU ADMIN NGAY** (bug 11, Vòng 37.4):
+> dump cũ chứa password hash cũ → restore làm mật khẩu hiện hành TRỞ VỀ CŨ (secret xoay bị hoàn nguyên).
+> Cách xử lý: chạy lại `node scripts/rotate_admin_password.mjs "<mật-khẩu-hiện-hành>"` (đổi sang secret file
+> đang có) HOẶC cập nhật `extra.password` của user admin trong dump về hash hiện hành trước khi restore.
+> Dấu hiệu nhận biết: script/tooling đột nhiên 401 sau khi restore.
+```
 - Dump JSON > ~2MB có thể bị proxy chặn 502 → restore theo phần (dùng `rebuild_r2_suite.mjs` cho testcases) hoặc dump nhỏ.
 - Drill định kỳ: hằng tháng chạy `node scripts/restore_drill.mjs backups/prod-dump-drill.json` (tự động 5 bước, an toàn prod).
 
