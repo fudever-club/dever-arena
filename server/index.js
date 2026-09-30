@@ -1314,9 +1314,12 @@ route('POST', '^/api/v1/admin/testcases$', async (req, res) => {
 }, { auth: true, admin: true });
 route('GET', '^/api/v1/admin/testcases$', async (req, res, url) => {
   const problem_id = url.searchParams.get('problem_id') || '';
+  // ?full=1: không cắt 2000 ký tự — tooling quản trị (dedup/verify) cần dữ liệu NGUYÊN VẸN;
+  // cap mặc định chỉ để xem (Vòng 37.2: cap làm dedup thất bại → nhân đôi testcase).
+  const full = url.searchParams.get('full') === '1';
   const rows = db.filter('testcases', (t) => !problem_id || t.problem_id === problem_id)
     .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
-    .map((t) => ({ ...t, stdin: String(t.stdin || '').slice(0, 2000), expected_stdout: String(t.expected_stdout || '').slice(0, 2000) }));
+    .map((t) => full ? t : { ...t, stdin: String(t.stdin || '').slice(0, 2000), expected_stdout: String(t.expected_stdout || '').slice(0, 2000) });
   send(res, 200, { testcases: rows });
 }, { auth: true, admin: true });
 route('DELETE', '^/api/v1/admin/testcases/([^/]+)$', async (req, res, url, m) => {
