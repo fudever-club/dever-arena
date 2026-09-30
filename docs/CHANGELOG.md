@@ -549,3 +549,12 @@
 - **Phase 39 sớm:** toolchain C++/Java VERIFIED trên prod thật (trước đây chỉ Python). `probe_toolchain.mjs` + `diag_toolchain.mjs` để kiểm tra định kỳ.
 - GET `admin/testcases?full=1` không cắt 2000 ký tự (tooling dedup/verify cần nguyên vẹn; mặc định vẫn cắt để xem).
 - Gate: **221/221 tests (+2)**, detect 0, lint 0, build sạch. Prod sau dọn: users:1, 1 contest REGISTRATION, 4 bài APPROVED, 59 testcases, 0 submissions, probe xanh.
+
+## Vòng 37.3: A5–A8 hoàn tất + bug 7–8 UI thật (30/9/2026)
+
+- **Bug 7 — Bài legacy ma:** `loadProblemsFromServer` merge "giữ nháp" giữ MỌI bài không có trên server → 5 bài demo bundle sống lại vô hạn sau khi admin dọn dữ liệu. Fix: chỉ giữ nháp đăng ký trong phiên (`nhapIds`); verified DOM prod sau deploy: bảng bài đúng 4 bài A–D.
+- **Bug 8 — Hero/timer/phase cứng Round #1:** ContestHub hero hardcode + timer fallback giả đếm ngược ảo; `changePhaseRemote` setPhase vào id kỳ đã xóa (thất bại âm thầm). Fix: `activeContest` chọn từ danh sách kỳ thi thật (CODING → REGISTRATION → FINISHED); hero tên thật + nhãn timer theo phase ("Bắt đầu sau"); link workspace tới bài đầu tiên.
+- **A7:** `docs/ops/PROD_RUNBOOK.md` 1 trang (Specific: restore đã kiểm chứng, flush fail, cron, live ops); `scripts/rotate_admin_password.mjs` xoay secret **tự kiểm chứng** (cũ → 401, mới → 200) — ĐÃ XOAY 30/9, credentials gitignored; `backups/` gitignored (dump chứa password hash, repo public).
+- **A8:** toolbar workspace 390px verified DOM thật (0 wrap/overflow) + banner "Ngoài giờ Coding (409 REGISTRATION)" trung thực.
+- **A5:** draft fanpage 2 đợt + checklist: `docs/marketing/round2-fanpage.md`.
+- Gate: 221/221 tests, detect 0, lint 0; probe xanh. Sprint 1b A1–A8: chỉ còn A1 verify cron 09:00 VN 1/10.
