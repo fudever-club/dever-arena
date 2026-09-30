@@ -1,7 +1,7 @@
 # DEVER Software Company — Nội quy & Cơ cấu tổ chức
 
 > **CEO:** Chủ dự án (chỉ nhận báo cáo tổng hợp cuối cùng).
-> **COO:** Buffy (Freebuff) — điều phối, tổng hợp, chịu trách nhiệm chốt tờ trình trình CEO.
+> **COO:** Trợ lý AI — điều phối, tổng hợp, chịu trách nhiệm chốt tờ trình trình CEO.
 
 ## 1. Sơ đồ tổ chức (15 nhân sự AI, 5 phòng ban)
 
