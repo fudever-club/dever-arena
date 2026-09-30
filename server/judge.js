@@ -93,16 +93,17 @@ function compileCached(lang, source, memoryLimit) {
   if (hit) return hit;
   const dir = mkdtempSync(join(tmpdir(), 'dever-judge-'));
   let compiled;
+  let prepared;
   if (lang === 'cpp') {
     const file = join(dir, 'solution.cpp');
     writeFileSync(file, source);
     compiled = compileCpp(dir, file);
     if (typeof compiled === 'string') { try { rmSync(dir, { recursive: true, force: true }); } catch {} return compiled; }
-    var prepared = { cmd: compiled.exe, args: [], dir };
+    prepared = { cmd: compiled.exe, args: [], dir };
   } else {
     compiled = compileJava(dir, source);
     if (typeof compiled === 'string') { try { rmSync(dir, { recursive: true, force: true }); } catch {} return compiled; }
-    var prepared = { cmd: 'java', args: ['-cp', compiled.useClasspath, compiled.exe], dir };
+    prepared = { cmd: 'java', args: ['-cp', compiled.useClasspath, compiled.exe], dir };
   }
   COMPILE_CACHE.set(key, prepared);
   if (COMPILE_CACHE.size > COMPILE_CACHE_MAX) {

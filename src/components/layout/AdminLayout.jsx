@@ -408,7 +408,8 @@ export const AdminLayout = ({ children }) => {
   const { user, isAdmin, logout } = useAuth();
   const { 
     phase, formattedTime, changePhaseRemote, frozen, toggleFrozen,
-    problems = [], addProblem, updateProblem, deleteProblem, resetProblems, loadProblemsFromServer 
+    problems = [], addProblem, updateProblem, deleteProblem, resetProblems, loadProblemsFromServer,
+    activeContest
   } = useContest();
   const navigate = useNavigate();
   // Task 119: người phụ trách kỳ thi trọng tâm (hiển thị chip "Organizer").
@@ -703,7 +704,7 @@ export const AdminLayout = ({ children }) => {
         <div className="p-3 bg-[#010102] border-b border-[#23252a] text-xs space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-slate-400">Vòng thi:</span>
-            <span className="font-semibold text-slate-200">{contestTitle || '—'}</span>
+            <span className="font-semibold text-slate-200">{activeContest?.title || '—'}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-slate-400">Pha:</span>

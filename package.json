@@ -4,7 +4,7 @@
   "description": "Nền tảng thi đấu giải thuật nội bộ chuẩn Codeforces của CLB FU-DEVER",
   "type": "module",
   "scripts": {
-    "postinstall": "node scripts/setup_git_hooks.mjs",
+    "postinstall": "node --input-type=module -e \"try { await import('./scripts/setup_git_hooks.mjs') } catch (e) { if (e.code !== 'ERR_MODULE_NOT_FOUND' && e.code !== 'MODULE_NOT_FOUND') throw e; console.log('[postinstall] Bo qua: khong co scripts/setup_git_hooks.mjs trong context build (container).') }\"",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
