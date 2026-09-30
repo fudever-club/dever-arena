@@ -4,7 +4,7 @@
   "description": "Nền tảng thi đấu giải thuật nội bộ chuẩn Codeforces của CLB FU-DEVER",
   "type": "module",
   "scripts": {
-    "postinstall": "git config commit.template .gitmessage && git config core.hooksPath .githooks",
+    "postinstall": "node scripts/setup_git_hooks.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
