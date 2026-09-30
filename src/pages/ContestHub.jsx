@@ -204,7 +204,7 @@ export const ContestHub = () => {
           <div>
             <div className="flex items-center gap-2 mb-3">
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-500/20 text-[#ff6600] border border-orange-500/30">
-                Div. 3 & Div. 4 Rated
+                {activeContest ? (activeContest.is_rated ? 'Rated Contest' : 'Unrated') : 'DEVER Arena'}
               </span>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
