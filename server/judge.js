@@ -12,8 +12,10 @@ import { join } from 'node:path';
 import { checkSecurity, compareOutputs } from '../src/engine/isolateRunner.js';
 
 const MAX_SOURCE = 100 * 1024; // 100KB
-const MAX_STDIN = 50 * 1024;   // 50KB
-const MAX_STDOUT = 50 * 1024;  // 50KB
+// Vòng 37.2: đề thật cần stdin lớn — n=2·10^5 giá trị 10 chữ số ≈ 2.2MB, n=10^6 ≈ 7.7MB.
+// Cap cũ 50KB khiến test lớn bị CE "Input too large" (bắt được khi soạn Round #2).
+const MAX_STDIN = 8 * 1024 * 1024;   // 8MB
+const MAX_STDOUT = 1024 * 1024;      // 1MB
 const MAX_COMPILE_ERR = 4000;  // Task 104: stderr compile đầy đủ hơn (trước chỉ 500 ký tự)
 
 // Task 104: MLE heuristic — JS/Python/Java throw message đặc trưng khi hết bộ nhớ.
@@ -107,7 +109,7 @@ export function executeOne({ language, source, stdin = '', timeLimitMs = 1000, m
   }
   if (!source || !source.trim()) return { verdict: 'CE', stdout: '', timeMs: 0, message: 'Compilation Error: Empty file' };
   if (source.length > MAX_SOURCE) return { verdict: 'CE', stdout: '', timeMs: 0, message: 'File too large (max 100KB)' };
-  if (stdin.length > MAX_STDIN) return { verdict: 'CE', stdout: '', timeMs: 0, message: 'Input too large (max 50KB)' };
+  if (stdin.length > MAX_STDIN) return { verdict: 'CE', stdout: '', timeMs: 0, message: `Input too large (max ${Math.round(MAX_STDIN / 1024 / 1024)}MB)` };
 
   const blocked = checkSecurity(source);
   if (blocked) return { verdict: 'CE', stdout: '', timeMs: 0, message: `Security Policy Violation: ${blocked}` };

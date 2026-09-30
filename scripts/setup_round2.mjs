@@ -241,21 +241,33 @@ async function api(method, path, body) {
 }
 const die = (msg) => { console.error(`[r2] FAIL: ${msg}`); process.exit(1); };
 
-/** Chạy verifier Python cục bộ: stdin qua file (LF chuẩn), đọc stdout chuẩn hóa LF. */
+/** Chạy verifier Python cục bộ: stdin qua pipe (LF chuẩn), đọc stdout chuẩn hóa LF. */
 function runVerifier(code, stdin, tlMs) {
   const dir = mkdtempSync(join(tmpdir(), 'dever-verify-'));
   const srcPath = join(dir, 'v.py');
-  const inPath = join(dir, 'in.txt');
   writeFileSync(srcPath, VERIFIER[code].replace(/\r\n/g, '\n'));
-  writeFileSync(inPath, stdin.replace(/\r\n/g, '\n'));
   try {
-    const out = execFileSync('python', [srcPath], { input: '', stdio: ['ignore', 'pipe', 'pipe'], timeout: Math.max(tlMs * 4, 8000) });
+    const out = execFileSync('python', [srcPath], {
+      input: stdin.replace(/\r\n/g, '\n'),
+      timeout: Math.max(tlMs * 4, 8000),
+      maxBuffer: 64 * 1024 * 1024,
+    });
     return out.toString().replace(/\r\n/g, '\n').trim();
   } catch (e) {
     return `__ERROR__:${e.status || ''} ${String(e.stderr || e.message).slice(0, 200)}`;
   } finally {
     try { rmSync(dir, { recursive: true, force: true }); } catch {}
   }
+}
+
+/** Sinh input cỡ lớn dạng `N` + dãy trong bounds (LCG deterministic — không phụ thuộc nền). */
+function genArrayInput(n, bounds) {
+  let s = (0x9e3779b9 ^ n) >>> 0;
+  const rnd = () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+  const lo = Math.max(bounds.minVal, -1000000000);
+  const hi = Math.min(bounds.maxVal, 1000000000);
+  const vals = Array.from({ length: n }, () => String(lo + Math.floor(rnd() * (hi - lo + 1))));
+  return `${n}\n${vals.join(' ')}\n`;
 }
 
 // ---- 0. login
@@ -306,9 +318,11 @@ for (const P of PROBLEMS) {
   }
 
   // ---- 3. stress model vs brute (luôn chạy — bằng chứng bài giải đúng)
+  // Stress trên cỡ NHỎ (maxN ≤ 2500) để brute O(n²) kịp — chuẩn Polygon; test cỡ lớn sinh riêng bằng model.
+  const stressRules = { ...P.bounds, maxN: Math.min(P.bounds.maxN, 2500) };
   const stress = await api('POST', '/api/v1/admin/stress', {
     language: 'python', model_source: P.model, brute_source: P.brute,
-    count: 12, seed: `round2-${P.code}`, timeLimitMs: 2500, rules: P.bounds,
+    count: 12, seed: `round2-${P.code}`, timeLimitMs: 2500, rules: stressRules,
   });
   if (stress.status !== 200) die(`stress ${P.code}: ${stress.status} ${JSON.stringify(stress.json).slice(0, 300)}`);
   const st = stress.json;
@@ -323,12 +337,21 @@ for (const P of PROBLEMS) {
     if (real.length) { console.error('[r2] mismatch THẬT:', JSON.stringify(real, null, 2)); die(`stress ${P.code} FAIL`); }
   }
 
-  // Suite local đầy đủ (sample + outputs stress trong ràng buộc) — dùng để verify, không qua HTTP.
-  const localSuite = [
-    { stdin: P.sampleInput, expected: P.sampleOutput.trim() },
-    ...(st.outputs || []).filter((t) => validateInput(t.stdin, P.bounds).isValid)
-      .map((t) => ({ stdin: t.stdin, expected: String(t.expected_stdout || '').replace(/\r\n/g, '\n').trim() })),
-  ];
+  // Suite local đầy đủ: sample + outputs stress trong ràng buộc + 2 test CỠ LỚN sinh bằng model.
+  // Model đã được brute kiểm chứng trên cỡ nhỏ; answer test lớn = output verifier (cùng họ thuật toán
+  // với model — rủi ro sót được ghi nhận, bù lại chặn tuyệt đối lỗi expected rỗng).
+  const inBounds = (s) => validateInput(s, P.bounds).isValid;
+  const stressTests = (st.outputs || []).filter((t) => inBounds(t.stdin))
+    .map((t) => ({ stdin: t.stdin, expected: String(t.expected_stdout || '').replace(/\r\n/g, '\n').trim() }));
+  const tlMs = (parseFloat(P.timeLimit) || 1.5) * 1000;
+  const nMax = P.bounds.maxN;
+  const genTests = [...new Set([Math.min(nMax, 250000), Math.min(nMax, 125000)])]
+    .map((n) => genArrayInput(n, P.bounds))
+    .filter(inBounds)
+    .map((stdin) => ({ stdin, expected: String(runVerifier(P.code, stdin, tlMs)).replace(/\r\n/g, '\n').trim() }));
+  const localSuite = [ { stdin: P.sampleInput, expected: P.sampleOutput.trim() }, ...stressTests, ...genTests ]
+    .filter((t) => t.expected !== '');
+  if (genTests.length) console.log(`[r2]   +${genTests.length} test lớn sinh bằng model (n=${genTests.map((t) => t.stdin.split('\n')[0]).join(', ')})`);
 
   if (DRY || !problem) continue;
 
@@ -347,7 +370,6 @@ for (const P of PROBLEMS) {
   console.log(`[r2] 4. testcases ${P.code}: +${added}, có sẵn ${skipped}, từ chối ${rejected} (tổng server sẽ dùng: ${serverTcs.length + added})`);
 
   // ---- 5. verify bằng dữ liệu LOCAL đầy đủ (python cục bộ, LF chuẩn)
-  const tlMs = (parseFloat(P.timeLimit) || 1.5) * 1000;
   let okCount = 0;
   const failures = [];
   for (const t of localSuite) {

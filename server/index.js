@@ -1261,8 +1261,18 @@ route('POST', '^/api/v1/admin/stress$', async (req, res, url, m, user) => {
         ? checkOutput(m.stdout || '', b.stdout || '', 'float_tolerance', { epsilon }).isCorrect
         : compareOutputs(m.stdout || '', b.stdout || '');
       if (ok) {
-        passed++;
-        outputs.push({ stdin: c.stdin, expected_stdout: b.stdout || '', strategy: c.strategy });
+        // Vòng 37.2: CE/TLE ở CẢ HAI bên không phải "khớp" — output rỗng của model chưa từng
+        // chạy đúng (stdin quá lớn với cap cũ) bị checker rỗng-rỗng coi là PASS. Chặn ở đây.
+        if (m.verdict === 'OK' && b.verdict === 'OK') {
+          passed++;
+          outputs.push({ stdin: c.stdin, expected_stdout: b.stdout || '', strategy: c.strategy });
+        } else {
+          if (mismatches.length < 5) mismatches.push({
+            stdin: c.stdin.slice(0, 2000), strategy: c.strategy,
+            model_verdict: m.verdict, brute_verdict: b.verdict,
+            model_stdout: (m.stdout || '').slice(0, 1000), brute_stdout: (b.stdout || '').slice(0, 1000),
+          });
+        }
       } else if (mismatches.length < 5) {
         mismatches.push({
           stdin: c.stdin.slice(0, 2000), strategy: c.strategy,
