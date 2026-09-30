@@ -140,21 +140,27 @@ export async function createPgStore(pool, opts = {}) {
   async function flushTables() {
     for (const col of COLLECTIONS) {
       const ids = [];
+      // Mirror DELETE chạy TRƯỚC upsert: hàng đã bị xóa khỏi memory có thể còn nằm trong
+      // DB và đang chiếm unique index (vd users.username) — nếu INSERT hàng thay thế
+      // (id mới, username cũ) chạy trước DELETE thì cả batch nổ duplicate và lặp vô hạn,
+      // mọi ghi trong RAM chờ persist bị treo (sự cố prod 30/9/2026: mất ts_test + đăng ký).
       for (const row of data[col]) {
         const id = String(row.id ?? JSON.stringify(row).slice(0, 64));
         ids.push(id);
+      }
+      if (ids.length > 0) {
+        await pool.query(`DELETE FROM ${col} WHERE NOT (id = ANY($1))`, [ids]);
+      } else {
+        await pool.query(`DELETE FROM ${col}`);
+      }
+      for (const row of data[col]) {
+        const id = String(row.id ?? JSON.stringify(row).slice(0, 64));
         const { names, vals, ph, setSql } = buildUpsert(col, { ...row, id });
         await pool.query(
           `INSERT INTO ${col} (${names.join(', ')}) VALUES (${ph})
            ON CONFLICT (id) DO UPDATE SET ${setSql}`,
           vals
         );
-      }
-      // Mirror DELETE — row xóa khỏi memory phải biến mất khỏi Postgres.
-      if (ids.length > 0) {
-        await pool.query(`DELETE FROM ${col} WHERE NOT (id = ANY($1))`, [ids]);
-      } else {
-        await pool.query(`DELETE FROM ${col}`);
       }
     }
   }

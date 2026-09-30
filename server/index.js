@@ -1486,6 +1486,30 @@ export function startServer(port = PORT) {
   return server;
 }
 
+// Bug 12 (prod 30/9/2026): platform gửi SIGTERM lúc redeploy — server chết ngay trong khi
+// ghi trong RAM chờ chu kỳ flush 5s → mất sạch batch cuối (ts_test + đăng ký Round #2).
+// Từ giờ: SIGTERM/SIGINT/uncaughtException → flush store tường minh rồi mới thoát.
+function installShutdownHandlers() {
+  let shuttingDown = false;
+  const graceful = (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(JSON.stringify({ ts: new Date().toISOString(), event: 'shutdown', signal }));
+    const hardExit = setTimeout(() => process.exit(0), 5000); // không bao giờ treo quá 5s
+    if (hardExit.unref) hardExit.unref();
+    Promise.resolve(db.stop?.())
+      .catch((e) => console.error('[shutdown] flush lỗi:', e?.message || e))
+      .finally(() => { clearTimeout(hardExit); process.exit(0); });
+  };
+  process.on('SIGTERM', () => graceful('SIGTERM'));
+  process.on('SIGINT', () => graceful('SIGINT'));
+  process.on('uncaughtException', (err) => {
+    console.error(JSON.stringify({ ts: new Date().toISOString(), event: 'uncaught_exception', error: String(err?.stack || err) }));
+    graceful('uncaughtException');
+  });
+}
+installShutdownHandlers();
+
 export { db, computeStandings, handle };
 export { judgeQueue, shutdownJudge } from './queue.js';
 

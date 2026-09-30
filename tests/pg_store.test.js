@@ -178,6 +178,28 @@ test('[tables] flush mirror DELETE per-table với danh sách id còn lại', as
   await store.stop();
 });
 
+test('[tables] replace-by-unique: xóa + tạo lại user cùng username trong 1 batch — DELETE phải chạy trước INSERT', async () => {
+  // Sự cố prod 30/9/2026 (bug 12): xóa u_235 rồi tạo u_236 (cùng username ts_test) trong
+  // 1 chu kỳ flush — batch cũ upsert-TRƯỚC-delete nên INSERT u_236 đụng unique
+  // idx_users_username của row u_235 chưa bị xóa → flush chết lặp vô hạn → mất sạch
+  // batch khi redeploy. Hợp đồng mới: mirror DELETE luôn chạy trước upsert.
+  const pool = fakePool();
+  const store = await createPgStore(pool, { flushMs: 60000 });
+  store.insert('users', { id: 'u_cu', username: 'ts_test', role: 'PARTICIPANT', rating: 1200 });
+  await store.flush();
+  store.data.users = store.data.users.filter((u) => u.id !== 'u_cu');
+  store.insert('users', { id: 'u_moi', username: 'ts_test', role: 'PARTICIPANT', rating: 1200 });
+  await store.flush();
+  const ops = pool.queries
+    .map((q, i) => ({ i, sql: q.sql }))
+    .filter(({ sql }) => sql.startsWith('DELETE FROM users') || sql.includes('INSERT INTO users'));
+  const lastDel = [...ops].reverse().find(({ sql }) => sql.startsWith('DELETE FROM users'));
+  const lastIns = [...ops].reverse().find(({ sql }) => sql.includes('INSERT INTO users'));
+  assert.ok(lastDel && lastIns, 'batch flush phải có cả DELETE + INSERT users');
+  assert.ok(lastDel.i < lastIns.i, `mirror DELETE users (idx ${lastDel.i}) phải chạy trước INSERT users (idx ${lastIns.i}) trong cùng batch`);
+  await store.stop();
+});
+
 test('[tables] cập nhật verdict bài nộp giữ nguyên id — upsert ghi đè đúng hàng', async () => {
   const pool = fakePool();
   const store = await createPgStore(pool, { flushMs: 60000 });
