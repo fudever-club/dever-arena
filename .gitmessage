@@ -1,0 +1,9 @@
+# <tóm tắt: động từ + đối tượng, ≤ 72 ký tự, tiếng Việt không dấu hoặc tiếng Anh>
+#
+# <thân bài: giải thích TẠI SAO (không phải cái gì) — mỗi dòng ≤ 72 ký tự. Tùy chọn.>
+#
+# Chuẩn repo DEVER Arena:
+#   - Dòng 1: tóm tắt, viết thường, không kết thúc bằng dấu chấm.
+#   - Footer bắt buộc "Author: qnhat" được hook tự thêm khi commit (không tự gõ).
+#   - Tham chiếu task/phase: Vòng NN hoặc Task NN (tasks/todo.md).
+#   - Xem thêm CONTRIBUTING.md mục 2 (gate: npm test, detect, lint:js, build).

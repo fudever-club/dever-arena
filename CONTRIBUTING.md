@@ -18,6 +18,11 @@ npm run build   # bundle sạch
 ```
 CI (`.github/workflows/ci.yml`) chạy detect + test + build + `lint:js` (0 errors) + `npm audit --audit-level=high`.
 
+## 2b. Chuẩn commit message
+- Dòng 1: tóm tắt (động từ + đối tượng, ≤ 72 ký tự), thân bài giải thích **tại sao**.
+- Footer bắt buộc `Author: qnhat` — **hook tự thêm** (`.githooks/commit-msg`, cài tự động qua `npm install` → postinstall). Không tự gõ.
+- Template khi `git commit`: `.gitmessage` (`git config commit.template`).
+
 ## 3. Quy ước chạm code
 - Core (`src/core/`, `src/engine/`): hàm thuần, không động DOM — mọi luật điểm/hack/Elo/AST phải có unit test.
 - Server (`server/`): route mới phải có test vòng đời trong `tests/server_api.test.js`; không log `source_code`/password.

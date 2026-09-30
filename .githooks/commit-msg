@@ -1,0 +1,22 @@
+#!/bin/sh
+# DEVER Arena — footer tác giả chuẩn repo (auto-append).
+# Thêm "Author: qnhat" vào cuối commit message nếu chưa có. Idempotent.
+
+FILE="$1"
+[ -f "$FILE" ] || exit 0
+
+if grep -qi "^Author: qnhat" "$FILE"; then
+  exit 0
+fi
+
+# Bỏ phần comment (#...) để đo độ dài thân message thật
+BODY_LEN=$(grep -v '^#' "$FILE" | grep -c . || true)
+
+# Dòng trống tách footer khỏi thân (nếu thân có nội dung)
+if [ "$BODY_LEN" -gt 0 ]; then
+  # đảm bảo cuối message (phần không comment) có đúng 1 dòng trống trước footer
+  printf "\nAuthor: qnhat\n" >> "$FILE"
+else
+  printf "Author: qnhat\n" >> "$FILE"
+fi
+exit 0
