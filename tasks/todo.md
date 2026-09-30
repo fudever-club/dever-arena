@@ -240,12 +240,12 @@
 
 ## Phase 37: Sprint 1b — Ra mắt Round #2 RATED (Planned, CEO duyệt 29/9/2026)
 > Quyết định CEO: (1) Round #2 **RATED** — kích hoạt Elo thật; (2) lịch thi **Tối T4 7/10/2026, 19:00–21:00 VN (12:00–14:00 UTC)**, 120 phút; (3) scope **trọn gói A1–A8**; hạn sprint 2/10.
-- [ ] A1: Verify cron backup lần chạy lịch 02:00 UTC 30/9 — dump lên S3, đối chiếu khớp prod bằng drill script (SRE-Backup).
-- [ ] A2: Reset trắng prod (reset-demo mode demo, giữ admin) — dọn dữ liệu test Round #1 trước khi soạn bài (SRE + PO-Contest).
+- [ ] A1: Verify cron backup lần chạy lịch 02:00 UTC 30/9 — dump lên S3, đối chiếu khớp prod bằng drill script (SRE-Backup). **PREP XONG 30/9:** backup_cron ghi marker `last_cron_backup_at` vào dever_meta; `node scripts/verify_cron_backup.mjs` (tuổi < 26h + đối chiếu counts) — chạy lúc 09:00 VN.
+- [x] A2: Reset trắng prod — reset-demo mode `all` 30/9 02:10 UTC: users:1 (dever_admin), 0 contests/problems/submissions; Round #1 lưu trong `backups/pre-reset-round1-*.json` + snapshot S3 restore-drill (SRE + PO-Contest).
 - [ ] A3: Soạn bộ bài Round #2 — 4 bài ICPC rating 800–1300, workflow DRAFT→IN_TESTING→APPROVED, stress test + testcases đầy đủ (PO-Contest + Eng-Judge).
 - [ ] A4: Mở kỳ Round #2 — contest is_rated=true, start 2026-10-07T12:00:00Z, 120 phút, REGISTRATION mở sớm; verify đăng ký hoạt động (PO-Contest).
 - [ ] A5: Bài đăng fanpage — nội dung + ảnh OG + link đăng ký, gửi duyệt trước 4/10 (PM + Design).
-- [ ] A6: Probe monitor — script cron 1 phút gọi /health + /ready, cảnh báo khi flush.stale / ready 503, hướng dẫn treo cron Specific (SRE-Lead).
+- [x] A6: Probe monitor — `scripts/probe_monitor.mjs` + cron Specific `probe-monitor` (* * * * *): /health + /ready + web, alert khi flush.stale / 503 / api xuống; probe xanh trên prod (SRE-Lead).
 - [ ] A7: Runbook sự cố 1 trang (docs/ops/) + lịch restore-drill hằng tháng + xoay secret admin (SRE-Backup + SRE-Security).
 - [ ] A8: Verify toolbar workspace nowrap ở viewport 390px (Eng-Frontend).
 
