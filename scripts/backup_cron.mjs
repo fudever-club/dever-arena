@@ -49,6 +49,14 @@ try {
   if (out === 'ok') {
     const collections = Object.keys(dump).map((c) => `${c}:${dump[c].length}`).join(', ');
     console.log(`[backup-cron] OK ${key} (mode=${mode}, ${(body.length / 1024).toFixed(1)} KB; ${collections})`);
+    // A1 (Sprint 1b): ghi dấu vết backup vào DB — verify_cron_backup.mjs đọc marker này
+    // để kiểm chứng cron đã chạy S3 thành công mà không cần đọc S3 trực tiếp.
+    const counts = Object.fromEntries(Object.entries(dump).map(([c, rows]) => [c, rows.length]));
+    await pool.query(
+      `INSERT INTO dever_meta (key, value) VALUES ('last_cron_backup_at', $1)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [JSON.stringify({ at: new Date().toISOString(), key, bytes: body.length, counts })]
+    );
   } else {
     console.error('[backup-cron] PUT object store thất bại.');
     process.exitCode = 1;

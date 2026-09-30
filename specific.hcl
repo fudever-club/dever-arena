@@ -63,6 +63,14 @@ cron "db-backup" {
   }
 }
 
+# A6 (Sprint 1b): probe monitor mỗi phút — health/ready/web + trạng thái flush DB.
+# Alert khi: api 503, /ready degraded (DB_FLUSH_STALE), flush.ok = false, web down.
+cron "probe-monitor" {
+  build    = build.api
+  command  = "node scripts/probe_monitor.mjs"
+  schedule = "* * * * *"
+}
+
 build "web" {
   base    = "node"
   command = "npm run build"
