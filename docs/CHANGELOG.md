@@ -578,3 +578,13 @@
 - **Vá kèm 2 lỗi lint chặn CI (hậu Vòng 37.2/37.4):** `judge.js` no-redeclare `prepared` (var trong if/else → let); AdminLayout ticker dùng `contestTitle` không tồn tại sau khi bỏ id cứng → `activeContest?.title`.
 - **Verify prod sau deploy `cce51e6` (ACTIVE):** tải toàn bộ 5 asset JS + app.html của web prod, quét 12 pattern → **0 hit**; probe xanh (health/ready/flush OK); Round #2 nguyên vẹn: REGISTRATION, rated, start 7/10 19:00 VN, 4 bài APPROVED.
 - Gate: 221/221 tests, detect 0, lint 0 errors, build sạch.
+
+## Vòng 37.6: Đẩy nhanh — A1 tự động hóa + multi-organizer + live ops (30/9/2026)
+
+- **A1 tự động hóa hoàn toàn:** cron `backup-verify` (02:30 UTC hằng ngày, 30' sau db-backup) chạy `scripts/backup_verify_cron.mjs` — đọc marker `last_cron_backup_at` TRỰC TIẾP Postgres (không cần mật khẩu admin, không gọi API); kiểm tra tuổi < 26h + counts không giảm; FAIL → exit 1 thấy ngay trong logs cron dashboard. Lần chạy đầu 02:30 UTC 1/10 (09:30 VN) — không cần ai chạy tay.
+- **Multi-organizer bước 1 (giảm key-person risk):** tạo `dever_btc` (ADMIN, backup admin BTC) trên prod — verify login 200; credentials trong secret file gitignored.
+- **Thí sinh test cho CEO:** `ts_test` (PARTICIPANT) — verify login 200 + **đã đăng ký Round #2** (11:50 UTC); xóa khi dùng xong.
+- **Live ops checklist:** `docs/ops/LIVE_OPS_ROUND2.md` — timeline 18:00–21:00+ VN ngày 7/10, xác nhận scheduler tự chuyển pha (không cần bấm), phương án freeze (⚠️ freeze ICPC chưa có — gap ghi nhận vào Phase 39), xử lý sự cố theo runbook.
+- **Roadmap khép:** Phase 38 (hậu kỳ + rating thật, 7–10/10) · Phase 39 (cứng hóa, 10–16/10) · Phase 40 (bàn giao v1.0 + tag + khép ~19/10) — ghi chi tiết `tasks/todo.md`.
+- Prod state: users:3 (dever_admin, dever_btc, ts_test) · Round #2 REGISTRATION + 4 bài + 59 testcases · 1 đăng ký (ts_test).
+- Gate: specific check xanh, 221/221 tests, detect 0, lint 0.

@@ -71,6 +71,18 @@ cron "probe-monitor" {
   schedule = "* * * * *"
 }
 
+# A1 tự động hóa (Vòng 37.6): verify marker backup 30' sau cron db-backup — đọc trực tiếp
+# Postgres (không cần mật khẩu admin). FAIL → exit 1 → thấy trong logs cron dashboard.
+cron "backup-verify" {
+  build    = build.api
+  command  = "node scripts/backup_verify_cron.mjs"
+  schedule = "30 2 * * *"
+
+  env = {
+    DEVER_DATABASE_URL = postgres.main.url
+  }
+}
+
 build "web" {
   base    = "node"
   command = "npm run build"

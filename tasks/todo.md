@@ -248,7 +248,23 @@
 - [x] A6: Probe monitor — `scripts/probe_monitor.mjs` + cron Specific `probe-monitor` (* * * * *): /health + /ready + web, alert khi flush.stale / 503 / api xuống; probe xanh trên prod (SRE-Lead).
 - [x] A7: Runbook prod 1 trang `docs/ops/PROD_RUNBOOK.md` (restore đã kiểm chứng, flush fail, cron, live ops 7/10) + **XOAY SECRET ADMIN 30/9** (`scripts/rotate_admin_password.mjs` tự kiểm chứng cũ-401/mới-200; credentials trong `dever-admin-credentials.secret` gitignored) + drill định kỳ hằng tháng + `backups/` gitignored (dump chứa hash, repo public).
 - [x] A8: Verify toolbar nowrap 390px — DOM thật trên prod: 0 wrap/overflow; kèm fix bug 7–8 (hero/timer/phase lấy từ kỳ thi thật, 5 bài legacy ma biến mất — verify DOM sau deploy).
-- [ ] A1: Verify cron backup 09:00 VN 1/10 (cron 30/9 chạy trước khi có marker → lần đầu verify được là 1/10).
+- [ ] A1: Verify cron backup 09:00 VN 1/10 — **TỰ ĐỘNG HÓA XONG (Vòng 37.6):** cron `backup-verify` (02:30 UTC hằng ngày) đọc marker trực tiếp Postgres, FAIL → exit 1 trong logs cron dashboard; không cần người chạy tay. 1/10 sáng chỉ cần check log PASS.
+
+## Phase 38: Hậu kỳ Round #2 + chứng minh rated thật (Planned, 7–10/10/2026)
+- [ ] Live ops 7/10 theo `docs/ops/LIVE_OPS_ROUND2.md` (timeline 15', freeze, xử lý sự cố) — scheduler tự chuyển pha, BTC giám sát.
+- [ ] Sau FINISHED: xác nhận RATING CHANGES lần đầu chạy thật (`GET /contests/dever-round-2/rating-changes`), podium/tổng kết, upsolve, đăng fanpage cảm ơn.
+- [ ] Retro 24h (8/10): số liệu thí sinh/submissions/verdict distribution; drill restore với dữ liệu thật (100+ submissions).
+
+## Phase 39: Cứng hóa + mở rộng (Planned, 10–16/10/2026)
+- [x] Multi-organizer bước 1: tài khoản backup admin BTC `dever_btc` (ADMIN) tạo trên prod 30/9 — credentials trong secret file (giảm key-person risk dever_admin).
+- [ ] Backup retention 30 ngày + drill khối lượng thật.
+- [ ] Anti-cheat AST diff chạy đại trà trên bài nộp thật.
+- [ ] Freeze standings ICPC (hiện chỉ CODEFORCES — gap ghi nhận trong LIVE_OPS_ROUND2.md).
+- [ ] Chu kỳ drill restore hằng tháng + probe toolchain định kỳ trước mỗi kỳ thi.
+
+## Phase 40: Bàn giao v1.0 + khép dự án (Planned, 17–19/10/2026)
+- [ ] Docs bàn giao v1.0: API spec chốt, runbook vận hành tổng, tài khoản BTC (không còn phụ thuộc cá nhân).
+- [ ] Tag v1.0 + retro dự án + khép (~19/10).
 
 ### Bổ sung Vòng 37.5 — Audit bundle + repair chuỗi deploy (30/9)
 - [x] Audit legacy/demo khỏi source: 12 pattern 18 hit → 0 (AuthContext GUEST-first + preset backend thật, StandingsPage bỏ 5 user ma, AdminLayout bỏ id kỳ cứng, ContestContext bỏ slug/id cứng, ProblemWorkspace bỏ fallback p102, Navbar/Landing/app.html hết chữ Round #1/Hack Room) — verified prod sau deploy: **0 hit trên 5 asset JS + app.html**.
@@ -262,5 +278,5 @@
 ### Giai đoạn C — Backlog sau Round #2 (PM ưu tiên)
 - [x] Verify chấm C++/Java trong container prod — probe prod: cpp AC 9.6s / java AC 16.1s (Vòng 37.2, sớm hơn kế hoạch).
 - [ ] Backup retention 30 ngày + drill khối lượng thật.
-- [ ] Multi-organizer thật: cấp tài khoản BTC CLB, bỏ phụ thuộc dever_admin (key-person risk).
+- [x] Multi-organizer thật: tài khoản backup admin BTC `dever_btc` (ADMIN) trên prod 30/9 — credentials secret file (bước 1; cấp thêm cho BTC khi có nhân sự).
 - [ ] Anti-cheat AST diff chạy đại trà trên bài nộp thật.
