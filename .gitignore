@@ -56,3 +56,7 @@ Thumbs.db
 !.vscode/settings.json
 .specific
 specific.local
+
+# Admin prod credentials (xoay định kỳ — KHÔNG commit)
+dever-admin-credentials.secret
+dever_token.tmp
