@@ -535,3 +535,17 @@
 - **A6 — Probe monitor mỗi phút:** `scripts/probe_monitor.mjs` + cron Specific `probe-monitor` (`* * * * *`, same build api): GET `/api/health` (flush.ok + !stale) + `/api/ready` (503 = DB_FLUSH_STALE) + web `/`; 1 dòng JSON `{"verdict":"OK|ALERT",...}`, exit 0/1. Probe xanh trên prod.
 - **A1 prep — Verify cron backup:** `backup_cron.mjs` ghi marker `last_cron_backup_at` ({at, key, bytes, counts per-bảng}) vào `dever_meta` sau khi PUT S3 thành công; script mới `scripts/verify_cron_backup.mjs` kiểm chứng tuổi < 26h + đối chiếu counts không được giảm — sẵn sàng chạy 09:00 VN 30/9 (lần chạy lịch đầu của cron backup).
 - Gate: 219/219 tests, detect 0, lint 0 errors; commit `efd20c4` deploy tự động.
+
+## Vòng 37.2: Sprint 1b tốc độ cao — Round #2 sẵn sàng + 6 bug engine thật (30/9/2026)
+
+- **A3+A4 — Round #2 RATED sẵn sàng trên prod:** contest `dever-round-2` (REGISTRATION, rated, start 12:00 UTC 7/10, 120'), 4 bài ICPC APPROVED: A TỔNG LỚN NHẤT (800), B ĐẾM SỐ CHẴN (900), C LIS (1100), D KADANE (1300); suite 14–15 test/bài (sample + stress + 2 test lớn n=125k–200k) — solver verify AC toàn bộ. Luồng đăng ký verify hoạt động. Script: `setup_round2.mjs` (setup trọn vòng) + `rebuild_r2_suite.mjs` (dựng lại suite sạch) + `round2_problems.mjs` (định nghĩa bài dùng chung).
+- **6 bug engine thật bắt được khi soạn đề thật (tất cả đã vá + test regression + deploy):**
+  1. Validator nổ stack input 200k token (`push(...lineTokens)` vượt giới hạn spread V8) → vòng for thường (+2 tests).
+  2. Judge chặn stdin > 50KB → CE "Input too large" với đề cỡ n=2·10^5 (≈2.2MB) → MAX_STDIN 8MB, MAX_STDOUT 1MB.
+  3. Stress coi CE/CE (output rỗng-rỗng) là "khớp" → pass ảo; chặn: cả hai bên phải verdict OK mới tính.
+  4. Compile C++ timeout 10s trên container lạnh (ETIMEDOUT probe prod) → 30s; javac 60s.
+  5. Java TLE ảo: TL đề định cho C++ nhưng JVM boot ~0.5–1s → `langTimeFactor` ×3 cho Java (submit + rejudge).
+  6. **Compile lại mỗi test** — judgeTests gọi executeOne N lần, C++/Java compile N lần/bài nộp → 504 (probe prod bắt được). Fix: cache binary theo hash source (LRU 32) — 1 compile cho cả suite; probe sau fix: **cpp AC 9.6s, java AC 16.1s trên prod**.
+- **Phase 39 sớm:** toolchain C++/Java VERIFIED trên prod thật (trước đây chỉ Python). `probe_toolchain.mjs` + `diag_toolchain.mjs` để kiểm tra định kỳ.
+- GET `admin/testcases?full=1` không cắt 2000 ký tự (tooling dedup/verify cần nguyên vẹn; mặc định vẫn cắt để xem).
+- Gate: **221/221 tests (+2)**, detect 0, lint 0, build sạch. Prod sau dọn: users:1, 1 contest REGISTRATION, 4 bài APPROVED, 59 testcases, 0 submissions, probe xanh.
